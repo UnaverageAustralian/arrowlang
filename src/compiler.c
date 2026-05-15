@@ -59,6 +59,7 @@ void print_op(Op *op) {
     case OP_LTEQ:  printf("LTEQ\n");  break;
     case OP_GT:    printf("GT\n");    break;
     case OP_GTEQ:  printf("GTEQ\n");  break;
+    case OP_LNOT:  printf("LNOT\n");  break;
     }
 }
 
@@ -243,6 +244,7 @@ void compile_stmt(Compiler *compiler) {
     case TOK_LTEQ:    DA_APPEND(&compiler->ops, make_op(compiler, OP_LTEQ, 0));               break;
     case TOK_GT:      DA_APPEND(&compiler->ops, make_op(compiler, OP_GT, 0));                 break;
     case TOK_GTEQ:    DA_APPEND(&compiler->ops, make_op(compiler, OP_GTEQ, 0));               break;
+    case TOK_LNOT:    DA_APPEND(&compiler->ops, make_op(compiler, OP_LNOT, 0));               break;
     case TOK_IF:
         compile_if_stmt(compiler);
         break;

@@ -21,7 +21,7 @@ typedef enum {
     OP_LT,    OP_LTEQ,
     OP_GT,    OP_GTEQ,
     OP_JMPF,  OP_JMP,
-    OP_LABEL,
+    OP_LABEL, OP_LNOT
 } Opcode;
 
 typedef enum {

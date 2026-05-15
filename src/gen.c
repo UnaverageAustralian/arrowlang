@@ -154,6 +154,13 @@ void generate_x86_64_linux(Ops *ops) {
             sb_appendf(&gen.sb, "    movzx rbx, bl\n");
             sb_appendf(&gen.sb, "    mov qword [rsp], rbx\n");
             break;
+        case OP_LNOT:
+            sb_appendf(&gen.sb, "    pop rax\n");
+            sb_appendf(&gen.sb, "    test rax, rax\n");
+            sb_appendf(&gen.sb, "    setz al\n");
+            sb_appendf(&gen.sb, "    movzx rax, al\n");
+            sb_appendf(&gen.sb, "    push rax\n");
+            break;
         case OP_JMPF:
             sb_appendf(&gen.sb, "    pop rax\n");
             sb_appendf(&gen.sb, "    test rax, rax\n");

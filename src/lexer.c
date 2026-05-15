@@ -429,6 +429,10 @@ void lexer_next(Lexer *lexer) {
         skip(lexer, 1);
         make_token(lexer, TOK_SWAP);
         break;
+    case '!':
+        skip(lexer, 1);
+        make_token(lexer, TOK_LNOT);
+        break;
     case '<':
         skip(lexer, 1);
         if (peek(lexer, 0) == '<' && peek(lexer, 1) == '<') {
@@ -503,6 +507,7 @@ char *tok_spelling(Token_Type type) {
     case TOK_LTEQ:      return "LTEQ";
     case TOK_GT:        return "GT";
     case TOK_GTEQ:      return "GTEQ";
+    case TOK_LNOT:      return "LNOT";
     case TOK_DUP:       return "DUP";
     case TOK_OVER:      return "OVER";
     case TOK_DUP2:      return "DUP2";
