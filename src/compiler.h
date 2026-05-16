@@ -21,7 +21,8 @@ typedef enum {
     OP_LT,    OP_LTEQ,
     OP_GT,    OP_GTEQ,
     OP_JMPF,  OP_JMP,
-    OP_LABEL, OP_LNOT
+    OP_LABEL, OP_LNOT,
+    OP_FUNC,  OP_RET,
 } Opcode;
 
 typedef enum {
@@ -47,7 +48,20 @@ typedef struct {
 } Backpatchee;
 
 typedef struct {
+    const char *name_start;
+    size_t name_len;
+    int arity, ret_arity;
+} Function;
+
+typedef struct {
+    size_t count;
+    size_t capacity;
+    Function *items;
+} Functions;
+
+typedef struct {
     Ops ops;
+    Functions functions;
     Lexer *lexer;
     Backpatchee backpatchees[MAX_BACKPATCHEES];
     int backpatchees_count;

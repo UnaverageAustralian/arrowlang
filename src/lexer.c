@@ -365,10 +365,6 @@ void lexer_next(Lexer *lexer) {
         skip(lexer, 1);
         make_token(lexer, TOK_ADD);
         break;
-    case '-':
-        skip(lexer, 1);
-        make_token(lexer, TOK_SUB);
-        break;
     case '*':
         skip(lexer, 1);
         make_token(lexer, TOK_MUL);
@@ -432,6 +428,28 @@ void lexer_next(Lexer *lexer) {
     case '!':
         skip(lexer, 1);
         make_token(lexer, TOK_LNOT);
+        break;
+    case '$':
+        skip(lexer, 1);
+        make_token(lexer, TOK_FUNC);
+        break;
+    case '(':
+        skip(lexer, 1);
+        make_token(lexer, TOK_LPAREN);
+        break;
+    case ')':
+        skip(lexer, 1);
+        make_token(lexer, TOK_RPAREN);
+        break;
+    case '-':
+        skip(lexer, 1);
+        if (peek(lexer, 0) == '>') {
+            skip(lexer, 1);
+            make_token(lexer, TOK_ARROW);
+        }
+        else {
+            make_token(lexer, TOK_SUB);
+        }
         break;
     case '<':
         skip(lexer, 1);
@@ -527,6 +545,10 @@ char *tok_spelling(Token_Type type) {
     case TOK_BRK:       return "BRK";
     case TOK_CONTINUE:  return "CONTINUE";
     case TOK_SEMICOLON: return "SEMICOLON";
+    case TOK_FUNC:      return "FUNC";
+    case TOK_LPAREN:    return "LPAREN";
+    case TOK_RPAREN:    return "RPAREN";
+    case TOK_ARROW:     return "ARROW";
     case TOK_INT_LIT:   return "INT_LIT";
     case TOK_FLOAT_LIT: return "FLOAT_LIT";
     case TOK_WORD:      return "WORD";

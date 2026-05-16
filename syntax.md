@@ -97,3 +97,13 @@ To break out of a loop use `brk`, and to immediately go to the next iteration, u
  end
 ```
 
+## Functions
+
+Functions are declared with the symbol `$` and end with the same symbol. And they must have declared stack effects as well.
+
+```
+ $floor10 ( a -> a )
+     dup 10 mod -
+ $
+```
+

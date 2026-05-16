@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "gen.h"
+#include "compiler.h"
 #include "utils.h"
 
 void init_generator(Generator *gen, Ops *ops) {
@@ -16,6 +17,12 @@ void generate_x86_64_linux(Ops *ops) {
 
     sb_appendf(&gen.sb, "global _start\n");
     sb_appendf(&gen.sb, "_start:\n");
+    sb_appendf(&gen.sb, "    call main\n");
+    sb_appendf(&gen.sb, "    mov rdi, [rax]\n");
+    sb_appendf(&gen.sb, "    mov rax, 60\n");
+    sb_appendf(&gen.sb, "    syscall\n");
+
+    Function *func = NULL;
 
     for (size_t i = 0; i < ops->count; i++) {
         Op *op = &ops->items[i];
@@ -172,6 +179,24 @@ void generate_x86_64_linux(Ops *ops) {
         case OP_LABEL:
             sb_appendf(&gen.sb, ".L%lld:\n", op->operand);
             break;
+        case OP_FUNC: {
+            func = (Function *)op->operand;
+            sb_appendf(&gen.sb, "%.*s:\n", func->name_len, func->name_start);
+            sb_appendf(&gen.sb, "    push rbp\n");
+            sb_appendf(&gen.sb, "    mov rbp, rsp\n");
+
+            size_t offs = 16;
+            for (int j = 0; j < func->arity; j++, offs += 8)
+                sb_appendf(&gen.sb, "    push qword [rbp+%zu]\n", offs);
+            break;
+        }
+        case OP_RET: {
+            sb_appendf(&gen.sb, "    mov rax, rsp\n");
+            sb_appendf(&gen.sb, "    mov rsp, rbp\n");
+            sb_appendf(&gen.sb, "    pop rbp\n");
+            sb_appendf(&gen.sb, "    ret %zu\n", func->arity*8);
+            break;
+        }
         default:
             eprintf(op->file_path, op->line, op->pos, LEVEL_ERR, "Unimplemented instruction: ");
             print_op(op);
@@ -179,10 +204,6 @@ void generate_x86_64_linux(Ops *ops) {
             break;
         }
     }
-
-    sb_appendf(&gen.sb, "    pop rdi\n");
-    sb_appendf(&gen.sb, "    mov rax, 60\n");
-    sb_appendf(&gen.sb, "    syscall\n");
 
     if (gen.had_error) {
         free(gen.sb.items);
