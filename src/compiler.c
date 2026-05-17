@@ -358,6 +358,30 @@ void compile_function(Compiler *compiler) {
 void compile_functions(Compiler *compiler) {
     while (compiler->lexer->cur.type == TOK_FUNC)
         compile_function(compiler);
+
+    if (compiler->functions.entries != NULL && hashmap_get(&compiler->functions, "main", 4)->key) {
+        if (compiler->lexer->cur.type != TOK_EOF) {
+            compiler->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "Extra tokens at end of file\n");
+        }
+        return;
+    }
+
+    Function *main = arena_calloc(&compiler->arena, sizeof(Function));
+    main->arity = 0;
+    main->ret_arity = 1;
+
+    Hash_Entry *entry = hashmap_add(&compiler->functions, "main", 4, main);
+
+    make_op(compiler, OP_FUNC, (int64_t)entry);
+    while (compiler->lexer->cur.type != TOK_FUNC && compiler->lexer->cur.type != TOK_EOF)
+        compile_stmt(compiler);
+
+    if (compiler->lexer->cur.type == TOK_FUNC) {
+        compiler->had_error++;
+        COMPILER_EPRINTF(LEVEL_ERR, "No extra functions can be defined after an implicit main yet\n");
+    }
+    make_op(compiler, OP_RET, 0);
 }
 
 void compile(const char *src, const char *file_path) {
