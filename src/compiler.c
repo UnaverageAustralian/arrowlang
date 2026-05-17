@@ -213,13 +213,7 @@ void compile_loop_stmt(Compiler *compiler) {
     compiler->is_in_loop = 0;
 }
 
-inline int is_invalid_tok_type(Token_Type type) {
-    return type == TOK_EOF || type == TOK_ELSE || type == TOK_SEMICOLON
-        || type == TOK_END || type == TOK_RBRACE;
-}
-
 void compile_stmt(Compiler *compiler) {
-    assert(!is_invalid_tok_type(compiler->lexer->cur.type));
     lexer_next(compiler->lexer);
 
     Token *tok = &compiler->lexer->prev;
@@ -301,6 +295,17 @@ void compile_stmt(Compiler *compiler) {
         compiler->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "%.*s\n", tok->len, tok->start);
         break;
+    case TOK_ELSE:
+    case TOK_SEMICOLON:
+    case TOK_END:
+    case TOK_RBRACE:
+        compiler->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Lone %s\n", tok_spelling(tok->type));
+        break;
+    case TOK_FUNC:
+    case TOK_EOF:
+        eprintf(__FILE__, __LINE__, 0, LEVEL_ERR, "Invalid token %s reached in compile_stmt\n", tok_spelling(tok->type));
+        exit(1);
     default:
         compiler->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Unimplemented operation starting with token %s\n", tok_spelling(tok->type));
