@@ -34,8 +34,32 @@ typedef struct {
     char *items;
 } String_Builder;
 
-void eprintf(const char *file_path, int line, int pos, Level level, const char *format, ...);
+typedef struct {
+    const char *key;
+    size_t key_len;
+    void *val;
+} Hash_Entry;
 
+typedef struct {
+    size_t count;
+    size_t capacity;
+    Hash_Entry *entries;
+} Hashmap;
+
+typedef struct {
+    size_t allocated;
+    size_t capacity;
+    void *block;
+} Arena;
+
+void eprintf(const char *file_path, int line, int pos, Level level, const char *format, ...);
 void sb_appendf(String_Builder *sb, const char *format, ...);
+
+Hash_Entry *hashmap_add(Hashmap *map, const char *key, size_t key_len, void *val);
+Hash_Entry *hashmap_get(Hashmap *map, const char *key, size_t key_len);
+
+void init_arena(Arena *arena, size_t size);
+void *arena_calloc(Arena *arena, size_t num_bytes);
+void free_arena(Arena *arena);
 
 #endif // ARROW_UTILS_H

@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -12,6 +13,7 @@
 void init_compiler(Compiler *compiler, Lexer *lexer) {
     *compiler = (Compiler){0};
     compiler->lexer = lexer;
+    init_arena(&compiler->arena, 1024 * 1024);
 }
 
 void print_op(Op *op) {
@@ -28,9 +30,16 @@ void print_op(Op *op) {
     case OP_LABEL:
         printf("LABEL %lld\n", op->operand);
         break;
-    case OP_FUNC:
-        printf("FUNC %lld\n", op->operand);
+    case OP_FUNC: {
+        Hash_Entry *entry = (Hash_Entry *)op->operand;
+        printf("FUNC %.*s\n", entry->key_len, entry->key);
         break;
+    }
+    case OP_CALL: {
+        Hash_Entry *entry = (Hash_Entry *)op->operand;
+        printf("CALL %.*s\n", entry->key_len, entry->key);
+        break;
+    }
     case OP_ADD:   printf("ADD\n");   break;
     case OP_SUB:   printf("SUB\n");   break;
     case OP_MUL:   printf("MUL\n");   break;
@@ -278,6 +287,16 @@ void compile_stmt(Compiler *compiler) {
         };
         make_op(compiler, OP_JMP, -1);
         break;
+    case TOK_WORD: {
+        Hash_Entry *entry = hashmap_get(&compiler->functions, tok->start, tok->len);
+        if (!entry->key) {
+            compiler->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "Unknown function \'%.*s\'\n", tok->len, tok->start);
+            break;
+        }
+        make_op(compiler, OP_CALL, (int64_t)entry);
+        break;
+    }
     case TOK_ERROR:
         compiler->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "%.*s\n", tok->len, tok->start);
@@ -293,17 +312,19 @@ void compile_function(Compiler *compiler) {
     lexer_next(compiler->lexer);
     expect(compiler, TOK_WORD);
 
-    Function func = {
-        .name_start = compiler->lexer->prev.start,
-        .name_len = compiler->lexer->prev.len,
-        .arity = 0,
-        .ret_arity = 0,
-    };
+    Function *func = arena_calloc(&compiler->arena, sizeof(Function));
+
+    Hash_Entry *entry = hashmap_add(&compiler->functions, compiler->lexer->prev.start, compiler->lexer->prev.len, func);
+    if (!entry) {
+        compiler->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Redefinition of a function\n");
+    }
+    make_op(compiler, OP_FUNC, (int64_t)entry);
 
     expect(compiler, TOK_LPAREN);
     while (compiler->lexer->cur.type != TOK_ARROW && compiler->lexer->cur.type != TOK_RPAREN && compiler->lexer->cur.type != TOK_EOF) {
         expect(compiler, TOK_WORD);
-        func.arity++;
+        func->arity++;
     }
 
     expect(compiler, TOK_ARROW);
@@ -311,14 +332,11 @@ void compile_function(Compiler *compiler) {
 
     while (compiler->lexer->cur.type != TOK_RPAREN && compiler->lexer->cur.type != TOK_EOF) {
         expect(compiler, TOK_WORD);
-        func.ret_arity++;
+        func->ret_arity++;
     }
 
     expect(compiler, TOK_RPAREN);
     if (compiler->lexer->prev.type == TOK_EOF) return;
-
-    DA_APPEND(&compiler->functions, func);
-    make_op(compiler, OP_FUNC, (int64_t)(compiler->functions.items + compiler->functions.count-1));
 
     while (compiler->lexer->cur.type != TOK_FUNC && compiler->lexer->cur.type != TOK_EOF)
         compile_stmt(compiler);
@@ -356,6 +374,7 @@ void compile(const char *src, const char *file_path) {
     }
 
     free(compiler.ops.items);
-    free(compiler.functions.items);
+    free(compiler.functions.entries);
+    free_arena(&compiler.arena);
 }
 

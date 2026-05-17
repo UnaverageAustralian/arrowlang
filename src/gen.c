@@ -22,7 +22,7 @@ void generate_x86_64_linux(Ops *ops) {
     sb_appendf(&gen.sb, "    mov rax, 60\n");
     sb_appendf(&gen.sb, "    syscall\n");
 
-    Function *func = NULL;
+    Hash_Entry *func_entry = NULL;
 
     for (size_t i = 0; i < ops->count; i++) {
         Op *op = &ops->items[i];
@@ -180,13 +180,13 @@ void generate_x86_64_linux(Ops *ops) {
             sb_appendf(&gen.sb, ".L%lld:\n", op->operand);
             break;
         case OP_FUNC: {
-            func = (Function *)op->operand;
-            sb_appendf(&gen.sb, "%.*s:\n", func->name_len, func->name_start);
+            func_entry = (Hash_Entry *)op->operand;
+            sb_appendf(&gen.sb, "%.*s:\n", func_entry->key_len, func_entry->key);
             sb_appendf(&gen.sb, "    push rbp\n");
             sb_appendf(&gen.sb, "    mov rbp, rsp\n");
 
-            size_t offs = 16;
-            for (int j = 0; j < func->arity; j++, offs += 8)
+            Function *func = (Function *)func_entry->val;
+            for (size_t offs = (func->arity-1)*8 + 16; offs >= 16; offs -= 8)
                 sb_appendf(&gen.sb, "    push qword [rbp+%zu]\n", offs);
             break;
         }
@@ -194,7 +194,18 @@ void generate_x86_64_linux(Ops *ops) {
             sb_appendf(&gen.sb, "    mov rax, rsp\n");
             sb_appendf(&gen.sb, "    mov rsp, rbp\n");
             sb_appendf(&gen.sb, "    pop rbp\n");
+
+            Function *func = (Function *)func_entry->val;
             sb_appendf(&gen.sb, "    ret %zu\n", func->arity*8);
+            break;
+        }
+        case OP_CALL: {
+            Hash_Entry *entry = (Hash_Entry *)op->operand;
+            sb_appendf(&gen.sb, "    call %.*s\n", entry->key_len, entry->key);
+
+            Function *func = (Function *)entry->val;
+            for (int64_t offs = (func->ret_arity-1)*8; offs >= 0; offs -= 8)
+                sb_appendf(&gen.sb, "    push qword [rax+%zu]\n", offs);
             break;
         }
         default:

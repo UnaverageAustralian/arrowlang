@@ -2,6 +2,7 @@
 #define ARROW_COMPILER_H
 
 #include "lexer.h"
+#include "utils.h"
 
 #define MAX_BACKPATCHEES 512
 
@@ -23,6 +24,7 @@ typedef enum {
     OP_JMPF,  OP_JMP,
     OP_LABEL, OP_LNOT,
     OP_FUNC,  OP_RET,
+    OP_CALL,
 } Opcode;
 
 typedef enum {
@@ -48,20 +50,13 @@ typedef struct {
 } Backpatchee;
 
 typedef struct {
-    const char *name_start;
-    size_t name_len;
     int arity, ret_arity;
 } Function;
 
 typedef struct {
-    size_t count;
-    size_t capacity;
-    Function *items;
-} Functions;
-
-typedef struct {
     Ops ops;
-    Functions functions;
+    Arena arena;
+    Hashmap functions;
     Lexer *lexer;
     Backpatchee backpatchees[MAX_BACKPATCHEES];
     int backpatchees_count;

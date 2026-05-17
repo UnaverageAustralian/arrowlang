@@ -1,7 +1,9 @@
 #include <assert.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 
 #include "utils.h"
 
@@ -43,5 +45,81 @@ void sb_appendf(String_Builder *sb, const char *format, ...) {
     va_end(args);
 
     sb->count += len;
+}
+
+static uint64_t hash_str(const char *key, size_t key_len) {
+    uint64_t hash = 0xCBF29CE484222325;
+    for (size_t i = 0; i < key_len; i++) {
+        hash ^= key[i];
+        hash *= 0x100000001B3;
+    }
+    return hash;
+}
+
+Hash_Entry *hashmap_get(Hashmap *map, const char *key, size_t key_len) {
+    assert(map->entries != NULL);
+    uint64_t index = hash_str(key, key_len) & (map->capacity-1);
+
+    for (size_t i = 0; i < map->capacity; i++) {
+        Hash_Entry *entry = &map->entries[(index + i) & (map->capacity-1)];
+        if ((entry->key_len == key_len && strncmp(entry->key, key, key_len) == 0) || entry->key == NULL)
+            return entry;
+    }
+    return NULL;
+}
+
+static void expand_hashmap(Hashmap *map) {
+    Hashmap new = {0};
+    new.capacity = map->capacity == 0 ? 16 : map->capacity*2;
+    new.entries = calloc(new.capacity, sizeof(Hash_Entry));
+
+    for (size_t i = 0; i < map->capacity; i++) {
+        Hash_Entry *entry = &map->entries[i];
+        if (entry->key != NULL)
+            hashmap_add(&new, entry->key, entry->key_len, entry->val);
+    }
+    free(map->entries);
+    *map = new;
+}
+
+Hash_Entry *hashmap_add(Hashmap *map, const char *key, size_t key_len, void *val) {
+    if (map->count >= map->capacity/2)
+        expand_hashmap(map);
+
+    if (hashmap_get(map, key, key_len)->key) return NULL;
+
+    uint64_t index = hash_str(key, key_len) & (map->capacity-1);
+    while (map->entries[index].key != NULL) {
+        index++;
+        index &= map->capacity-1;
+    }
+
+    map->entries[index] = (Hash_Entry){ .key = key, .key_len = key_len, .val = val };
+    map->count++;
+    return &map->entries[index];
+}
+
+void init_arena(Arena *arena, size_t size) {
+    arena->capacity = size;
+    arena->allocated = 0;
+    arena->block = malloc(size);
+    assert(arena->block != NULL);
+}
+
+void *arena_calloc(Arena *arena, size_t num_bytes) {
+    if (arena->allocated + num_bytes >= arena->capacity) {
+        fprintf(stderr, "\x1b[31mERROR\x1b[0m: The compiler has run out of memory\n");
+        exit(1);
+    }
+    memset((uint8_t *)arena->block + arena->allocated, 0, num_bytes);
+    void *ptr = (uint8_t *)arena->block + arena->allocated;
+    arena->allocated += num_bytes;
+    return ptr;
+}
+
+void free_arena(Arena *arena) {
+    arena->allocated = 0;
+    arena->capacity = 0;
+    free(arena->block);
 }
 
