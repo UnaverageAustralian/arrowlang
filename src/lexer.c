@@ -204,9 +204,10 @@ void lex_hex(Lexer *lexer) {
     }
 
     if (c == 'p' || c == 'P') {
-        real = 1;
-        if (!parse_exponent(lexer, 16, &float_num))
+        if (!parse_exponent(lexer, 16, &float_num) && !real)
             real = 0;
+        else
+            real = 1;
     }
 
     if (!real && overflowed)
@@ -250,9 +251,10 @@ void lex_decimal(Lexer *lexer) {
     }
 
     if (c == 'e' || c == 'E') {
-        real = 1;
-        if (!parse_exponent(lexer, 10, &float_num))
+        if (!parse_exponent(lexer, 10, &float_num) && !real)
             real = 0;
+        else
+            real = 1;
     }
 
     if (!real && overflowed)
