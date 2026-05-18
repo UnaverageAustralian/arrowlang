@@ -117,7 +117,7 @@ void compile_if_stmt(Compiler *compiler) {
     make_op(compiler, OP_JMPF, 0);
 
     Token *cur = &compiler->lexer->cur;
-    while (cur->type != TOK_SEMICOLON && cur->type != TOK_ELSE && cur->type != TOK_EOF)
+    while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_ELSE && cur->type != TOK_EOF)
         compile_stmt(compiler);
     compiler->ops.items[if_start].operand = compiler->label_count;
 
@@ -128,7 +128,7 @@ void compile_if_stmt(Compiler *compiler) {
         make_op(compiler, OP_JMP, 0);
         make_op(compiler, OP_LABEL, compiler->label_count++);
 
-        while (cur->type != TOK_SEMICOLON && cur->type != TOK_EOF)
+        while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_EOF)
             compile_stmt(compiler);
         compiler->ops.items[else_start].operand = compiler->label_count;
     }

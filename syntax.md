@@ -58,7 +58,7 @@ There is also a `neg` operation, which negates the top value on the stack.
 
 ## Conditionals
 
-If statements are declared with either the word `if`, or the symbol `?`, and are ended with the symbol `;`. Else is either the word `else`, or the symbol `:`.
+If statements are declared with either the word `if` or the symbol `?`, and are ended with the word `end` or the symbol `;`. Else is either the word `else` or the symbol `:`.
 
 Arrowlang's comparison operators are: `<`/`lt`, `<=`/`lteq`, `>`/`gt`, `>=`/`gteq`, `=`/`eq`, and `!` (logical not).
 
