@@ -84,14 +84,13 @@ inline void make_err_token(Lexer *lexer, char *msg) {
     lexer->cur.len = strlen(msg);
 }
 
-void parse_exponent(Lexer *lexer, int base, double *num) {
+int parse_exponent(Lexer *lexer, int base, double *num) {
     double sign = 1, exp = 0;
 
     char c = skip(lexer, 1);
     if ((c < '0' || c > '9') && c != '-' && c != '+') {
         skip(lexer, -1);
-        make_token(lexer, TOK_INT_LIT);
-        return;
+        return 0;
     }
 
     if (c == '-') {
@@ -104,8 +103,7 @@ void parse_exponent(Lexer *lexer, int base, double *num) {
 
     if (c < '0' || c > '9') {
         skip(lexer, -2);
-        make_token(lexer, TOK_INT_LIT);
-        return;
+        return 0;
     }
 
     while (c >= '0' && c <= '9') {
@@ -113,6 +111,7 @@ void parse_exponent(Lexer *lexer, int base, double *num) {
         c = skip(lexer, 1);
     }
     *num *= base == 10 ? pow(10, exp * sign) : pow(2, exp * sign);
+    return 1;
 }
 
 void lex_binary(Lexer *lexer) {
@@ -135,7 +134,7 @@ void lex_binary(Lexer *lexer) {
     }
 
     if (had_error)
-        make_err_token(lexer, "Number is too large for 64 bits.\n");
+        make_err_token(lexer, "Number is too large for 64 bits.");
     else
         make_token(lexer, TOK_INT_LIT);
 
@@ -162,7 +161,7 @@ void lex_octal(Lexer *lexer) {
     }
 
     if (had_error)
-        make_err_token(lexer, "Number is too large for 64 bits.\n");
+        make_err_token(lexer, "Number is too large for 64 bits.");
     else
         make_token(lexer, TOK_INT_LIT);
 
@@ -170,8 +169,10 @@ void lex_octal(Lexer *lexer) {
 }
 
 void lex_hex(Lexer *lexer) {
-    double num = 0;
+    int64_t num = 0;
+    double float_num = 0;
     int real = 0;
+    uint8_t overflowed = 0;
 
     char c = peek(lexer, 0);
     if (!is_hex(c)) {
@@ -182,7 +183,10 @@ void lex_hex(Lexer *lexer) {
     }
 
     while (is_hex(c)) {
-        num = num * 16 + (c > 'F' ? c - 'a' : c > '9' ? c - 'A' : c - '0');
+        if (num > (INT64_MAX >> 4))
+            overflowed += 1;
+        num = num * 16 + (c > 'F' ? c - 'a' + 10 : c > '9' ? c - 'A' + 10 : c - '0');
+        float_num = float_num * 16 + (c > 'F' ? c - 'a' : c > '9' ? c - 'A' : c - '0');
         c = skip(lexer, 1);
     }
 
@@ -196,32 +200,39 @@ void lex_hex(Lexer *lexer) {
             dividend = dividend * 16 + (c > 'F' ? c - 'a' : c > '9' ? c - 'A' : c - '0');
             c = skip(lexer, 1);
         }
-        num += dividend/divisor;
+        float_num += dividend/divisor;
     }
 
     if (c == 'p' || c == 'P') {
         real = 1;
-        parse_exponent(lexer, 16, &num);
+        if (!parse_exponent(lexer, 16, &float_num))
+            real = 0;
     }
 
-    if (!real && num > INT64_MAX)
-        make_err_token(lexer, "Number is too large for 64 bits.\n");
+    if (!real && overflowed)
+        make_err_token(lexer, "Number is too large for 64 bits.");
     else
         make_token(lexer, real ? TOK_FLOAT_LIT : TOK_INT_LIT);
 
     if (real)
-        lexer->cur.as.real = num;
+        lexer->cur.as.real = float_num;
     else
-        lexer->cur.as.integer = (int64_t)num;
+        lexer->cur.as.integer = num;
 }
 
 void lex_decimal(Lexer *lexer) {
-    double num = 0;
+    int64_t num = 0;
+    double float_num = 0;
     int real = 0;
+    uint8_t overflowed = 0;
 
     char c = peek(lexer, 0);
     while (c >= '0' && c <= '9') {
-        num = num * 10 + (c - '0');
+        int64_t result = num * 10 + (c - '0');
+        if ((num * 10) / 10 != num || result < num)
+            overflowed = 1;
+        num = result;
+        float_num = float_num * 10 + (c - '0');
         c = skip(lexer, 1);
     }
 
@@ -235,23 +246,24 @@ void lex_decimal(Lexer *lexer) {
             dividend = dividend * 10 + (c - '0');
             c = skip(lexer, 1);
         }
-        num += dividend/divisor;
+        float_num += dividend/divisor;
     }
 
     if (c == 'e' || c == 'E') {
         real = 1;
-        parse_exponent(lexer, 10, &num);
+        if (!parse_exponent(lexer, 10, &float_num))
+            real = 0;
     }
 
-    if (!real && num > INT64_MAX)
+    if (!real && overflowed)
         make_err_token(lexer, "Number is too large for 64 bits.");
     else
         make_token(lexer, real ? TOK_FLOAT_LIT : TOK_INT_LIT);
 
     if (real)
-        lexer->cur.as.real = num;
+        lexer->cur.as.real = float_num;
     else
-        lexer->cur.as.integer = (int64_t)num;
+        lexer->cur.as.integer = num;
 }
 
 void lex_number(Lexer *lexer) {
