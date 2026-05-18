@@ -4,7 +4,7 @@
 #include "lexer.h"
 #include "utils.h"
 
-#define MAX_BACKPATCHEES 512
+#define MAX_BACKPATCHEES 256
 
 typedef enum {
     OP_PUSH,  OP_ADD,
@@ -45,9 +45,9 @@ typedef struct {
 } Ops;
 
 typedef struct {
-    int pos;
-    Backpatchee_Type type;
-} Backpatchee;
+    size_t count;
+    int positions[MAX_BACKPATCHEES];
+} Backpatchees;
 
 typedef struct {
     int arity, ret_arity;
@@ -58,8 +58,9 @@ typedef struct {
     Arena arena;
     Hashmap functions;
     Lexer *lexer;
-    Backpatchee backpatchees[MAX_BACKPATCHEES];
-    int backpatchees_count;
+    Backpatchees brks;
+    Backpatchees conts;
+    Backpatchees rets;
     int label_count;
     uint8_t had_error;
     uint8_t is_in_loop;

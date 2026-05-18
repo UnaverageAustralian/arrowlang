@@ -25,7 +25,7 @@ static const char *keywords[] = {
     "brk",     "continue",
     "macro",   "struct",
     "import",  "neg",
-    "abs",
+    "abs",     "ret",
 
     "i8",      "u8",
     "i16",     "u16",
@@ -549,6 +549,7 @@ char *tok_spelling(Token_Type type) {
     case TOK_LPAREN:    return "LPAREN";
     case TOK_RPAREN:    return "RPAREN";
     case TOK_ARROW:     return "ARROW";
+    case TOK_RET:       return "RET";
     case TOK_INT_LIT:   return "INT_LIT";
     case TOK_FLOAT_LIT: return "FLOAT_LIT";
     case TOK_WORD:      return "WORD";

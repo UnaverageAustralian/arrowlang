@@ -9,6 +9,7 @@
 #include "utils.h"
 
 #define COMPILER_EPRINTF(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->prev.line, compiler->lexer->prev.pos, level, __VA_ARGS__); 
+#define COMPILER_EPRINTF_AT_CUR(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->cur.line, compiler->lexer->cur.pos, level, __VA_ARGS__); 
 
 void init_compiler(Compiler *compiler, Lexer *lexer) {
     *compiler = (Compiler){0};
@@ -91,6 +92,16 @@ inline void make_op(Compiler *compiler, Opcode opcode, int64_t operand) {
     DA_APPEND(&compiler->ops, op);
 }
 
+inline void make_op_at_cur(Compiler *compiler, Opcode opcode, int64_t operand) {
+    Op op = {
+        .opcode = opcode,
+        .operand = operand,
+        .file_path = compiler->lexer->file_path,
+        .pos = compiler->lexer->cur.pos,
+        .line = compiler->lexer->cur.line,
+    };
+    DA_APPEND(&compiler->ops, op);
+}
 static inline void expect(Compiler *compiler, Token_Type type) {
     lexer_next(compiler->lexer);
     if (compiler->lexer->prev.type != type) {
@@ -124,7 +135,7 @@ void compile_if_stmt(Compiler *compiler) {
 
     if (cur->type == TOK_EOF) {
         compiler->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Expected end of if statement, got end of file. Did you forget a semicolon somewhere?\n");
+        COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected end of if statement, got end of file. Did you forget a semicolon somewhere?\n");
         return;
     }
 
@@ -153,26 +164,34 @@ void compile_while_stmt(Compiler *compiler) {
 
     if (cur->type == TOK_EOF) {
         compiler->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Expected start of loop, got end of file\n");
+        COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected start of loop, got end of file\n");
         return;
     }
 
     lexer_next(compiler->lexer);
-    while (cur->type != TOK_RBRACE && cur->type != TOK_END)
+    while (cur->type != TOK_RBRACE && cur->type != TOK_END && cur->type != TOK_EOF)
         compile_stmt(compiler);
     compiler->ops.items[loop_start].operand = compiler->label_count;
 
+    if (compiler->lexer->cur.type == TOK_EOF) {
+        compiler->had_error = 1;
+        COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected end of loop, got end of file. Did you forget an end or right brace?\n");
+        return;
+    }
     expect(compiler, end_type);
-    if (cur->type == TOK_EOF) return;
 
     make_op(compiler, OP_JMP, loop_label);
 
     lexer_next(compiler->lexer);
-    for (int i = compiler->backpatchees_count-1; i >= 0; i--) {
-        if (compiler->backpatchees[i].pos < loop_start) break;
-        compiler->ops.items[compiler->backpatchees[i].pos].operand =
-            compiler->backpatchees[i].type == BTYPE_BRK ? compiler->label_count : loop_label;
-        compiler->backpatchees_count--;
+    for (int i = compiler->brks.count-1; i >= 0; i--) {
+        if (compiler->brks.positions[i] < loop_start) break;
+        compiler->ops.items[compiler->brks.positions[i]].operand = compiler->label_count;
+        compiler->brks.count--;
+    }
+    for (int i = compiler->conts.count-1; i >= 0; i--) {
+        if (compiler->conts.positions[i] < loop_start) break;
+        compiler->ops.items[compiler->conts.positions[i]].operand = loop_label;
+        compiler->conts.count--;
     }
     make_op(compiler, OP_LABEL, compiler->label_count++);
 
@@ -196,17 +215,25 @@ void compile_loop_stmt(Compiler *compiler) {
     while (cur->type != TOK_RBRACE && cur->type != TOK_END)
         compile_stmt(compiler);
 
+    if (compiler->lexer->cur.type == TOK_EOF) {
+        compiler->had_error = 1;
+        COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected end of loop, got end of file. Did you forget an end or right brace?\n");
+        return;
+    }
     expect(compiler, end_type);
-    if (cur->type == TOK_EOF) return;
 
     make_op(compiler, OP_JMP, loop_label);
 
     lexer_next(compiler->lexer);
-    for (int i = compiler->backpatchees_count-1; i >= 0; i--) {
-        if (compiler->backpatchees[i].pos < loop_start) break;
-        compiler->ops.items[compiler->backpatchees[i].pos].operand =
-            compiler->backpatchees[i].type == BTYPE_BRK ? compiler->label_count : loop_label;
-        compiler->backpatchees_count--;
+    for (int i = compiler->brks.count-1; i >= 0; i--) {
+        if (compiler->brks.positions[i] < loop_start) break;
+        compiler->ops.items[compiler->brks.positions[i]].operand = compiler->label_count;
+        compiler->brks.count--;
+    }
+    for (int i = compiler->conts.count-1; i >= 0; i--) {
+        if (compiler->conts.positions[i] < loop_start) break;
+        compiler->ops.items[compiler->conts.positions[i]].operand = loop_label;
+        compiler->conts.count--;
     }
     make_op(compiler, OP_LABEL, compiler->label_count++);
 
@@ -264,10 +291,7 @@ void compile_stmt(Compiler *compiler) {
             compiler->had_error = 1;
             COMPILER_EPRINTF(LEVEL_ERR, "Brk can only be in loops\n");
         }
-        compiler->backpatchees[compiler->backpatchees_count++] = (Backpatchee){
-            .pos = compiler->ops.count,
-            .type = BTYPE_BRK,
-        };
+        compiler->brks.positions[compiler->brks.count++] = compiler->ops.count;
         make_op(compiler, OP_JMP, -1);
         break;
     case TOK_CONTINUE:
@@ -275,10 +299,11 @@ void compile_stmt(Compiler *compiler) {
             compiler->had_error = 1;
             COMPILER_EPRINTF(LEVEL_ERR, "Continue can only be in loops\n");
         }
-        compiler->backpatchees[compiler->backpatchees_count++] = (Backpatchee){
-            .pos = compiler->ops.count,
-            .type = BTYPE_CONT,
-        };
+        compiler->conts.positions[compiler->conts.count++] = compiler->ops.count;
+        make_op(compiler, OP_JMP, -1);
+        break;
+    case TOK_RET:
+        compiler->rets.positions[compiler->rets.count++] = compiler->ops.count;
         make_op(compiler, OP_JMP, -1);
         break;
     case TOK_WORD: {
@@ -347,11 +372,17 @@ void compile_function(Compiler *compiler) {
         compile_stmt(compiler);
 
     lexer_next(compiler->lexer);
+    for (int i = compiler->rets.count-1; i >= 0; i--) {
+        compiler->ops.items[compiler->rets.positions[i]].operand = compiler->label_count;
+        compiler->rets.count--;
+    }
+
+    make_op(compiler, OP_LABEL, compiler->label_count++);
     make_op(compiler, OP_RET, 0);
 
     if (compiler->lexer->prev.type == TOK_EOF) {
         compiler->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Expected end of function, got end of file\n");
+        COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected end of function, got end of file\n");
     }
 }
 
@@ -381,6 +412,13 @@ void compile_functions(Compiler *compiler) {
         compiler->had_error++;
         COMPILER_EPRINTF(LEVEL_ERR, "No extra functions can be defined after an implicit main yet\n");
     }
+
+    for (int i = compiler->rets.count-1; i >= 0; i--) {
+        compiler->ops.items[compiler->rets.positions[i]].operand = compiler->label_count;
+        compiler->rets.count--;
+    }
+
+    make_op(compiler, OP_LABEL, compiler->label_count++);
     make_op(compiler, OP_RET, 0);
 }
 
@@ -393,7 +431,7 @@ void compile(const char *src, const char *file_path) {
 
     lexer_next(&lexer);
     if (lexer.cur.type == TOK_EOF)
-        eprintf(lexer.file_path, lexer.cur.line, lexer.cur.pos, LEVEL_WARN, "Empty file");
+        eprintf(lexer.file_path, lexer.cur.line, lexer.cur.pos, LEVEL_WARN, "Empty file\n");
 
     compile_functions(&compiler);
 
