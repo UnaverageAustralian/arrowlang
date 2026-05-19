@@ -270,10 +270,14 @@ void lex_decimal(Lexer *lexer, int sign) {
 
 void lex_number(Lexer *lexer) {
     int sign = 1;
+
     char c = peek(lexer, 0);
-    if (c == '-' || c == '+') {
+    if (c == '-') {
         c = skip(lexer, 1);
         sign = -1;
+    }
+    else if (c == '+') {
+        c = skip(lexer, 1);
     }
 
     if (c == '0') {
