@@ -34,7 +34,7 @@ typedef enum {
 typedef struct {
     Opcode opcode;
     const char *file_path;
-    int64_t operand;
+    uint64_t operand;
     int pos, line;
 } Op;
 

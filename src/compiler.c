@@ -20,16 +20,16 @@ void init_compiler(Compiler *compiler, Lexer *lexer) {
 void print_op(Op *op) {
     switch (op->opcode) {
     case OP_PUSH:
-        printf("PUSH %lld\n", op->operand);
+        printf("PUSH %llu\n", op->operand);
         break;
     case OP_JMPF:
-        printf("JMPF %lld\n", op->operand);
+        printf("JMPF %llu\n", op->operand);
         break;
     case OP_JMP:
-        printf("JMP %lld\n", op->operand);
+        printf("JMP %llu\n", op->operand);
         break;
     case OP_LABEL:
-        printf("LABEL %lld\n", op->operand);
+        printf("LABEL %llu\n", op->operand);
         break;
     case OP_FUNC: {
         Hash_Entry *entry = (Hash_Entry *)op->operand;
@@ -154,7 +154,7 @@ void compile_while_stmt(Compiler *compiler) {
         compile_stmt(compiler);
 
     int loop_start = compiler->ops.count;
-    make_op(compiler, OP_JMPF, 0);
+    make_op_at_cur(compiler, OP_JMPF, 0);
 
     Token_Type end_type;
     if (cur->type == TOK_LBRACE)
@@ -182,7 +182,6 @@ void compile_while_stmt(Compiler *compiler) {
 
     make_op(compiler, OP_JMP, loop_label);
 
-    lexer_next(compiler->lexer);
     for (int i = compiler->brks.count-1; i >= 0; i--) {
         if (compiler->brks.positions[i] < loop_start) break;
         compiler->ops.items[compiler->brks.positions[i]].operand = compiler->label_count;
@@ -224,7 +223,6 @@ void compile_loop_stmt(Compiler *compiler) {
 
     make_op(compiler, OP_JMP, loop_label);
 
-    lexer_next(compiler->lexer);
     for (int i = compiler->brks.count-1; i >= 0; i--) {
         if (compiler->brks.positions[i] < loop_start) break;
         compiler->ops.items[compiler->brks.positions[i]].operand = compiler->label_count;
@@ -404,7 +402,7 @@ void compile_functions(Compiler *compiler) {
 
     Hash_Entry *entry = hashmap_add(&compiler->functions, "main", 4, main);
 
-    make_op(compiler, OP_FUNC, (int64_t)entry);
+    make_op_at_cur(compiler, OP_FUNC, (int64_t)entry);
     while (compiler->lexer->cur.type != TOK_FUNC && compiler->lexer->cur.type != TOK_EOF)
         compile_stmt(compiler);
 
@@ -418,8 +416,8 @@ void compile_functions(Compiler *compiler) {
         compiler->rets.count--;
     }
 
-    make_op(compiler, OP_LABEL, compiler->label_count++);
-    make_op(compiler, OP_RET, 0);
+    make_op_at_cur(compiler, OP_LABEL, compiler->label_count++);
+    make_op_at_cur(compiler, OP_RET, 0);
 }
 
 void compile(const char *src, const char *file_path) {

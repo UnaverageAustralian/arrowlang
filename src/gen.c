@@ -28,12 +28,12 @@ void generate_x86_64_linux(Ops *ops) {
         Op *op = &ops->items[i];
         switch(op->opcode) {
         case OP_PUSH:
-            if (op->operand > INT32_MAX || op->operand < INT32_MIN) {
-                sb_appendf(&gen.sb, "    movabs rax, %lld\n", op->operand);
+            if (op->operand > UINT32_MAX) {
+                sb_appendf(&gen.sb, "    movabs rax, %llu\n", op->operand);
                 sb_appendf(&gen.sb, "    push rax\n");
             }
             else {
-                sb_appendf(&gen.sb, "    push %d\n", op->operand);
+                sb_appendf(&gen.sb, "    push %u\n", op->operand);
             }
             break;
         case OP_ADD:

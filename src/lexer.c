@@ -114,7 +114,7 @@ int parse_exponent(Lexer *lexer, int base, double *num) {
     return 1;
 }
 
-void lex_binary(Lexer *lexer) {
+void lex_binary(Lexer *lexer, int sign) {
     int had_error = 0;
     int64_t num = 0;
 
@@ -138,10 +138,10 @@ void lex_binary(Lexer *lexer) {
     else
         make_token(lexer, TOK_INT_LIT);
 
-    lexer->cur.as.integer = num;
+    lexer->cur.as.integer = num * sign;
 }
 
-void lex_octal(Lexer *lexer) {
+void lex_octal(Lexer *lexer,int sign) {
     int had_error = 0;
     int64_t num = 0;
 
@@ -165,10 +165,10 @@ void lex_octal(Lexer *lexer) {
     else
         make_token(lexer, TOK_INT_LIT);
 
-    lexer->cur.as.integer = num;
+    lexer->cur.as.integer = num * sign;
 }
 
-void lex_hex(Lexer *lexer) {
+void lex_hex(Lexer *lexer, int sign) {
     int64_t num = 0;
     double float_num = 0;
     int real = 0;
@@ -216,12 +216,12 @@ void lex_hex(Lexer *lexer) {
         make_token(lexer, real ? TOK_FLOAT_LIT : TOK_INT_LIT);
 
     if (real)
-        lexer->cur.as.real = float_num;
+        lexer->cur.as.real = float_num * sign;
     else
-        lexer->cur.as.integer = num;
+        lexer->cur.as.integer = num * sign;
 }
 
-void lex_decimal(Lexer *lexer) {
+void lex_decimal(Lexer *lexer, int sign) {
     int64_t num = 0;
     double float_num = 0;
     int real = 0;
@@ -263,15 +263,18 @@ void lex_decimal(Lexer *lexer) {
         make_token(lexer, real ? TOK_FLOAT_LIT : TOK_INT_LIT);
 
     if (real)
-        lexer->cur.as.real = float_num;
+        lexer->cur.as.real = float_num * sign;
     else
-        lexer->cur.as.integer = num;
+        lexer->cur.as.integer = num * sign;
 }
 
 void lex_number(Lexer *lexer) {
+    int sign = 1;
     char c = peek(lexer, 0);
-    if (c == '-' || c == '+')
+    if (c == '-' || c == '+') {
         c = skip(lexer, 1);
+        sign = -1;
+    }
 
     if (c == '0') {
         c = skip(lexer, 1);
@@ -279,30 +282,30 @@ void lex_number(Lexer *lexer) {
         case 'X':
         case 'x':
             skip(lexer, 1);
-            lex_hex(lexer);
+            lex_hex(lexer, sign);
             return;
         case 'O':
         case 'o':
             skip(lexer, 1);
-            lex_octal(lexer);
+            lex_octal(lexer, sign);
             return;
         case 'B':
         case 'b':
             skip(lexer, 1);
-            lex_binary(lexer);
+            lex_binary(lexer, sign);
             return;
         default:
             break;
         }
     }
-    lex_decimal(lexer);
+    lex_decimal(lexer, sign);
 }
 
 void lex_word(Lexer *lexer) {
     char buf[256] = {0};
 
     char c = peek(lexer, 0);
-    for (int i = 0; isalnum(c); i++) {
+    for (int i = 0; isalnum(c) || c == '_'; i++) {
         if (i >= 255) {
             make_err_token(lexer, "Identifier is too long");
             return;
@@ -376,8 +379,14 @@ void lexer_next(Lexer *lexer) {
     char c = peek(lexer, 0);
     switch (c) {
     case '+':
-        skip(lexer, 1);
-        make_token(lexer, TOK_ADD);
+        c = peek(lexer, 1);
+        if (c >= '0' && c <= '9') {
+            lex_number(lexer);
+        }
+        else {
+            skip(lexer, 1);
+            make_token(lexer, TOK_ADD);
+        }
         break;
     case '*':
         skip(lexer, 1);
@@ -457,9 +466,14 @@ void lexer_next(Lexer *lexer) {
         break;
     case '-':
         skip(lexer, 1);
-        if (peek(lexer, 0) == '>') {
+        c = peek(lexer, 0);
+        if (c == '>') {
             skip(lexer, 1);
             make_token(lexer, TOK_ARROW);
+        }
+        else if (c >= '0' && c <= '9') {
+            skip(lexer, -1);
+            lex_number(lexer);
         }
         else {
             make_token(lexer, TOK_SUB);
