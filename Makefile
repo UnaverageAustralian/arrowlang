@@ -14,4 +14,4 @@ a:
 	ld -o a a.o
 
 clean:
-	rm -f arrow a a.o a.s
+	rm -f arrow *.o *.s

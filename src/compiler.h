@@ -27,9 +27,10 @@ typedef enum {
     OP_CALL,
 } Opcode;
 
-typedef enum {
-    BTYPE_BRK, BTYPE_CONT,
-} Backpatchee_Type;
+typedef struct {
+    char *file_path;
+    char *output_file;
+} Compiler_Options;
 
 typedef struct {
     Opcode opcode;
@@ -66,7 +67,7 @@ typedef struct {
     uint8_t is_in_loop;
 } Compiler;
 
-void compile(const char *src, const char *file_path);
+void compile(const char *src, Compiler_Options options);
 void print_op(Op *op);
 
 #endif // ARROW_COMPILER_H

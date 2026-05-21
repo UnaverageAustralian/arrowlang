@@ -1,4 +1,6 @@
-a
-a.*
-arrow
-test.alng
+*
+!*/
+!*.md
+!Makefile
+!LICENSE
+!.gitignore

@@ -242,7 +242,9 @@ void compile_stmt(Compiler *compiler) {
     lexer_next(compiler->lexer);
 
     Token *tok = &compiler->lexer->prev;
+#ifdef DEBUG
     print_token(*tok);
+#endif
 
     switch (tok->type) {
     case TOK_INT_LIT: make_op(compiler, OP_PUSH, tok->as.integer); break;
@@ -420,9 +422,9 @@ void compile_functions(Compiler *compiler) {
     make_op_at_cur(compiler, OP_RET, 0);
 }
 
-void compile(const char *src, const char *file_path) {
+void compile(const char *src, Compiler_Options options) {
     Lexer lexer;
-    init_lexer(&lexer, src, file_path);
+    init_lexer(&lexer, src, options.file_path);
 
     Compiler compiler;
     init_compiler(&compiler, &lexer);
@@ -434,8 +436,10 @@ void compile(const char *src, const char *file_path) {
     compile_functions(&compiler);
 
     if (!compiler.had_error) {
+#ifdef DEBUG
         print_ops(&compiler.ops);
-        generate_x86_64_linux(&compiler.ops);
+#endif
+        generate_x86_64_linux(&compiler.ops, options.output_file);
     }
 
     free(compiler.ops.items);

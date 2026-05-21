@@ -11,7 +11,7 @@ void init_generator(Generator *gen, Ops *ops) {
     gen->had_error = 0;
 }
 
-void generate_x86_64_linux(Ops *ops) {
+void generate_x86_64_linux(Ops *ops, char *output_file) {
     Generator gen;
     init_generator(&gen, ops);
 
@@ -221,7 +221,7 @@ void generate_x86_64_linux(Ops *ops) {
         return;
     }
 
-    FILE *out = fopen("./a.s", "wb");
+    FILE *out = fopen(output_file, "wb");
     if (!out) {
         fprintf(stderr, "\x1b[31mFailed to create output file\x1b[0m\n");
         free(gen.sb.items);
