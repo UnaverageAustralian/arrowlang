@@ -55,9 +55,22 @@ typedef struct {
 } Function;
 
 typedef struct {
+    const char *name;
+    size_t len;
+    int pos;
+} Unresolved_Symbol;
+
+typedef struct {
+    size_t count;
+    size_t capacity;
+    Unresolved_Symbol *items;
+} Unresolved_Symbols;
+
+typedef struct {
     Ops ops;
     Arena arena;
     Hashmap functions;
+    Unresolved_Symbols unresolved;
     Lexer *lexer;
     Backpatchees brks;
     Backpatchees conts;

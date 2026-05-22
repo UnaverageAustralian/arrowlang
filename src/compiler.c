@@ -309,8 +309,13 @@ void compile_stmt(Compiler *compiler) {
     case TOK_WORD: {
         Hash_Entry *entry = hashmap_get(&compiler->functions, tok->start, tok->len);
         if (!entry->key) {
-            compiler->had_error = 1;
-            COMPILER_EPRINTF(LEVEL_ERR, "Unknown function \'%.*s\'\n", tok->len, tok->start);
+            Unresolved_Symbol sym = {
+                .name = tok->start,
+                .len = tok->len,
+                .pos = compiler->ops.count,
+            };
+            DA_APPEND(&compiler->unresolved, sym);
+            make_op(compiler, OP_CALL, 0);
             break;
         }
         make_op(compiler, OP_CALL, (int64_t)entry);
@@ -408,11 +413,6 @@ void compile_functions(Compiler *compiler) {
     while (compiler->lexer->cur.type != TOK_FUNC && compiler->lexer->cur.type != TOK_EOF)
         compile_stmt(compiler);
 
-    if (compiler->lexer->cur.type == TOK_FUNC) {
-        compiler->had_error++;
-        COMPILER_EPRINTF(LEVEL_ERR, "No extra functions can be defined after an implicit main yet\n");
-    }
-
     for (int i = compiler->rets.count-1; i >= 0; i--) {
         compiler->ops.items[compiler->rets.positions[i]].operand = compiler->label_count;
         compiler->rets.count--;
@@ -420,6 +420,30 @@ void compile_functions(Compiler *compiler) {
 
     make_op_at_cur(compiler, OP_LABEL, compiler->label_count++);
     make_op_at_cur(compiler, OP_RET, 0);
+
+    while (compiler->lexer->cur.type == TOK_FUNC)
+        compile_function(compiler);
+
+    if (compiler->lexer->cur.type != TOK_EOF) {
+        compiler->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Extra tokens at end of file\n");
+    }
+}
+
+void resolve_symbols(Compiler *compiler) {
+    for (size_t i = 0; i < compiler->unresolved.count; i++) {
+        Unresolved_Symbol sym = compiler->unresolved.items[i];
+        Op *op = &compiler->ops.items[sym.pos];
+
+        Hash_Entry *entry = hashmap_get(&compiler->functions, sym.name, sym.len);
+        if (!entry->key) {
+            compiler->had_error = 1;
+            eprintf(op->file_path, op->line, op->pos, LEVEL_ERR, "Unknown function %.*s\n", sym.len, sym.name);
+            continue;
+        }
+
+        op->operand = (int64_t)entry;
+    }
 }
 
 void compile(const char *src, Compiler_Options options) {
@@ -434,6 +458,7 @@ void compile(const char *src, Compiler_Options options) {
         eprintf(lexer.file_path, lexer.cur.line, lexer.cur.pos, LEVEL_WARN, "Empty file\n");
 
     compile_functions(&compiler);
+    resolve_symbols(&compiler);
 
     if (!compiler.had_error) {
 #ifdef DEBUG
