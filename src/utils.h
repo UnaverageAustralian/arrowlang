@@ -52,8 +52,17 @@ typedef struct {
     void *block;
 } Arena;
 
+typedef struct {
+    size_t count;
+    size_t capacity;
+    const char **items;
+} Cmd;
+
 void eprintf(const char *file_path, int line, int pos, Level level, const char *format, ...);
 void sb_appendf(String_Builder *sb, const char *format, ...);
+
+void cmd_append_many(Cmd *cmd, int argc, ...);
+int cmd_exec(Cmd *cmd);
 
 Hash_Entry *hashmap_add(Hashmap *map, const char *key, size_t key_len, void *val);
 Hash_Entry *hashmap_get(Hashmap *map, const char *key, size_t key_len);

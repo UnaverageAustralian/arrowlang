@@ -51,7 +51,7 @@ Compiler_Options parse_arguments(int argc, char **argv) {
     options.file_path = argv[i];
 
     if (options.output_file == NULL)
-        options.output_file = "a.s";
+        options.output_file = "a";
     return options;
 }
 

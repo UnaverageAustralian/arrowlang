@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "gen.h"
 #include "compiler.h"
@@ -221,7 +222,11 @@ void generate_x86_64_linux(Ops *ops, char *output_file) {
         return;
     }
 
-    FILE *out = fopen(output_file, "wb");
+    size_t len = strlen(output_file) + 3;
+    char *output_asm = malloc(len);
+    snprintf(output_asm, len, "%s.s", output_file);
+
+    FILE *out = fopen(output_asm, "wb");
     if (!out) {
         fprintf(stderr, "\x1b[31mFailed to create output file\x1b[0m\n");
         free(gen.sb.items);
@@ -235,6 +240,22 @@ void generate_x86_64_linux(Ops *ops, char *output_file) {
         return;
     }
 
+    fclose(out);
+
+    char *output_obj = malloc(len);
+    snprintf(output_obj, len, "%s.o", output_file);
+
+    Cmd cmd = {0};
+    cmd_append_many(&cmd, 5, "nasm", "-felf64", "-o", output_obj, output_asm);
+    if (!cmd_exec(&cmd)) return;
+
+    cmd.count = 0;
+    cmd_append_many(&cmd, 4, "ld", "-o", output_file, output_obj);
+    if (!cmd_exec(&cmd)) return;
+
+    free(cmd.items);
     free(gen.sb.items);
+    free(output_asm);
+    free(output_obj);
 }
 

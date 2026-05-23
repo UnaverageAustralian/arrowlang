@@ -102,6 +102,7 @@ inline void make_op_at_cur(Compiler *compiler, Opcode opcode, int64_t operand) {
     };
     DA_APPEND(&compiler->ops, op);
 }
+
 static inline void expect(Compiler *compiler, Token_Type type) {
     lexer_next(compiler->lexer);
     if (compiler->lexer->prev.type != type) {

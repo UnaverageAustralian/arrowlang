@@ -9,9 +9,5 @@ all: arrow
 arrow:
 	$(CC) $(CFLAGS) -o arrow $(SRC)
 
-a:
-	nasm -felf64 -o a.o a.s
-	ld -o a a.o
-
 clean:
 	rm -f arrow *.o *.s

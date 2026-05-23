@@ -1,9 +1,13 @@
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include "utils.h"
 
@@ -45,6 +49,58 @@ void sb_appendf(String_Builder *sb, const char *format, ...) {
     va_end(args);
 
     sb->count += len;
+}
+
+void cmd_append_many(Cmd *cmd, int argc, ...) {
+    va_list args;
+    va_start(args, argc);
+
+    for (int i = 0; i < argc; i++) {
+        const char *arg = va_arg(args, const char *);
+        DA_APPEND(cmd, arg);
+    }
+
+    va_end(args);
+}
+
+int cmd_exec(Cmd *cmd) {
+    DA_APPEND(cmd, NULL);
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        fprintf(stderr, "\x1b[31mERROR: Could not fork child process for command \'%s\': %s\x1b[0m\n", cmd->items[0], strerror(errno));
+        return 0;
+    }
+
+    if (pid == 0) {
+        if (execvp(cmd->items[0], (char *const *)cmd->items) < 0) {
+            fprintf(stderr, "\x1b[31mERROR: Could not execute command \'%s\': %s\x1b[0m\n", cmd->items[0], strerror(errno));
+            return 0;
+        }
+    }
+
+    for (; ;) {
+        int status = 0;
+        if (waitpid(pid, &status, 0) < 0) {
+            fprintf(stderr, "\x1b[31mERROR: Could not wait for command \'%s\': %s\x1b[0m\n", cmd->items[0], strerror(errno));
+            return 0;
+        }
+
+        if (WIFEXITED(status)) {
+            status = WEXITSTATUS(status);
+            if (status != 0) {
+                fprintf(stderr, "\x1b[31mERROR: Command \'%s\' exited with a non-zero exit code\n", cmd->items[0]);
+                return 0;
+            }
+            break;
+        }
+
+        if (WIFSIGNALED(status)) {
+            fprintf(stderr, "\x1b[31mERROR: Command \'%s\' was terminated via signal\x1b[0m\n", cmd->items[0]);
+            return 0;
+        }
+    }
+    return 1;
 }
 
 static uint64_t hash_str(const char *key, size_t key_len) {
