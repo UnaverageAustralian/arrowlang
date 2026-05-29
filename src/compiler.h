@@ -24,12 +24,17 @@ typedef enum {
     OP_JMPF,  OP_JMP,
     OP_LABEL, OP_LNOT,
     OP_FUNC,  OP_RET,
-    OP_CALL,
+    OP_CALL,  OP_EXTERN,
 } Opcode;
+
+typedef enum {
+    STYPE_FUNC, STYPE_MODULE,
+} Symbol_Type;
 
 typedef struct {
     char *file_path;
     char *output_file;
+    String_Array linker_files;
 } Compiler_Options;
 
 typedef struct {
@@ -55,8 +60,7 @@ typedef struct {
 } Function;
 
 typedef struct {
-    const char *name;
-    size_t len;
+    String_View name;
     int pos;
 } Unresolved_Symbol;
 
@@ -67,18 +71,39 @@ typedef struct {
 } Unresolved_Symbols;
 
 typedef struct {
-    Ops ops;
+    String_View path;
+    String_View name;
+    Hashmap symbols;
+    uint8_t has_ext_funcs;
+} Module;
+
+typedef struct {
+    Symbol_Type type;
+    union {
+        Function func;
+        Module module;
+    } as;
+} Symbol;
+
+typedef struct {
     Arena arena;
-    Hashmap functions;
+    Compiler_Options options;
+    uint8_t had_error;
+} Compiler;
+
+typedef struct {
+    Ops ops;
+    Hashmap symbols;
     Unresolved_Symbols unresolved;
+    Module module;
+    Compiler *global;
     Lexer *lexer;
     Backpatchees brks;
     Backpatchees conts;
     Backpatchees rets;
     int label_count;
-    uint8_t had_error;
     uint8_t is_in_loop;
-} Compiler;
+} Compilation_Unit;
 
 void compile(const char *src, Compiler_Options options);
 void print_op(Op *op);

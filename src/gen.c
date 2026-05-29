@@ -12,16 +12,18 @@ void init_generator(Generator *gen, Ops *ops) {
     gen->had_error = 0;
 }
 
-void generate_x86_64_linux(Ops *ops, char *output_file) {
+void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
     Generator gen;
     init_generator(&gen, ops);
 
-    sb_appendf(&gen.sb, "global _start\n");
-    sb_appendf(&gen.sb, "_start:\n");
-    sb_appendf(&gen.sb, "    call main\n");
-    sb_appendf(&gen.sb, "    mov rdi, [rax]\n");
-    sb_appendf(&gen.sb, "    mov rax, 60\n");
-    sb_appendf(&gen.sb, "    syscall\n");
+    if (gen_start) {
+        sb_appendf(&gen.sb, "global _start\n");
+        sb_appendf(&gen.sb, "_start:\n");
+        sb_appendf(&gen.sb, "    call main\n");
+        sb_appendf(&gen.sb, "    mov rdi, [rax]\n");
+        sb_appendf(&gen.sb, "    mov rax, 60\n");
+        sb_appendf(&gen.sb, "    syscall\n");
+    }
 
     Hash_Entry *func_entry = NULL;
 
@@ -182,12 +184,13 @@ void generate_x86_64_linux(Ops *ops, char *output_file) {
             break;
         case OP_FUNC: {
             func_entry = (Hash_Entry *)op->operand;
-            sb_appendf(&gen.sb, "%.*s:\n", func_entry->key_len, func_entry->key);
+            sb_appendf(&gen.sb, "global %.*s\n", func_entry->key_len, func_entry->key);
+            sb_appendf(&gen.sb, "$%.*s:\n", func_entry->key_len, func_entry->key);
             sb_appendf(&gen.sb, "    push rbp\n");
             sb_appendf(&gen.sb, "    mov rbp, rsp\n");
 
-            Function *func = (Function *)func_entry->val;
-            for (size_t offs = (func->arity-1)*8 + 16; offs >= 16; offs -= 8)
+            Function func = ((Symbol *)func_entry->val)->as.func;
+            for (size_t offs = (func.arity-1)*8 + 16; offs >= 16; offs -= 8)
                 sb_appendf(&gen.sb, "    push qword [rbp+%zu]\n", offs);
             break;
         }
@@ -196,17 +199,22 @@ void generate_x86_64_linux(Ops *ops, char *output_file) {
             sb_appendf(&gen.sb, "    mov rsp, rbp\n");
             sb_appendf(&gen.sb, "    pop rbp\n");
 
-            Function *func = (Function *)func_entry->val;
-            sb_appendf(&gen.sb, "    ret %zu\n", func->arity*8);
+            Function func = ((Symbol *)func_entry->val)->as.func;
+            sb_appendf(&gen.sb, "    ret %zu\n", func.arity*8);
             break;
         }
         case OP_CALL: {
             Hash_Entry *entry = (Hash_Entry *)op->operand;
-            sb_appendf(&gen.sb, "    call %.*s\n", entry->key_len, entry->key);
+            sb_appendf(&gen.sb, "    call $%.*s\n", entry->key_len, entry->key);
 
-            Function *func = (Function *)entry->val;
-            for (int64_t offs = (func->ret_arity-1)*8; offs >= 0; offs -= 8)
+            Function func = ((Symbol *)entry->val)->as.func;
+            for (int64_t offs = (func.ret_arity-1)*8; offs >= 0; offs -= 8)
                 sb_appendf(&gen.sb, "    push qword [rax+%zu]\n", offs);
+            break;
+        }
+        case OP_EXTERN: {
+            Hash_Entry *entry = (Hash_Entry *)op->operand;
+            sb_appendf(&gen.sb, "extern %.*s\n", entry->key_len, entry->key);
             break;
         }
         default:
@@ -249,9 +257,9 @@ void generate_x86_64_linux(Ops *ops, char *output_file) {
     cmd_append_many(&cmd, 5, "nasm", "-felf64", "-o", output_obj, output_asm);
     if (!cmd_exec(&cmd)) return;
 
-    cmd.count = 0;
-    cmd_append_many(&cmd, 4, "ld", "-o", output_file, output_obj);
-    if (!cmd_exec(&cmd)) return;
+    // cmd.count = 0;
+    // cmd_append_many(&cmd, 4, "ld", "-o", output_file, output_obj);
+    // if (!cmd_exec(&cmd)) return;
 
     free(cmd.items);
     free(gen.sb.items);

@@ -58,6 +58,13 @@ typedef struct {
     const char **items;
 } Cmd;
 
+typedef Cmd String_Array;
+
+typedef struct {
+    size_t len;
+    const char *str;
+} String_View;
+
 void eprintf(const char *file_path, int line, int pos, Level level, const char *format, ...);
 void sb_appendf(String_Builder *sb, const char *format, ...);
 
@@ -70,5 +77,7 @@ Hash_Entry *hashmap_get(Hashmap *map, const char *key, size_t key_len);
 void init_arena(Arena *arena, size_t size);
 void *arena_calloc(Arena *arena, size_t num_bytes);
 void free_arena(Arena *arena);
+
+char *open_file(char *path);
 
 #endif // ARROW_UTILS_H

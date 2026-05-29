@@ -1,7 +1,10 @@
+#include <assert.h>
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "gen.h"
 #include "compiler.h"
@@ -11,10 +14,36 @@
 #define COMPILER_EPRINTF(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->prev.line, compiler->lexer->prev.pos, level, __VA_ARGS__); 
 #define COMPILER_EPRINTF_AT_CUR(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->cur.line, compiler->lexer->cur.pos, level, __VA_ARGS__); 
 
-void init_compiler(Compiler *compiler, Lexer *lexer) {
+inline String_View strip_file_path(const char *path) {
+    String_View stripped = { .len = 0, .str = path };
+    while (*path != '\0') {
+        if (*path == '/' || *path == '\\')
+            stripped.str = path + 1;
+        path++;
+    }
+    stripped.len = path - stripped.str;
+    while (path != stripped.str) {
+        if (*path == '.')
+            stripped.len = path - stripped.str;
+        path--;
+    }
+    return stripped;
+}
+
+void init_compiler(Compiler *compiler, Compiler_Options options) {
     *compiler = (Compiler){0};
-    compiler->lexer = lexer;
+    compiler->options = options;
     init_arena(&compiler->arena, 1024 * 1024);
+}
+
+void init_compilation_unit(Compilation_Unit *unit, Lexer *lexer, Compiler *global) {
+    *unit = (Compilation_Unit){0};
+    unit->lexer = lexer;
+    unit->global = global;
+
+    unit->module.name = strip_file_path(lexer->file_path);
+    unit->module.path = (String_View){ .len = unit->module.name.str - lexer->file_path, .str = lexer->file_path, };
+    unit->module.symbols = (Hashmap){0};
 }
 
 void print_op(Op *op) {
@@ -39,6 +68,11 @@ void print_op(Op *op) {
     case OP_CALL: {
         Hash_Entry *entry = (Hash_Entry *)op->operand;
         printf("CALL %.*s\n", entry->key_len, entry->key);
+        break;
+    }
+    case OP_EXTERN: {
+        Hash_Entry *entry = (Hash_Entry *)op->operand;
+        printf("EXTERN %.*s\n", entry->key_len, entry->key);
         break;
     }
     case OP_ADD:   printf("ADD\n");   break;
@@ -81,7 +115,7 @@ void print_ops(Ops *ops) {
     }
 }
 
-inline void make_op(Compiler *compiler, Opcode opcode, int64_t operand) {
+inline void make_op(Compilation_Unit *compiler, Opcode opcode, int64_t operand) {
     Op op = {
         .opcode = opcode,
         .operand = operand,
@@ -92,7 +126,7 @@ inline void make_op(Compiler *compiler, Opcode opcode, int64_t operand) {
     DA_APPEND(&compiler->ops, op);
 }
 
-inline void make_op_at_cur(Compiler *compiler, Opcode opcode, int64_t operand) {
+inline void make_op_at_cur(Compilation_Unit *compiler, Opcode opcode, int64_t operand) {
     Op op = {
         .opcode = opcode,
         .operand = operand,
@@ -103,17 +137,17 @@ inline void make_op_at_cur(Compiler *compiler, Opcode opcode, int64_t operand) {
     DA_APPEND(&compiler->ops, op);
 }
 
-static inline void expect(Compiler *compiler, Token_Type type) {
+static inline void expect(Compilation_Unit *compiler, Token_Type type) {
     lexer_next(compiler->lexer);
     if (compiler->lexer->prev.type != type) {
-        compiler->had_error = 1;
+        compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Expected %s, got %s\n", tok_spelling(type), tok_spelling(compiler->lexer->prev.type));
     }
 }
 
-void compile_stmt(Compiler *compiler);
+void compile_stmt(Compilation_Unit *compiler);
 
-void compile_if_stmt(Compiler *compiler) {
+void compile_if_stmt(Compilation_Unit *compiler) {
     int if_start = compiler->ops.count;
     make_op(compiler, OP_JMPF, 0);
 
@@ -135,7 +169,7 @@ void compile_if_stmt(Compiler *compiler) {
     }
 
     if (cur->type == TOK_EOF) {
-        compiler->had_error = 1;
+        compiler->global->had_error = 1;
         COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected end of if statement, got end of file. Did you forget a semicolon somewhere?\n");
         return;
     }
@@ -144,7 +178,7 @@ void compile_if_stmt(Compiler *compiler) {
     make_op(compiler, OP_LABEL, compiler->label_count++);
 }
 
-void compile_while_stmt(Compiler *compiler) {
+void compile_while_stmt(Compilation_Unit *compiler) {
     compiler->is_in_loop = 1;
 
     int loop_label = compiler->label_count;
@@ -164,7 +198,7 @@ void compile_while_stmt(Compiler *compiler) {
         end_type = TOK_END;
 
     if (cur->type == TOK_EOF) {
-        compiler->had_error = 1;
+        compiler->global->had_error = 1;
         COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected start of loop, got end of file\n");
         return;
     }
@@ -175,7 +209,7 @@ void compile_while_stmt(Compiler *compiler) {
     compiler->ops.items[loop_start].operand = compiler->label_count;
 
     if (compiler->lexer->cur.type == TOK_EOF) {
-        compiler->had_error = 1;
+        compiler->global->had_error = 1;
         COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected end of loop, got end of file. Did you forget an end or right brace?\n");
         return;
     }
@@ -198,7 +232,7 @@ void compile_while_stmt(Compiler *compiler) {
     compiler->is_in_loop = 0;
 }
 
-void compile_loop_stmt(Compiler *compiler) {
+void compile_loop_stmt(Compilation_Unit *compiler) {
     compiler->is_in_loop = 1;
 
     Token_Type end_type;
@@ -216,7 +250,7 @@ void compile_loop_stmt(Compiler *compiler) {
         compile_stmt(compiler);
 
     if (compiler->lexer->cur.type == TOK_EOF) {
-        compiler->had_error = 1;
+        compiler->global->had_error = 1;
         COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected end of loop, got end of file. Did you forget an end or right brace?\n");
         return;
     }
@@ -239,7 +273,7 @@ void compile_loop_stmt(Compiler *compiler) {
     compiler->is_in_loop = 0;
 }
 
-void compile_stmt(Compiler *compiler) {
+void compile_stmt(Compilation_Unit *compiler) {
     lexer_next(compiler->lexer);
 
     Token *tok = &compiler->lexer->prev;
@@ -289,7 +323,7 @@ void compile_stmt(Compiler *compiler) {
         break;
     case TOK_BRK:
         if (!compiler->is_in_loop) {
-            compiler->had_error = 1;
+            compiler->global->had_error = 1;
             COMPILER_EPRINTF(LEVEL_ERR, "Brk can only be in loops\n");
         }
         compiler->brks.positions[compiler->brks.count++] = compiler->ops.count;
@@ -297,7 +331,7 @@ void compile_stmt(Compiler *compiler) {
         break;
     case TOK_CONTINUE:
         if (!compiler->is_in_loop) {
-            compiler->had_error = 1;
+            compiler->global->had_error = 1;
             COMPILER_EPRINTF(LEVEL_ERR, "Continue can only be in loops\n");
         }
         compiler->conts.positions[compiler->conts.count++] = compiler->ops.count;
@@ -308,29 +342,44 @@ void compile_stmt(Compiler *compiler) {
         make_op(compiler, OP_JMP, -1);
         break;
     case TOK_WORD: {
-        Hash_Entry *entry = hashmap_get(&compiler->functions, tok->start, tok->len);
+        const char *module_name = tok->start;
+        size_t module_name_len = tok->len;
+
+        Hash_Entry *entry = hashmap_get(&compiler->symbols, tok->start, tok->len);
         if (!entry->key) {
             Unresolved_Symbol sym = {
-                .name = tok->start,
-                .len = tok->len,
+                .name = { .len = tok->len, .str = tok->start },
                 .pos = compiler->ops.count,
             };
             DA_APPEND(&compiler->unresolved, sym);
             make_op(compiler, OP_CALL, 0);
             break;
         }
+        if (((Symbol *)entry->val)->type == STYPE_MODULE) {
+            expect(compiler, TOK_SCOPE);
+            expect(compiler, TOK_WORD);
+
+            entry = hashmap_get(&((Symbol *)entry->val)->as.module.symbols, tok->start, tok->len);
+            if (!entry->key) {
+                compiler->global->had_error = 1;
+                COMPILER_EPRINTF(LEVEL_ERR, "Unknown function %.*s in module %.*s\n", tok->len, tok->start, module_name_len, module_name);
+                break;
+            }
+            make_op(compiler, OP_EXTERN, (int64_t)entry);
+        }
         make_op(compiler, OP_CALL, (int64_t)entry);
         break;
     }
     case TOK_ERROR:
-        compiler->had_error = 1;
+        compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "%.*s\n", tok->len, tok->start);
         break;
     case TOK_ELSE:
     case TOK_SEMICOLON:
     case TOK_END:
     case TOK_RBRACE:
-        compiler->had_error = 1;
+    case TOK_SCOPE:
+        compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Lone %s\n", tok_spelling(tok->type));
         break;
     case TOK_FUNC:
@@ -338,41 +387,49 @@ void compile_stmt(Compiler *compiler) {
         eprintf(__FILE__, __LINE__, 0, LEVEL_ERR, "Invalid token %s reached in compile_stmt\n", tok_spelling(tok->type));
         exit(1);
     default:
-        compiler->had_error = 1;
+        compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Unimplemented operation starting with token %s\n", tok_spelling(tok->type));
         break;
     }
 }
 
-void compile_function(Compiler *compiler) {
+Hash_Entry *compile_function_signature(Compilation_Unit *compiler) {
     lexer_next(compiler->lexer);
     expect(compiler, TOK_WORD);
 
-    Function *func = arena_calloc(&compiler->arena, sizeof(Function));
+    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
+    sym->type = STYPE_FUNC;
 
-    Hash_Entry *entry = hashmap_add(&compiler->functions, compiler->lexer->prev.start, compiler->lexer->prev.len, func);
+    Hash_Entry *entry = hashmap_add(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
+    hashmap_add(&compiler->module.symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
     if (!entry) {
-        compiler->had_error = 1;
+        compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Redefinition of a function\n");
     }
-    make_op(compiler, OP_FUNC, (int64_t)entry);
 
     expect(compiler, TOK_LPAREN);
     while (compiler->lexer->cur.type != TOK_ARROW && compiler->lexer->cur.type != TOK_RPAREN && compiler->lexer->cur.type != TOK_EOF) {
         expect(compiler, TOK_WORD);
-        func->arity++;
+        sym->as.func.arity++;
     }
 
     expect(compiler, TOK_ARROW);
-    if (compiler->lexer->prev.type == TOK_EOF) return;
+    if (compiler->lexer->prev.type == TOK_EOF) return entry;
 
     while (compiler->lexer->cur.type != TOK_RPAREN && compiler->lexer->cur.type != TOK_EOF) {
         expect(compiler, TOK_WORD);
-        func->ret_arity++;
+        sym->as.func.ret_arity++;
     }
 
     expect(compiler, TOK_RPAREN);
-    if (compiler->lexer->prev.type == TOK_EOF) return;
+    if (compiler->lexer->prev.type == TOK_EOF) return entry;
+
+    return entry;
+}
+
+void compile_function(Compilation_Unit *compiler) {
+    Hash_Entry *entry = compile_function_signature(compiler);
+    make_op(compiler, OP_FUNC, (int64_t)entry);
 
     while (compiler->lexer->cur.type != TOK_FUNC && compiler->lexer->cur.type != TOK_EOF)
         compile_stmt(compiler);
@@ -387,28 +444,55 @@ void compile_function(Compiler *compiler) {
     make_op(compiler, OP_RET, 0);
 
     if (compiler->lexer->prev.type == TOK_EOF) {
-        compiler->had_error = 1;
+        compiler->global->had_error = 1;
         COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected end of function, got end of file\n");
     }
 }
 
-void compile_functions(Compiler *compiler) {
-    while (compiler->lexer->cur.type == TOK_FUNC)
-        compile_function(compiler);
+void compile_external_function(Compilation_Unit *compiler) {
+    Hash_Entry *entry = compile_function_signature(compiler);
+    make_op(compiler, OP_EXTERN, (int64_t)entry);
 
-    if (compiler->functions.entries != NULL && hashmap_get(&compiler->functions, "main", 4)->key) {
+    if (!compiler->module.has_ext_funcs) {
+        compiler->module.has_ext_funcs = 1;
+        char *extern_path = arena_calloc(&compiler->global->arena, compiler->module.path.len + compiler->module.name.len + 7);
+        snprintf(extern_path, compiler->module.path.len + compiler->module.name.len + 7, "%.*s%.*s_ext.o", compiler->module.path.len, compiler->module.path.str, compiler->module.name.len, compiler->module.name.str);
+        if (access(extern_path, F_OK) == 0)
+            DA_APPEND(&compiler->global->options.linker_files, extern_path);
+    }
+}
+
+void compile_functions(Compilation_Unit *compiler) {
+    for (; ;) {
+        switch (compiler->lexer->cur.type) {
+        case TOK_FUNC:
+            compile_function(compiler);
+            continue;
+        case TOK_EXT_FUNC:
+            compile_external_function(compiler);
+            continue;
+        default:;
+        }
+        break;
+    }
+
+    if (compiler->symbols.entries != NULL && hashmap_get(&compiler->symbols, "main", 4)->key) {
         if (compiler->lexer->cur.type != TOK_EOF) {
-            compiler->had_error = 1;
+            compiler->global->had_error = 1;
             COMPILER_EPRINTF(LEVEL_ERR, "Extra tokens at end of file\n");
         }
         return;
     }
 
-    Function *main = arena_calloc(&compiler->arena, sizeof(Function));
-    main->arity = 0;
-    main->ret_arity = 1;
+    if (compiler->lexer->cur.type == TOK_EOF) return;
 
-    Hash_Entry *entry = hashmap_add(&compiler->functions, "main", 4, main);
+    Symbol *main = arena_calloc(&compiler->global->arena, sizeof(Symbol));
+    main->type = STYPE_FUNC;
+    main->as.func.arity = 0;
+    main->as.func.ret_arity = 1;
+
+    Hash_Entry *entry = hashmap_add(&compiler->symbols, "main", 4, main);
+    hashmap_add(&compiler->module.symbols, "main", 4, main);
 
     make_op_at_cur(compiler, OP_FUNC, (int64_t)entry);
     while (compiler->lexer->cur.type != TOK_FUNC && compiler->lexer->cur.type != TOK_EOF)
@@ -422,24 +506,34 @@ void compile_functions(Compiler *compiler) {
     make_op_at_cur(compiler, OP_LABEL, compiler->label_count++);
     make_op_at_cur(compiler, OP_RET, 0);
 
-    while (compiler->lexer->cur.type == TOK_FUNC)
-        compile_function(compiler);
+    for (; ;) {
+        switch (compiler->lexer->cur.type) {
+        case TOK_FUNC:
+            compile_function(compiler);
+            continue;
+        case TOK_EXT_FUNC:
+            compile_external_function(compiler);
+            continue;
+        default:;
+        }
+        break;
+    }
 
     if (compiler->lexer->cur.type != TOK_EOF) {
-        compiler->had_error = 1;
+        compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Extra tokens at end of file\n");
     }
 }
 
-void resolve_symbols(Compiler *compiler) {
+void resolve_symbols(Compilation_Unit *compiler) {
     for (size_t i = 0; i < compiler->unresolved.count; i++) {
         Unresolved_Symbol sym = compiler->unresolved.items[i];
         Op *op = &compiler->ops.items[sym.pos];
 
-        Hash_Entry *entry = hashmap_get(&compiler->functions, sym.name, sym.len);
-        if (!entry->key) {
-            compiler->had_error = 1;
-            eprintf(op->file_path, op->line, op->pos, LEVEL_ERR, "Unknown function %.*s\n", sym.len, sym.name);
+        Hash_Entry *entry = hashmap_get(&compiler->symbols, sym.name.str, sym.name.len);
+        if (!entry->key || ((Symbol *)entry->val)->type != STYPE_FUNC) {
+            compiler->global->had_error = 1;
+            eprintf(op->file_path, op->line, op->pos, LEVEL_ERR, "Unknown function %.*s\n", sym.name.len, sym.name.str);
             continue;
         }
 
@@ -447,29 +541,78 @@ void resolve_symbols(Compiler *compiler) {
     }
 }
 
-void compile(const char *src, Compiler_Options options) {
+Module compile_module(Compiler *global, const char *src, const char *file_path) {
     Lexer lexer;
-    init_lexer(&lexer, src, options.file_path);
+    init_lexer(&lexer, src, file_path);
 
-    Compiler compiler;
-    init_compiler(&compiler, &lexer);
+    Compilation_Unit unit;
+    init_compilation_unit(&unit, &lexer, global);
+
+    char *obj_name = arena_calloc(&global->arena, unit.module.name.len + 3);
+    snprintf(obj_name, unit.module.name.len + 3, "%.*s.o", unit.module.name.len, unit.module.name.str);
+
+    DA_APPEND(&global->options.linker_files, obj_name);
 
     lexer_next(&lexer);
     if (lexer.cur.type == TOK_EOF)
         eprintf(lexer.file_path, lexer.cur.line, lexer.cur.pos, LEVEL_WARN, "Empty file\n");
 
-    compile_functions(&compiler);
-    resolve_symbols(&compiler);
+    while (lexer.cur.type == TOK_IMPORT) {
+        lexer_next(&lexer);
+        expect(&unit, TOK_WORD);
+        char *module_path = arena_calloc(&global->arena, lexer.prev.len + 12);
+        snprintf(module_path, lexer.prev.len + 12, "./std/%.*s.alng", lexer.prev.len, lexer.prev.start);
 
-    if (!compiler.had_error) {
+        char *module_contents = open_file(module_path);
+        if (!module_contents) {
+            fprintf(stderr, "\x1b[31mERROR:\x1b[0m Could not read file %s for module %.*s: %s\n", module_path, lexer.prev.len, lexer.prev.start, strerror(errno));
+            exit(1);
+        }
+
+        Module module = compile_module(global, module_contents, module_path);
+
+        Symbol *module_sym = arena_calloc(&global->arena, sizeof(Symbol));
+        module_sym->type = STYPE_MODULE;
+        module_sym->as.module = module;
+
+        hashmap_add(&unit.symbols, module.name.str, module.name.len, module_sym);
+    }
+
+    compile_functions(&unit);
+    resolve_symbols(&unit);
+
+    if (!global->had_error) {
 #ifdef DEBUG
         print_ops(&compiler.ops);
 #endif
-        generate_x86_64_linux(&compiler.ops, options.output_file);
+        char *output_file = arena_calloc(&global->arena, unit.module.name.len + 1);
+        snprintf(output_file, unit.module.name.len + 1, "%s", unit.module.name.str);
+
+        Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
+        generate_x86_64_linux(&unit.ops, output_file, main != NULL && main->key != NULL);
     }
 
-    free(compiler.ops.items);
-    free(compiler.functions.entries);
+    free(unit.ops.items);
+    free(unit.symbols.entries);
+
+    return unit.module;
+}
+
+void link_files(Compiler_Options options) {
+    Cmd cmd = {0};
+    cmd_append_many(&cmd, 3, "ld", "-o", options.output_file);
+    for (size_t i = 0; i < options.linker_files.count; i++)
+        DA_APPEND(&cmd, options.linker_files.items[i]);
+    cmd_exec(&cmd);
+}
+
+void compile(const char *src, Compiler_Options options) {
+    Compiler compiler;
+    init_compiler(&compiler, options);
+
+    compile_module(&compiler, src, options.file_path);
+    link_files(compiler.options);
+
     free_arena(&compiler.arena);
 }
 

@@ -115,3 +115,15 @@ You can return early from a function with `ret`.
  $
 ```
 
+## Modules
+
+Modules are imported using `import`. For now you can only import standard library modules, these are:
+`io` - For input-output functions (but no input yet).
+
+Here is an example using the `io` module:
+```
+import io
+71 io::printc // Prints the character G to the io buffer
+io::flush     // Flushes the io buffer
+```
+

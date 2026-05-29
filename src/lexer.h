@@ -20,7 +20,8 @@ typedef enum {
     TOK_LBRACE,    TOK_RBRACE,
     TOK_AT,        TOK_FUNC,
     TOK_ARROW,     TOK_LPAREN,
-    TOK_RPAREN,
+    TOK_RPAREN,    TOK_SCOPE,
+    TOK_EXT_FUNC,  TOK_C_FUNC,
 
     // Symbols/Words
     TOK_MOD,       TOK_AND,

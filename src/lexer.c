@@ -327,6 +327,22 @@ void lex_word(Lexer *lexer) {
     make_token(lexer, TOK_WORD);
 }
 
+void lex_string(Lexer *lexer) {
+    char c = peek(lexer, 0);
+    while (c && c != '\"' && c != '\n')
+        skip(lexer, 1);
+    if (c) skip(lexer, 1);
+
+    if (!c || c == '\n') {
+        make_err_token(lexer, "Unterminated string");
+        return;
+    }
+
+    make_token(lexer, TOK_STR_LIT);
+    lexer->cur.start++;
+    lexer->cur.len -= 2;
+}
+
 void single_line_comment(Lexer *lexer) {
     char c = skip(lexer, 2);
     while (c && c != '\n')
@@ -424,10 +440,6 @@ void lexer_next(Lexer *lexer) {
         skip(lexer, 1);
         make_token(lexer, TOK_IF);
         break;
-    case ':':
-        skip(lexer, 1);
-        make_token(lexer, TOK_ELSE);
-        break;
     case ';':
         skip(lexer, 1);
         make_token(lexer, TOK_SEMICOLON);
@@ -467,6 +479,35 @@ void lexer_next(Lexer *lexer) {
     case ')':
         skip(lexer, 1);
         make_token(lexer, TOK_RPAREN);
+        break;
+    case 'E':
+        if (peek(lexer, 1) == '$') {
+            skip(lexer, 2);
+            make_token(lexer, TOK_EXT_FUNC);
+        }
+        else {
+            lex_word(lexer);
+        }
+        break;
+    case 'C':
+        if (peek(lexer, 1) == '$') {
+            skip(lexer, 2);
+            make_token(lexer, TOK_C_FUNC);
+        }
+        else {
+            lex_word(lexer);
+        }
+        break;
+    case ':':
+        skip(lexer, 1);
+        c = peek(lexer, 0);
+        if (c == ':') {
+            skip(lexer, 1);
+            make_token(lexer, TOK_SCOPE);
+        }
+        else {
+            make_token(lexer, TOK_ELSE);
+        }
         break;
     case '-':
         skip(lexer, 1);
@@ -518,6 +559,9 @@ void lexer_next(Lexer *lexer) {
         else {
             make_token(lexer, TOK_GT);
         }
+        break;
+    case '\"':
+        lex_string(lexer);
         break;
     case '\0':
         make_token(lexer, TOK_EOF);
@@ -582,6 +626,9 @@ char *tok_spelling(Token_Type type) {
     case TOK_RPAREN:    return "RPAREN";
     case TOK_ARROW:     return "ARROW";
     case TOK_RET:       return "RET";
+    case TOK_EXT_FUNC:  return "EXT_FUNC";
+    case TOK_C_FUNC:    return "C_FUNC";
+    case TOK_IMPORT:    return "IMPORT";
     case TOK_INT_LIT:   return "INT_LIT";
     case TOK_FLOAT_LIT: return "FLOAT_LIT";
     case TOK_WORD:      return "WORD";

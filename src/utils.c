@@ -89,7 +89,7 @@ int cmd_exec(Cmd *cmd) {
         if (WIFEXITED(status)) {
             status = WEXITSTATUS(status);
             if (status != 0) {
-                fprintf(stderr, "\x1b[31mERROR: Command \'%s\' exited with a non-zero exit code\n", cmd->items[0]);
+                fprintf(stderr, "\x1b[31mERROR: Command \'%s\' exited with a non-zero exit code\x1b[0m\n", cmd->items[0]);
                 return 0;
             }
             break;
@@ -179,3 +179,23 @@ void free_arena(Arena *arena) {
     free(arena->block);
 }
 
+char *open_file(char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+
+    if (fseek(f, 0, SEEK_END) == -1) return NULL;
+
+    long long length = ftell(f);
+    if (length == -1) return NULL;
+    rewind(f);
+
+    char *contents = malloc(length+1);
+    if (!contents) return NULL;
+
+    fread(contents, 1, length, f);
+    if (ferror(f)) return NULL;
+    fclose(f);
+
+    contents[length] = '\0';
+    return contents;
+}

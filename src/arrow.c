@@ -55,27 +55,6 @@ Compiler_Options parse_arguments(int argc, char **argv) {
     return options;
 }
 
-char *open_file(char *path) {
-    FILE *f = fopen(path, "rb");
-    if (!f) return NULL;
-
-    if (fseek(f, 0, SEEK_END) == -1) return NULL;
-
-    long long length = ftell(f);
-    if (length == -1) return NULL;
-    rewind(f);
-
-    char *contents = malloc(length+1);
-    if (!contents) return NULL;
-
-    fread(contents, 1, length, f);
-    if (ferror(f)) return NULL;
-    fclose(f);
-
-    contents[length] = '\0';
-    return contents;
-}
-
 int main(int argc, char **argv) {
     Compiler_Options options = parse_arguments(argc, argv);
 
