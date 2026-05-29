@@ -1,0 +1,3 @@
+E$printc ( a -> )
+E$prints ( a -> )
+E$flush  ( -> )
