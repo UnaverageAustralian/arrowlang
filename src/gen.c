@@ -17,11 +17,11 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
     init_generator(&gen, ops);
 
     if (gen_start) {
-        sb_appendf(&gen.sb, "global _start\n");
+        sb_appendf(&gen.sb, ".globl _start\n");
         sb_appendf(&gen.sb, "_start:\n");
         sb_appendf(&gen.sb, "    call main\n");
-        sb_appendf(&gen.sb, "    mov rdi, [rax]\n");
-        sb_appendf(&gen.sb, "    mov rax, 60\n");
+        sb_appendf(&gen.sb, "    movq (%%rax), %%rdi\n");
+        sb_appendf(&gen.sb, "    movq $60, %%rax\n");
         sb_appendf(&gen.sb, "    syscall\n");
     }
 
@@ -32,148 +32,148 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
         switch(op->opcode) {
         case OP_PUSH:
             if (op->operand > UINT32_MAX) {
-                sb_appendf(&gen.sb, "    movabs rax, %llu\n", op->operand);
-                sb_appendf(&gen.sb, "    push rax\n");
+                sb_appendf(&gen.sb, "    movabsq $%llu, %%rax\n", op->operand);
+                sb_appendf(&gen.sb, "    pushq %%rax\n");
             }
             else {
-                sb_appendf(&gen.sb, "    push %u\n", op->operand);
+                sb_appendf(&gen.sb, "    pushq $%u\n", op->operand);
             }
             break;
         case OP_ADD:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    add qword [rsp], rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    addq %%rax, (%%rsp)\n");
             break;
         case OP_SUB:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    sub qword [rsp], rbx\n");
+            sb_appendf(&gen.sb, "    popq rax\n");
+            sb_appendf(&gen.sb, "    subq %%rax, (%%rsp)\n");
             break;
         case OP_MUL:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    pop rax\n");
-            sb_appendf(&gen.sb, "    imul rax, rbx\n");
-            sb_appendf(&gen.sb, "    push rax\n");
+            sb_appendf(&gen.sb, "    popq %%rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    imulq %%rbx, %%rax\n");
+            sb_appendf(&gen.sb, "    pushq %%rax\n");
             break;
         case OP_DIV:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    pop rax\n");
-            sb_appendf(&gen.sb, "    idiv rbx\n");
-            sb_appendf(&gen.sb, "    push rax\n");
+            sb_appendf(&gen.sb, "    popq %%rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    idivq %%rbx\n");
+            sb_appendf(&gen.sb, "    pushq %%rax\n");
             break;
         case OP_MOD:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    pop rax\n");
-            sb_appendf(&gen.sb, "    idiv rbx\n");
-            sb_appendf(&gen.sb, "    push rdx\n");
+            sb_appendf(&gen.sb, "    popq %%rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    idivq %%rbx\n");
+            sb_appendf(&gen.sb, "    pushq %%rdx\n");
             break;
         case OP_AND:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    and qword [rsp], rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    andq %%rax, (%%rsp)\n");
             break;
         case OP_OR:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    or qword [rsp], rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    orq %%rax, (%%rsp)\n");
             break;
         case OP_XOR:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    xor qword [rsp], rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    xorq %%rax, (%%rsp)\n");
             break;
         case OP_SHL:
-            sb_appendf(&gen.sb, "    pop rcx\n");
-            sb_appendf(&gen.sb, "    sal qword [rsp], cl\n");
+            sb_appendf(&gen.sb, "    popq %%rcx\n");
+            sb_appendf(&gen.sb, "    salq %%cl, (%%rsp)\n");
             break;
         case OP_SHR:
-            sb_appendf(&gen.sb, "    pop rcx\n");
-            sb_appendf(&gen.sb, "    sar qword [rsp], cl\n");
+            sb_appendf(&gen.sb, "    popq %%rcx\n");
+            sb_appendf(&gen.sb, "    sarq %%cl, (%%rsp)\n");
             break;
         case OP_ROL:
-            sb_appendf(&gen.sb, "    pop rcx\n");
-            sb_appendf(&gen.sb, "    rol qword [rsp], cl\n");
+            sb_appendf(&gen.sb, "    popq %%rcx\n");
+            sb_appendf(&gen.sb, "    rolq %%cl, (%%rsp)\n");
             break;
         case OP_ROR:
-            sb_appendf(&gen.sb, "    pop rcx\n");
-            sb_appendf(&gen.sb, "    ror qword [rsp], cl\n");
+            sb_appendf(&gen.sb, "    popq %%rcx\n");
+            sb_appendf(&gen.sb, "    rorq %%cl, (%%rsp)\n");
             break;
         case OP_NOT:
-            sb_appendf(&gen.sb, "    not qword [rsp]\n");
+            sb_appendf(&gen.sb, "    notq (%%rsp)\n");
             break;
         case OP_DUP:
-            sb_appendf(&gen.sb, "    push qword [rsp]\n");
+            sb_appendf(&gen.sb, "    pushq (%%rsp)\n");
             break;
         case OP_OVER:
-            sb_appendf(&gen.sb, "    push qword [rsp+8]\n");
+            sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
             break;
         case OP_DUP2:
-            sb_appendf(&gen.sb, "    push qword [rsp+8]\n");
-            sb_appendf(&gen.sb, "    push qword [rsp+8]\n");
+            sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
+            sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
             break;
         case OP_DROP:
-            sb_appendf(&gen.sb, "    add rsp, 8\n");
+            sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
             break;
         case OP_SWAP:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    push qword [rsp]\n");
-            sb_appendf(&gen.sb, "    mov qword [rsp+8], rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rbx\n");
+            sb_appendf(&gen.sb, "    pushq (%%rsp)\n");
+            sb_appendf(&gen.sb, "    movq %%rbx, 8(%%rsp)\n");
             break;
         case OP_OVER2:
-            sb_appendf(&gen.sb, "    push qword [rsp+24]\n");
-            sb_appendf(&gen.sb, "    push qword [rsp+24]\n");
+            sb_appendf(&gen.sb, "    pushq 24(%%rsp)\n");
+            sb_appendf(&gen.sb, "    pushq 24(%%rsp)\n");
             break;
         case OP_SWAP2:
-            sb_appendf(&gen.sb, "    pop rax\n");
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    push qword [rsp+8]\n");
-            sb_appendf(&gen.sb, "    push qword [rsp+8]\n");
-            sb_appendf(&gen.sb, "    mov qword [rsp+16], rax\n");
-            sb_appendf(&gen.sb, "    mov qword [rsp+24], rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    popq %%rbx\n");
+            sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
+            sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
+            sb_appendf(&gen.sb, "    movq %%rax, 16(%%rsp)\n");
+            sb_appendf(&gen.sb, "    movq %%rax, 24(%%rsp)\n");
             break;
         case OP_NEG:
-            sb_appendf(&gen.sb, "    neg qword [rsp]\n");
+            sb_appendf(&gen.sb, "    negq (%%rsp)\n");
             break;
         case OP_EQ:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    cmp rbx, qword [rsp]\n");
-            sb_appendf(&gen.sb, "    sete bl\n");
-            sb_appendf(&gen.sb, "    movzx rbx, bl\n");
-            sb_appendf(&gen.sb, "    mov qword [rsp], rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    cmpq (%%rsp), %%rax\n");
+            sb_appendf(&gen.sb, "    sete %%al\n");
+            sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
+            sb_appendf(&gen.sb, "    movq %%rax, (%%rsp)\n");
             break;
         case OP_LT:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    cmp rbx, qword [rsp]\n");
-            sb_appendf(&gen.sb, "    setg bl\n");
-            sb_appendf(&gen.sb, "    movzx rbx, bl\n");
-            sb_appendf(&gen.sb, "    mov qword [rsp], rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    cmpq (%%rsp), %%rax\n");
+            sb_appendf(&gen.sb, "    setg %%al\n");
+            sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
+            sb_appendf(&gen.sb, "    movq %%rax, (%%rsp)\n");
             break;
         case OP_GT:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    cmp rbx, qword [rsp]\n");
-            sb_appendf(&gen.sb, "    setl bl\n");
-            sb_appendf(&gen.sb, "    movzx rbx, bl\n");
-            sb_appendf(&gen.sb, "    mov qword [rsp], rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    cmpq (%%rsp), %%rax\n");
+            sb_appendf(&gen.sb, "    setl %%al\n");
+            sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
+            sb_appendf(&gen.sb, "    movq %%rax, (%%rsp)\n");
             break;
         case OP_LTEQ:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    cmp rbx, qword [rsp]\n");
-            sb_appendf(&gen.sb, "    setge bl\n");
-            sb_appendf(&gen.sb, "    movzx rbx, bl\n");
-            sb_appendf(&gen.sb, "    mov qword [rsp], rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    cmpq (%%rsp), %%rax\n");
+            sb_appendf(&gen.sb, "    setge %%al\n");
+            sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
+            sb_appendf(&gen.sb, "    movq %%rax, (%%rsp)\n");
             break;
         case OP_GTEQ:
-            sb_appendf(&gen.sb, "    pop rbx\n");
-            sb_appendf(&gen.sb, "    cmp rbx, qword [rsp]\n");
-            sb_appendf(&gen.sb, "    setle bl\n");
-            sb_appendf(&gen.sb, "    movzx rbx, bl\n");
-            sb_appendf(&gen.sb, "    mov qword [rsp], rbx\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    cmpq (%%rsp), %%rax\n");
+            sb_appendf(&gen.sb, "    setle %%al\n");
+            sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
+            sb_appendf(&gen.sb, "    movq %%rax, (%%rsp)\n");
             break;
         case OP_LNOT:
-            sb_appendf(&gen.sb, "    pop rax\n");
-            sb_appendf(&gen.sb, "    test rax, rax\n");
-            sb_appendf(&gen.sb, "    setz al\n");
-            sb_appendf(&gen.sb, "    movzx rax, al\n");
-            sb_appendf(&gen.sb, "    push rax\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    testq %%rax, %%rax\n");
+            sb_appendf(&gen.sb, "    setz %%al\n");
+            sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
+            sb_appendf(&gen.sb, "    pushq %%rax\n");
             break;
         case OP_JMPF:
-            sb_appendf(&gen.sb, "    pop rax\n");
-            sb_appendf(&gen.sb, "    test rax, rax\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    testq %%rax, %%rax\n");
             sb_appendf(&gen.sb, "    jz .L%lld\n", op->operand);
             break;
         case OP_JMP:
@@ -184,37 +184,32 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_FUNC: {
             func_entry = (Hash_Entry *)op->operand;
-            sb_appendf(&gen.sb, "global %.*s\n", func_entry->key_len, func_entry->key);
-            sb_appendf(&gen.sb, "$%.*s:\n", func_entry->key_len, func_entry->key);
-            sb_appendf(&gen.sb, "    push rbp\n");
-            sb_appendf(&gen.sb, "    mov rbp, rsp\n");
+            sb_appendf(&gen.sb, ".globl \"%.*s\"\n", func_entry->key_len, func_entry->key);
+            sb_appendf(&gen.sb, "\"%.*s\":\n", func_entry->key_len, func_entry->key);
+            sb_appendf(&gen.sb, "    pushq %%rbp\n");
+            sb_appendf(&gen.sb, "    movq %%rsp, %%rbp\n");
 
             Function func = ((Symbol *)func_entry->val)->as.func;
             for (size_t offs = (func.arity-1)*8 + 16; offs >= 16; offs -= 8)
-                sb_appendf(&gen.sb, "    push qword [rbp+%zu]\n", offs);
+                sb_appendf(&gen.sb, "    pushq %zu(%%rbp)\n", offs);
             break;
         }
         case OP_RET: {
-            sb_appendf(&gen.sb, "    mov rax, rsp\n");
-            sb_appendf(&gen.sb, "    mov rsp, rbp\n");
-            sb_appendf(&gen.sb, "    pop rbp\n");
+            sb_appendf(&gen.sb, "    movq %%rsp, %%rax\n");
+            sb_appendf(&gen.sb, "    movq %%rbp, %%rsp\n");
+            sb_appendf(&gen.sb, "    popq %%rbp\n");
 
             Function func = ((Symbol *)func_entry->val)->as.func;
-            sb_appendf(&gen.sb, "    ret %zu\n", func.arity*8);
+            sb_appendf(&gen.sb, "    ret $%zu\n", func.arity*8);
             break;
         }
         case OP_CALL: {
             Hash_Entry *entry = (Hash_Entry *)op->operand;
-            sb_appendf(&gen.sb, "    call $%.*s\n", entry->key_len, entry->key);
+            sb_appendf(&gen.sb, "    call \"%.*s\"\n", entry->key_len, entry->key);
 
             Function func = ((Symbol *)entry->val)->as.func;
             for (int64_t offs = (func.ret_arity-1)*8; offs >= 0; offs -= 8)
-                sb_appendf(&gen.sb, "    push qword [rax+%zu]\n", offs);
-            break;
-        }
-        case OP_EXTERN: {
-            Hash_Entry *entry = (Hash_Entry *)op->operand;
-            sb_appendf(&gen.sb, "extern %.*s\n", entry->key_len, entry->key);
+                sb_appendf(&gen.sb, "    pushq %zu(%%rax)\n", offs);
             break;
         }
         default:
@@ -254,7 +249,7 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
     snprintf(output_obj, len, "%s.o", output_file);
 
     Cmd cmd = {0};
-    cmd_append_many(&cmd, 5, "nasm", "-felf64", "-o", output_obj, output_asm);
+    cmd_append_many(&cmd, 4, "as", "-o", output_obj, output_asm);
     if (!cmd_exec(&cmd)) return;
 
     // cmd.count = 0;

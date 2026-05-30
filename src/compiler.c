@@ -70,11 +70,6 @@ void print_op(Op *op) {
         printf("CALL %.*s\n", entry->key_len, entry->key);
         break;
     }
-    case OP_EXTERN: {
-        Hash_Entry *entry = (Hash_Entry *)op->operand;
-        printf("EXTERN %.*s\n", entry->key_len, entry->key);
-        break;
-    }
     case OP_ADD:   printf("ADD\n");   break;
     case OP_SUB:   printf("SUB\n");   break;
     case OP_MUL:   printf("MUL\n");   break;
@@ -365,7 +360,6 @@ void compile_stmt(Compilation_Unit *compiler) {
                 COMPILER_EPRINTF(LEVEL_ERR, "Unknown function %.*s in module %.*s\n", tok->len, tok->start, module_name_len, module_name);
                 break;
             }
-            make_op(compiler, OP_EXTERN, (int64_t)entry);
         }
         make_op(compiler, OP_CALL, (int64_t)entry);
         break;
@@ -450,8 +444,7 @@ void compile_function(Compilation_Unit *compiler) {
 }
 
 void compile_external_function(Compilation_Unit *compiler) {
-    Hash_Entry *entry = compile_function_signature(compiler);
-    make_op(compiler, OP_EXTERN, (int64_t)entry);
+    compile_function_signature(compiler);
 
     if (!compiler->module.has_ext_funcs) {
         compiler->module.has_ext_funcs = 1;

@@ -1,68 +1,66 @@
-default rel
-
-global prints
-$prints:
-    push rbp
-    mov rbp, rsp
-    mov rdi, qword [rbp+16]
-    mov rsi, rdi
-    mov rax, 0
-    mov rcx, 255
+.globl prints
+prints:
+    pushq %rbp
+    movq %rsp, %rbp
+    movq 16(%rbp), %rdi
+    movq %rdi, %rsi
+    movq $0, %rax
+    movq $255, %rcx
     repne scasb
-    sub rdi, rsi
-    mov rcx, rdi
-    add cl, byte [buf]
+    subq %rsi, %rdi
+    movq %rdi, %rcx
+    addb (buf), %cl
     jnc prints_below_capacity
-    cmp cl, 255
+    cmpb $255, %cl
     jne prints_below_capacity
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, buf+1
-    movzx rdx, byte [buf]
+    movq $1, %rax
+    movq $1, %rdi
+    leaq (buf+1), %rsi
+    movzbq (buf), %rdx
     syscall
-    mov byte [buf], 0
+    movb $0, (buf)
 prints_below_capacity:
-    mov rdi, buf+1
-    movzx rbx, byte [buf]
-    add rdi, rbx
+    leaq (buf+1), %rdi
+    movzbq (buf), %rbx
+    addq %rbx, %rdi
     rep movsb
-    mov byte [buf], cl
-    mov rsp, rbp
-    pop rbp
-    ret
+    movb %cl, (buf)
+    movq %rbp, %rsp
+    popq %rbp
+    ret $8
 
-global printc
-$printc:
-    push rbp
-    mov rbp, rsp
-    mov r8, qword [rbp+16]
-    cmp byte [buf], 255
-    jl printc_below_capacity
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, buf+1
-    movzx rdx, byte [buf]
+.globl printc
+printc:
+    pushq %rbp
+    movq %rsp, %rbp
+    movq 16(%rbp), %r8
+    cmpb $255, (buf)
+    jb printc_below_capacity
+    movq $1, %rax
+    movq $1, %rdi
+    leaq (buf+1), %rsi
+    movzbq (buf), %rdx
     syscall
-    mov byte [buf], 0
+    movb $0, (buf)
 printc_below_capacity:
-    mov rdi, buf+1
-    movzx rbx, byte [buf]
-    add rdi, rbx
-    mov byte [rdi], r8b
-    inc byte [buf]
-    mov rsp, rbp
-    pop rbp
-    ret
+    leaq (buf+1), %rdi
+    movzbq (buf), %rbx
+    addq %rbx, %rdi
+    movb %r8b, (%rdi)
+    incb (buf)
+    movq %rbp, %rsp
+    popq %rbp
+    ret $8
 
-global flush
-$flush:
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, buf+1
-    movzx rdx, byte [buf]
+.globl flush
+flush:
+    movq $1, %rax
+    movq $1, %rdi
+    leaq (buf+1), %rsi
+    movzbq (buf), %rdx
     syscall
-    mov byte [buf], 0
+    movb $0, (buf)
     ret
 
-section .bss
-buf: resb 256
+.bss
+buf: .zero 256
