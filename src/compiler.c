@@ -393,6 +393,7 @@ Hash_Entry *compile_function_signature(Compilation_Unit *compiler) {
 
     Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     sym->type = STYPE_FUNC;
+    sym->as.func.module_name = compiler->module.name;
 
     Hash_Entry *entry = hashmap_add(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
     hashmap_add(&compiler->module.symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
@@ -483,6 +484,7 @@ void compile_functions(Compilation_Unit *compiler) {
     main->type = STYPE_FUNC;
     main->as.func.arity = 0;
     main->as.func.ret_arity = 1;
+    main->as.func.module_name = (String_View){0};
 
     Hash_Entry *entry = hashmap_add(&compiler->symbols, "main", 4, main);
     hashmap_add(&compiler->module.symbols, "main", 4, main);

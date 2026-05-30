@@ -1,5 +1,5 @@
-.globl prints
-prints:
+.globl "io::prints"
+"io::prints":
     pushq %rbp
     movq %rsp, %rbp
     movq 16(%rbp), %rdi
@@ -29,8 +29,8 @@ prints_below_capacity:
     popq %rbp
     ret $8
 
-.globl printc
-printc:
+.globl "io::printc"
+"io::printc":
     pushq %rbp
     movq %rsp, %rbp
     movq 16(%rbp), %r8
@@ -52,8 +52,8 @@ printc_below_capacity:
     popq %rbp
     ret $8
 
-.globl flush
-flush:
+.globl "io::flush"
+"io::flush":
     movq $1, %rax
     movq $1, %rdi
     leaq (buf+1), %rsi

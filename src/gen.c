@@ -184,12 +184,19 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_FUNC: {
             func_entry = (Hash_Entry *)op->operand;
-            sb_appendf(&gen.sb, ".globl \"%.*s\"\n", func_entry->key_len, func_entry->key);
-            sb_appendf(&gen.sb, "\"%.*s\":\n", func_entry->key_len, func_entry->key);
+            Function func = ((Symbol *)func_entry->val)->as.func;
+
+            if (func.module_name.str == NULL) {
+                sb_appendf(&gen.sb, ".globl \"%.*s\"\n", func_entry->key_len, func_entry->key);
+                sb_appendf(&gen.sb, "\"%.*s\":\n", func_entry->key_len, func_entry->key);
+            }
+            else {
+                sb_appendf(&gen.sb, ".globl \"%.*s::%.*s\"\n", func.module_name.len, func.module_name.str, func_entry->key_len, func_entry->key);
+                sb_appendf(&gen.sb, "\"%.*s::%.*s\":\n", func.module_name.len, func.module_name.str, func_entry->key_len, func_entry->key);
+            }
             sb_appendf(&gen.sb, "    pushq %%rbp\n");
             sb_appendf(&gen.sb, "    movq %%rsp, %%rbp\n");
 
-            Function func = ((Symbol *)func_entry->val)->as.func;
             for (size_t offs = (func.arity-1)*8 + 16; offs >= 16; offs -= 8)
                 sb_appendf(&gen.sb, "    pushq %zu(%%rbp)\n", offs);
             break;
@@ -205,9 +212,13 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
         }
         case OP_CALL: {
             Hash_Entry *entry = (Hash_Entry *)op->operand;
-            sb_appendf(&gen.sb, "    call \"%.*s\"\n", entry->key_len, entry->key);
-
             Function func = ((Symbol *)entry->val)->as.func;
+
+            if (func.module_name.str == NULL)
+                sb_appendf(&gen.sb, "    call \"%.*s\"\n", entry->key_len, entry->key);
+            else
+                sb_appendf(&gen.sb, "    call \"%.*s::%.*s\"\n", func.module_name.len, func.module_name.str, entry->key_len, entry->key);
+
             for (int64_t offs = (func.ret_arity-1)*8; offs >= 0; offs -= 8)
                 sb_appendf(&gen.sb, "    pushq %zu(%%rax)\n", offs);
             break;

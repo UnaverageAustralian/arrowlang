@@ -56,10 +56,6 @@ typedef struct {
 } Backpatchees;
 
 typedef struct {
-    int arity, ret_arity;
-} Function;
-
-typedef struct {
     String_View name;
     int pos;
 } Unresolved_Symbol;
@@ -76,6 +72,11 @@ typedef struct {
     Hashmap symbols;
     uint8_t has_ext_funcs;
 } Module;
+
+typedef struct {
+    String_View module_name;
+    int arity, ret_arity;
+} Function;
 
 typedef struct {
     Symbol_Type type;
