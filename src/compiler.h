@@ -32,7 +32,7 @@ typedef enum {
 } Symbol_Type;
 
 typedef struct {
-    char *file_path;
+    char **input_files;
     char *output_file;
     String_Array linker_files;
 } Compiler_Options;
@@ -89,6 +89,7 @@ typedef struct {
 typedef struct {
     Arena arena;
     Compiler_Options options;
+    Hashmap modules;
     uint8_t had_error;
 } Compiler;
 
@@ -106,7 +107,7 @@ typedef struct {
     uint8_t is_in_loop;
 } Compilation_Unit;
 
-void compile(const char *src, Compiler_Options options);
+void compile(Compiler_Options options);
 void print_op(Op *op);
 
 #endif // ARROW_COMPILER_H

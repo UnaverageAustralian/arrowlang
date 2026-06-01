@@ -113,7 +113,7 @@ static uint64_t hash_str(const char *key, size_t key_len) {
 }
 
 Hash_Entry *hashmap_get(Hashmap *map, const char *key, size_t key_len) {
-    assert(map->entries != NULL);
+    if (map->entries == NULL) return NULL;
     uint64_t index = hash_str(key, key_len) & (map->capacity-1);
 
     for (size_t i = 0; i < map->capacity; i++) {
@@ -142,7 +142,8 @@ Hash_Entry *hashmap_add(Hashmap *map, const char *key, size_t key_len, void *val
     if (map->count >= map->capacity/2)
         expand_hashmap(map);
 
-    if (hashmap_get(map, key, key_len)->key) return NULL;
+    Hash_Entry *entry = hashmap_get(map, key, key_len);
+    if (entry && entry->key) return NULL;
 
     uint64_t index = hash_str(key, key_len) & (map->capacity-1);
     while (map->entries[index].key != NULL) {

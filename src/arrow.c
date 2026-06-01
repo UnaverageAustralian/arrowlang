@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 
 #include "compiler.h"
 
@@ -44,11 +43,11 @@ Compiler_Options parse_arguments(int argc, char **argv) {
 
     if (i == argc) {
         usage(argv[0]);
-        fprintf(stderr, "ERROR: Expected input file name\n");
+        fprintf(stderr, "ERROR: Expected input file\n");
         exit(1);
     }
 
-    options.file_path = argv[i];
+    options.input_files = argv + i;
 
     if (options.output_file == NULL)
         options.output_file = "a";
@@ -57,15 +56,6 @@ Compiler_Options parse_arguments(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     Compiler_Options options = parse_arguments(argc, argv);
-
-    char *contents = open_file(options.file_path);
-    if (!contents) {
-        fprintf(stderr, "\x1b[31mERROR:\x1b[0m Could not read file: %s\n", strerror(errno));
-        return 1;
-    }
-
-    compile(contents, options);
-
-    free(contents);
+    compile(options);
     return 0;
 }

@@ -328,9 +328,10 @@ void lex_word(Lexer *lexer) {
 }
 
 void lex_string(Lexer *lexer) {
+    skip(lexer, 1);
     char c = peek(lexer, 0);
     while (c && c != '\"' && c != '\n')
-        skip(lexer, 1);
+        c = skip(lexer, 1);
     if (c) skip(lexer, 1);
 
     if (!c || c == '\n') {
@@ -629,6 +630,7 @@ char *tok_spelling(Token_Type type) {
     case TOK_EXT_FUNC:  return "EXT_FUNC";
     case TOK_C_FUNC:    return "C_FUNC";
     case TOK_IMPORT:    return "IMPORT";
+    case TOK_SCOPE:     return "SCOPE";
     case TOK_INT_LIT:   return "INT_LIT";
     case TOK_FLOAT_LIT: return "FLOAT_LIT";
     case TOK_WORD:      return "WORD";

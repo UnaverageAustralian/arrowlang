@@ -341,7 +341,7 @@ void compile_stmt(Compilation_Unit *compiler) {
         size_t module_name_len = tok->len;
 
         Hash_Entry *entry = hashmap_get(&compiler->symbols, tok->start, tok->len);
-        if (!entry->key) {
+        if (!entry || !entry->key) {
             Unresolved_Symbol sym = {
                 .name = { .len = tok->len, .str = tok->start },
                 .pos = compiler->ops.count,
@@ -355,7 +355,7 @@ void compile_stmt(Compilation_Unit *compiler) {
             expect(compiler, TOK_WORD);
 
             entry = hashmap_get(&((Symbol *)entry->val)->as.module.symbols, tok->start, tok->len);
-            if (!entry->key) {
+            if (!entry || !entry->key) {
                 compiler->global->had_error = 1;
                 COMPILER_EPRINTF(LEVEL_ERR, "Unknown function %.*s in module %.*s\n", tok->len, tok->start, module_name_len, module_name);
                 break;
@@ -376,7 +376,12 @@ void compile_stmt(Compilation_Unit *compiler) {
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Lone %s\n", tok_spelling(tok->type));
         break;
+    case TOK_IMPORT:
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Import is not allowed here\n");
+        break;
     case TOK_FUNC:
+    case TOK_EXT_FUNC:
     case TOK_EOF:
         eprintf(__FILE__, __LINE__, 0, LEVEL_ERR, "Invalid token %s reached in compile_stmt\n", tok_spelling(tok->type));
         exit(1);
@@ -526,7 +531,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
         Op *op = &compiler->ops.items[sym.pos];
 
         Hash_Entry *entry = hashmap_get(&compiler->symbols, sym.name.str, sym.name.len);
-        if (!entry->key || ((Symbol *)entry->val)->type != STYPE_FUNC) {
+        if (!entry || !entry->key || ((Symbol *)entry->val)->type != STYPE_FUNC) {
             compiler->global->had_error = 1;
             eprintf(op->file_path, op->line, op->pos, LEVEL_ERR, "Unknown function %.*s\n", sym.name.len, sym.name.str);
             continue;
@@ -554,23 +559,39 @@ Module compile_module(Compiler *global, const char *src, const char *file_path) 
 
     while (lexer.cur.type == TOK_IMPORT) {
         lexer_next(&lexer);
-        expect(&unit, TOK_WORD);
-        char *module_path = arena_calloc(&global->arena, lexer.prev.len + 12);
-        snprintf(module_path, lexer.prev.len + 12, "./std/%.*s.alng", lexer.prev.len, lexer.prev.start);
 
-        char *module_contents = open_file(module_path);
-        if (!module_contents) {
-            fprintf(stderr, "\x1b[31mERROR:\x1b[0m Could not read file %s for module %.*s: %s\n", module_path, lexer.prev.len, lexer.prev.start, strerror(errno));
-            exit(1);
+        lexer_next(&lexer);
+        if (lexer.prev.type == TOK_WORD) {
+            char *path = arena_calloc(&global->arena, lexer.prev.len + 12);
+            snprintf(path, lexer.prev.len + 12, "./std/%.*s.alng", lexer.prev.len, lexer.prev.start);
+
+            char *contents = open_file(path);
+            if (!contents) {
+                fprintf(stderr, "\x1b[31mERROR:\x1b[0m Could not read file %s for module %.*s: %s\n", path, lexer.prev.len, lexer.prev.start, strerror(errno));
+                exit(1);
+            }
+
+            Module module = compile_module(global, contents, path);
+
+            Symbol *sym = arena_calloc(&global->arena, sizeof(Symbol));
+            sym->type = STYPE_MODULE;
+            sym->as.module = module;
+
+            hashmap_add(&unit.symbols, module.name.str, module.name.len, sym);
         }
+        else if (lexer.prev.type == TOK_STR_LIT) {
+            Hash_Entry *entry = hashmap_get(&global->modules, lexer.prev.start, lexer.prev.len);
+            if (!entry || !entry->key) {
+                eprintf(unit.lexer->file_path, unit.lexer->prev.line, unit.lexer->prev.pos, LEVEL_ERR, "Unresolved module %.*s\n", lexer.prev.len, lexer.prev.start);
+                continue;
+            }
 
-        Module module = compile_module(global, module_contents, module_path);
-
-        Symbol *module_sym = arena_calloc(&global->arena, sizeof(Symbol));
-        module_sym->type = STYPE_MODULE;
-        module_sym->as.module = module;
-
-        hashmap_add(&unit.symbols, module.name.str, module.name.len, module_sym);
+            Symbol *module = (Symbol *)entry->val;
+            hashmap_add(&unit.symbols, entry->key, entry->key_len, module);
+        }
+        else {
+            eprintf(unit.lexer->file_path, unit.lexer->prev.line, unit.lexer->prev.pos, LEVEL_ERR, "Expected word or string, got %s\n", tok_spelling(lexer.prev.type));
+        }
     }
 
     compile_functions(&unit);
@@ -601,12 +622,27 @@ void link_files(Compiler_Options options) {
     cmd_exec(&cmd);
 }
 
-void compile(const char *src, Compiler_Options options) {
+void compile(Compiler_Options options) {
     Compiler compiler;
     init_compiler(&compiler, options);
 
-    compile_module(&compiler, src, options.file_path);
-    link_files(compiler.options);
+    for (int i = 0; options.input_files[i] != NULL; i++) {
+        char *contents = open_file(options.input_files[i]);
+        if (!contents) {
+            fprintf(stderr, "\x1b[31mERROR:\x1b[0m Could not read file: %s\n", strerror(errno));
+            exit(1);
+        }
+        Module module = compile_module(&compiler, contents, options.input_files[i]);
+
+        Symbol *module_sym = arena_calloc(&compiler.arena, sizeof(Symbol));
+        module_sym->type = STYPE_MODULE;
+        module_sym->as.module = module;
+
+        hashmap_add(&compiler.modules, module.name.str, module.name.len, module_sym);
+    }
+
+    if (!compiler.had_error)
+        link_files(compiler.options);
 
     free_arena(&compiler.arena);
 }
