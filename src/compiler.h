@@ -24,7 +24,7 @@ typedef enum {
     OP_JMPF,  OP_JMP,
     OP_LABEL, OP_LNOT,
     OP_FUNC,  OP_RET,
-    OP_CALL,
+    OP_CALL,  OP_STR,
 } Opcode;
 
 typedef enum {

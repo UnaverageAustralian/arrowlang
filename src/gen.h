@@ -6,6 +6,7 @@
 
 typedef struct {
     String_Builder sb;
+    String_Array strs;
     Ops *ops;
     int had_error;
 } Generator;

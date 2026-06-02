@@ -4,15 +4,13 @@
     movq %rsp, %rbp
     movq 16(%rbp), %rdi
     movq %rdi, %rsi
-    movq $0, %rax
+    movb $0, %al
     movq $255, %rcx
     repne scasb
     subq %rsi, %rdi
     movq %rdi, %rcx
     addb (buf), %cl
     jnc prints_below_capacity
-    cmpb $255, %cl
-    jne prints_below_capacity
     movq $1, %rax
     movq $1, %rdi
     leaq (buf+1), %rsi
@@ -23,8 +21,9 @@ prints_below_capacity:
     leaq (buf+1), %rdi
     movzbq (buf), %rbx
     addq %rbx, %rdi
+    movb %cl, %bl
     rep movsb
-    movb %cl, (buf)
+    movb %bl, (buf)
     movq %rbp, %rsp
     popq %rbp
     ret $8

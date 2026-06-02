@@ -70,6 +70,10 @@ void print_op(Op *op) {
         printf("CALL %.*s\n", entry->key_len, entry->key);
         break;
     }
+    case OP_STR: {
+        printf("STR %s\n", (char *)op->operand);
+        break;
+    }
     case OP_ADD:   printf("ADD\n");   break;
     case OP_SUB:   printf("SUB\n");   break;
     case OP_MUL:   printf("MUL\n");   break;
@@ -306,6 +310,12 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_GT:      make_op(compiler, OP_GT, 0);                 break;
     case TOK_GTEQ:    make_op(compiler, OP_GTEQ, 0);               break;
     case TOK_LNOT:    make_op(compiler, OP_LNOT, 0);               break;
+    case TOK_STR_LIT: {
+        char *str = arena_calloc(&compiler->global->arena, tok->len + 1);
+        strncpy(str, tok->start, tok->len);
+        make_op(compiler, OP_STR, (int64_t)str);
+        break;
+    }
     case TOK_IF:
         compile_if_stmt(compiler);
         break;
@@ -602,7 +612,7 @@ Module compile_module(Compiler *global, const char *src, const char *file_path) 
         print_ops(&compiler.ops);
 #endif
         char *output_file = arena_calloc(&global->arena, unit.module.name.len + 1);
-        snprintf(output_file, unit.module.name.len + 1, "%s", unit.module.name.str);
+        strncpy(output_file, unit.module.name.str, unit.module.name.len);
 
         Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
         generate_x86_64_linux(&unit.ops, output_file, main != NULL && main->key != NULL);

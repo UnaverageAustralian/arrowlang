@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,9 +8,8 @@
 #include "utils.h"
 
 void init_generator(Generator *gen, Ops *ops) {
+    *gen = (Generator){0};
     gen->ops = ops;
-    gen->sb = (String_Builder){0};
-    gen->had_error = 0;
 }
 
 void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
@@ -223,6 +223,10 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
                 sb_appendf(&gen.sb, "    pushq %zu(%%rax)\n", offs);
             break;
         }
+        case OP_STR:
+            sb_appendf(&gen.sb, "    pushq $.str%zu\n", gen.strs.count);
+            DA_APPEND(&gen.strs, (char *)op->operand);
+            break;
         default:
             eprintf(op->file_path, op->line, op->pos, LEVEL_ERR, "Unimplemented instruction: ");
             print_op(op);
@@ -230,6 +234,10 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         }
     }
+
+    sb_appendf(&gen.sb, ".section .rodata\n");
+    for (size_t i = 0; i < gen.strs.count; i++)
+        sb_appendf(&gen.sb, ".str%zu: .asciz \"%s\"\n", i, gen.strs.items[i]);
 
     if (gen.had_error) {
         free(gen.sb.items);
@@ -262,10 +270,6 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
     Cmd cmd = {0};
     cmd_append_many(&cmd, 4, "as", "-o", output_obj, output_asm);
     if (!cmd_exec(&cmd)) return;
-
-    // cmd.count = 0;
-    // cmd_append_many(&cmd, 4, "ld", "-o", output_file, output_obj);
-    // if (!cmd_exec(&cmd)) return;
 
     free(cmd.items);
     free(gen.sb.items);
