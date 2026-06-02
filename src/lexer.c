@@ -329,10 +329,20 @@ void lex_word(Lexer *lexer) {
 
 void lex_string(Lexer *lexer) {
     skip(lexer, 1);
+
     char c = peek(lexer, 0);
-    while (c && c != '\"' && c != '\n')
+
+    int i = 0;
+    while (c && c != '\"' && c != '\n') {
         c = skip(lexer, 1);
+        i++;
+    }
     if (c) skip(lexer, 1);
+
+    if (i >= 255) {
+        make_err_token(lexer, "String literal is too long");
+        return;
+    }
 
     if (!c || c == '\n') {
         make_err_token(lexer, "Unterminated string");
