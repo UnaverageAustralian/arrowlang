@@ -1,3 +1,32 @@
 E$printc ( a -> )
 E$prints ( a -> )
 E$flush  ( -> )
+
+$print ( a -> )
+    dup 0 < if
+        45 printc
+        neg
+    end
+
+    0 swap
+    while dup 0 > loop
+        dup 10 mod rot rot
+        10 /
+        swap 1+ swap
+    end drop
+
+    while dup 0 > loop
+        swap 48 + printc
+        1-
+    end
+$
+
+$printsln ( a -> )
+    prints
+    10 printc
+$
+
+$println ( a -> )
+    print
+    10 printc
+$
