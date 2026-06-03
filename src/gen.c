@@ -44,7 +44,7 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    addq %%rax, (%%rsp)\n");
             break;
         case OP_SUB:
-            sb_appendf(&gen.sb, "    popq rax\n");
+            sb_appendf(&gen.sb, "    popq %%rax\n");
             sb_appendf(&gen.sb, "    subq %%rax, (%%rsp)\n");
             break;
         case OP_MUL:
@@ -125,6 +125,14 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
             sb_appendf(&gen.sb, "    movq %%rax, 16(%%rsp)\n");
             sb_appendf(&gen.sb, "    movq %%rax, 24(%%rsp)\n");
+            break;
+        case OP_ROT:
+            sb_appendf(&gen.sb, "    movq 8(%%rsp), %%rax\n");
+            sb_appendf(&gen.sb, "    movq 16(%%rsp), %%rbx\n");
+            sb_appendf(&gen.sb, "    movq %%rax, 16(%%rsp)\n");
+            sb_appendf(&gen.sb, "    movq (%%rsp), %%rax\n");
+            sb_appendf(&gen.sb, "    movq %%rax, 8(%%rsp)\n");
+            sb_appendf(&gen.sb, "    movq %%rbx, (%%rsp)\n");
             break;
         case OP_NEG:
             sb_appendf(&gen.sb, "    negq (%%rsp)\n");

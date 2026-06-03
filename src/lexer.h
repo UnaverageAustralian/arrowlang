@@ -43,6 +43,7 @@ typedef enum {
     TOK_MACRO,     TOK_STRUCT,
     TOK_IMPORT,    TOK_NEG,
     TOK_ABS,       TOK_RET,
+    TOK_ROT,
     // Types
     TOK_I8,        TOK_U8,
     TOK_I16,       TOK_U16,

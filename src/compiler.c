@@ -102,6 +102,7 @@ void print_op(Op *op) {
     case OP_GT:    printf("GT\n");    break;
     case OP_GTEQ:  printf("GTEQ\n");  break;
     case OP_LNOT:  printf("LNOT\n");  break;
+    case OP_ROT:   printf("ROT\n");   break;
     case OP_RET:   printf("RET\n");   break;
     }
 }
@@ -310,6 +311,7 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_GT:      make_op(compiler, OP_GT, 0);                 break;
     case TOK_GTEQ:    make_op(compiler, OP_GTEQ, 0);               break;
     case TOK_LNOT:    make_op(compiler, OP_LNOT, 0);               break;
+    case TOK_ROT:     make_op(compiler, OP_ROT, 0);                break;
     case TOK_STR_LIT: {
         char *str = arena_calloc(&compiler->global->arena, tok->len + 1);
         strncpy(str, tok->start, tok->len);
