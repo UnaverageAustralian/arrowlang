@@ -41,6 +41,7 @@ Arrowlang's bit operators are: `&`/`and`, `|`/`or`, `^`/`xor`, `<<`/`shl`, `>>`/
 `\`/`swap` swaps the top two elements.
 `over2` pushes the second-to-top pair of elements onto the stack.
 `swap2` swaps the top two pairs of elements.
+`rot` moves the third-to-top element to the front of the stack.
 
 ```
  2 3 dup       // STACK: [ 2 | 3 ] -> [ 2 | 3 | 3 ]
@@ -50,6 +51,7 @@ Arrowlang's bit operators are: `&`/`and`, `|`/`or`, `^`/`xor`, `<<`/`shl`, `>>`/
  2 3 swap      // STACK: [ 2 | 3 ] -> [ 3 | 2 ]
  2 3 9 8 over2 // STACK: [ 2 | 3 | 9 | 8 ] -> [ 2 | 3 | 9 | 8 | 2 | 3 ]
  2 3 9 8 swap2 // STACK: [ 2 | 3 | 9 | 8 ] -> [ 9 | 8 | 2 | 3 ]
+ 2 3 9 rot     // STACK: [ 2 | 3 | 9 ] -> [ 3 | 9 | 2 ]
 ```
 
 ## Other operations
@@ -117,7 +119,9 @@ You can return early from a function with `ret`.
 
 ## Modules
 
-Modules are imported using `import`. For now you can only import standard library modules, these are:
+Modules are imported using `import`. You can either import standard library modules by putting a word after it (`import io`), or a local module by putting a string after it (`import "foo"`).
+
+The standard library modules are:
 `io` - For input-output functions (but no input yet).
 
 Here is an example using the `io` module:
