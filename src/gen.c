@@ -126,7 +126,7 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
             sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
             sb_appendf(&gen.sb, "    movq %%rax, 16(%%rsp)\n");
-            sb_appendf(&gen.sb, "    movq %%rax, 24(%%rsp)\n");
+            sb_appendf(&gen.sb, "    movq %%rbx, 24(%%rsp)\n");
             break;
         case OP_ROT:
             sb_appendf(&gen.sb, "    movq 8(%%rsp), %%rax\n");
