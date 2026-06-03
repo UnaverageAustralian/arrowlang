@@ -57,6 +57,7 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    popq %%rbx\n");
             sb_appendf(&gen.sb, "    popq %%rax\n");
             sb_appendf(&gen.sb, "    idivq %%rbx\n");
+            sb_appendf(&gen.sb, "    xorq %%rdx, %%rdx\n");
             sb_appendf(&gen.sb, "    pushq %%rax\n");
             break;
         case OP_MOD:
