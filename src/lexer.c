@@ -128,7 +128,7 @@ void lex_binary(Lexer *lexer, int sign) {
     }
 
     while (c == '0' || c == '1') {
-        if (num > (UINT64_MAX >> 1))
+        if ((uint64_t)num > (UINT64_MAX >> 1))
             had_error = 1;
         num = num * 2 + (c - '0');
         c = skip(lexer, 1);
@@ -155,7 +155,7 @@ void lex_octal(Lexer *lexer,int sign) {
     }
 
     while (c >= '0' && c <= '7') {
-        if (num > (UINT64_MAX >> 3))
+        if ((uint64_t)num > (UINT64_MAX >> 3))
             had_error = 1;
         num = num * 8 + (c - '0');
         c = skip(lexer, 1);
@@ -184,7 +184,7 @@ void lex_hex(Lexer *lexer, int sign) {
     }
 
     while (is_hex(c)) {
-        if (num > (UINT64_MAX >> 4))
+        if ((uint64_t)num > (UINT64_MAX >> 4))
             overflowed = 1;
         num = num * 16 + (c > 'F' ? c - 'a' + 10 : c > '9' ? c - 'A' + 10 : c - '0');
         float_num = float_num * 16 + (c > 'F' ? c - 'a' : c > '9' ? c - 'A' : c - '0');
