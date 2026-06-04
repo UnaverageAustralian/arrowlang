@@ -8,6 +8,11 @@ $print ( a -> )
         neg
     end
 
+    dup 0 = if
+        48 printc
+        ret
+    end
+
     0 swap
     while dup 0 > loop
         dup 10 mod rot rot
