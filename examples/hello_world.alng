@@ -1,0 +1,3 @@
+import io
+"Hello, World!" io::printsln
+io::flush

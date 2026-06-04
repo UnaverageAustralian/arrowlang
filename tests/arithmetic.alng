@@ -1,0 +1,9 @@
+import io
+
+2 3 + io::println
+2 3 - io::println
+2 3 * io::println
+5 3 / io::println
+5 3 % io::println
+5 neg io::println
+io::flush

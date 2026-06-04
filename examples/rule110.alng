@@ -1,0 +1,27 @@
+import io
+
+1
+0 while dup 63 < loop
+    swap
+    63 while dup 0 >= loop
+        dup2 >> 1 & if
+            35 io::printc
+        else
+            46 io::printc
+        end
+        1-
+    end drop
+    10 io::printc
+
+    0 62 while dup -1 >= loop
+        rot dup2 swap >>> 7 &
+        110 swap >> 1 &
+        rot swap over 1+ <<
+        swap2 rot rot |
+        rot
+        1-
+    end drop swap drop
+    swap 1+
+end
+
+io::flush

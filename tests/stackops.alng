@@ -1,0 +1,46 @@
+import io
+
+2 3 dup
+io::print 32 io::printc
+io::print 32 io::printc
+io::println
+
+2 3 swap
+io::print 32 io::printc
+io::println
+
+2 3 over
+io::print 32 io::printc
+io::print 32 io::printc
+io::println
+
+2 3 dup2
+io::print 32 io::printc
+io::print 32 io::printc
+io::print 32 io::printc
+io::println
+
+2 3 drop
+io::println
+
+2 3 9 8 over2
+io::print 32 io::printc
+io::print 32 io::printc
+io::print 32 io::printc
+io::print 32 io::printc
+io::print 32 io::printc
+io::println
+
+2 3 9 8 swap2
+io::print 32 io::printc
+io::print 32 io::printc
+io::print 32 io::printc
+io::print 32 io::printc
+io::println
+
+2 3 9 rot
+io::print 32 io::printc
+io::print 32 io::printc
+io::println
+
+io::flush

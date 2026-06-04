@@ -1,0 +1,11 @@
+import io
+
+10 9 &  io::println
+10 9 |  io::println
+10 9 ^  io::println
+10 1 >> io::println
+10 1 << io::println
+56 ~    io::println
+2 4 >>> io::println
+0x8000000000000000 1 <<< io::println
+io::flush

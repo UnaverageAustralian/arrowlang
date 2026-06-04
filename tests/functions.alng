@@ -1,0 +1,8 @@
+import io
+
+$addmul ( a b -> c )
+    swap over + *
+$
+
+2 3 addmul io::println
+io::flush
