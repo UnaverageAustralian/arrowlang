@@ -10,3 +10,5 @@ import io
 3 3 <  if 1 else 0 end io::println
 3 3 <= if 1 else 0 end io::println
 io::flush
+
+0

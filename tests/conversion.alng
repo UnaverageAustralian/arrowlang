@@ -1,0 +1,12 @@
+import io
+
+128u8  255u8         + i64 io::println
+128u16 65535u16      + i64 io::println
+128u32 4294967295u32 + i64 io::println
+255i8                  i64 io::println
+2.1f32 1.09          - i64 io::println
+256.0 i8               i64 io::println
+65536.0 i16            i64 io::println
+
+io::flush
+0

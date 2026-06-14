@@ -7,3 +7,5 @@ import io
 5 3 % io::println
 5 neg io::println
 io::flush
+
+0

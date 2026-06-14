@@ -1,8 +1,9 @@
 import io
 
-$addmul ( a b -> c )
+$addmul ( i64 i64 -> i64 )
     swap over + *
 $
 
 2 3 addmul io::println
 io::flush
+0

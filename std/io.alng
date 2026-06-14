@@ -1,37 +1,14 @@
-E$printc ( a -> )
-E$prints ( a -> )
+E$printc ( char -> )
+E$prints ( str -> )
+E$print  ( i64 -> )
 E$flush  ( -> )
 
-$print ( a -> )
-    dup 0 < if
-        45 printc
-        neg
-    end
-
-    dup 0 = if
-        48 printc
-        ret
-    end
-
-    0 swap
-    while dup 0 > loop
-        dup 10 mod rot rot
-        10 /
-        swap 1+ swap
-    end drop
-
-    while dup 0 > loop
-        swap 48 + printc
-        1-
-    end
-$
-
-$printsln ( a -> )
+$printsln ( str -> )
     prints
-    10 printc
+    10char printc
 $
 
-$println ( a -> )
+$println ( i64 -> )
     print
-    10 printc
+    10char printc
 $

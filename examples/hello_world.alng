@@ -1,3 +1,4 @@
 import io
 "Hello, World!" io::printsln
 io::flush
+0

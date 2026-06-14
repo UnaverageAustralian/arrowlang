@@ -42,16 +42,14 @@ typedef enum {
     TOK_BRK,       TOK_CONTINUE,
     TOK_MACRO,     TOK_STRUCT,
     TOK_IMPORT,    TOK_NEG,
-    TOK_ABS,       TOK_RET,
-    TOK_ROT,
+    TOK_RET,       TOK_ROT,
     // Types
     TOK_I8,        TOK_U8,
     TOK_I16,       TOK_U16,
     TOK_I32,       TOK_U32,
     TOK_I64,       TOK_U64,
     TOK_F32,       TOK_F64,
-    TOK_CHAR,      TOK_TOF32,
-    TOK_TOF64,     TOK_TOINT,
+    TOK_CHAR,      TOK_STR,
     // Generics
     TOK_INTEGER,   TOK_REAL,
     TOK_NUMBER,
@@ -59,12 +57,6 @@ typedef enum {
     TOK_EOF,
     TOK_LAST = TOK_EOF,
 } Token_Type;
-
-typedef enum {
-    TYPE_I8,  TYPE_I16,
-    TYPE_I32, TYPE_I64,
-    TYPE_F32, TYPE_F64,
-} Type;
 
 typedef struct {
     Token_Type type;

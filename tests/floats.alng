@@ -1,0 +1,21 @@
+import io
+
+10.0 10.0 + i64 io::println
+10.0 5.2  - i64 io::println
+10.0 9.9  * i64 io::println
+10.0 3.0  / i64 io::println
+9.9 neg     i64 io::println
+
+10.0 10.0 =  i64 io::println
+10.0 9.9  =  i64 io::println
+10.0 9.9  >  i64 io::println
+9.9 10.0  >  i64 io::println
+9.9 10.0  <  i64 io::println
+10.0 9.9  <  i64 io::println
+10.0 10.0 >= i64 io::println
+10.0 10.0 >  i64 io::println
+10.0 10.0 <= i64 io::println
+10.0 10.0 <  i64 io::println
+
+io::flush
+0

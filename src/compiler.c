@@ -6,13 +6,14 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "analyser.h"
 #include "gen.h"
 #include "compiler.h"
 #include "lexer.h"
 #include "utils.h"
 
 #define COMPILER_EPRINTF(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->prev.line, compiler->lexer->prev.pos, level, __VA_ARGS__); 
-#define COMPILER_EPRINTF_AT_CUR(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->cur.line, compiler->lexer->cur.pos, level, __VA_ARGS__); 
+#define COMPILER_EPRINTF_AT_CUR(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->cur.line, compiler->lexer->cur.pos, level, __VA_ARGS__);
 
 inline String_View strip_file_path(const char *path) {
     String_View stripped = { .len = 0, .str = path };
@@ -46,65 +47,77 @@ void init_compilation_unit(Compilation_Unit *unit, Lexer *lexer, Compiler *globa
     unit->module.symbols = (Hashmap){0};
 }
 
+char *opcode_spelling(Opcode opcode) {
+    switch (opcode) {
+    case OP_NOP:     return "NOP";
+    case OP_PUSH:    return "PUSH";
+    case OP_JMPF:    return "JMPF";
+    case OP_JMP:     return "JMP";
+    case OP_LABEL:   return "LABEL";
+    case OP_FUNC:    return "FUNC";
+    case OP_CALL:    return "CALL";
+    case OP_STR:     return "STR";
+    case OP_ADD:     return "ADD";
+    case OP_SUB:     return "SUB";
+    case OP_MUL:     return "MUL";
+    case OP_DIV:     return "DIV";
+    case OP_MOD:     return "MOD";
+    case OP_AND:     return "AND";
+    case OP_OR:      return "OR";
+    case OP_XOR:     return "XOR";
+    case OP_SHL:     return "SHL";
+    case OP_SHR:     return "SHR";
+    case OP_ROL:     return "ROL";
+    case OP_ROR:     return "ROR";
+    case OP_NOT:     return "NOT";
+    case OP_DUP:     return "DUP";
+    case OP_OVER:    return "OVER";
+    case OP_DUP2:    return "DUP2";
+    case OP_DROP:    return "DROP";
+    case OP_SWAP:    return "SWAP";
+    case OP_OVER2:   return "OVER";
+    case OP_SWAP2:   return "SWAP";
+    case OP_NEG:     return "NEG";
+    case OP_EQ:      return "EQ";
+    case OP_LT:      return "LT";
+    case OP_LTEQ:    return "LTEQ";
+    case OP_GT:      return "GT";
+    case OP_GTEQ:    return "GTEQ";
+    case OP_LNOT:    return "LNOT";
+    case OP_ROT:     return "ROT";
+    case OP_RET:     return "RET";
+    case OP_CONVERT: return "CONVERT";
+    case OP_START:   return "START";
+    case OP_END:     return "END";
+    default:         return "UNKNOWN";
+    }
+}
+
 void print_op(Op *op) {
+    printf("%s", opcode_spelling(op->opcode));
     switch (op->opcode) {
-    case OP_PUSH:
-        printf("PUSH %llu\n", op->operand);
-        break;
     case OP_JMPF:
-        printf("JMPF %llu\n", op->operand);
-        break;
     case OP_JMP:
-        printf("JMP %llu\n", op->operand);
-        break;
     case OP_LABEL:
-        printf("LABEL %llu\n", op->operand);
+    case OP_PUSH:
+        printf(" %llu", op->operand);
         break;
+    case OP_CALL:
     case OP_FUNC: {
         Hash_Entry *entry = (Hash_Entry *)op->operand;
-        printf("FUNC %.*s\n", entry->key_len, entry->key);
-        break;
-    }
-    case OP_CALL: {
-        Hash_Entry *entry = (Hash_Entry *)op->operand;
-        printf("CALL %.*s\n", entry->key_len, entry->key);
+        printf(" %.*s", entry->key_len, entry->key);
         break;
     }
     case OP_STR: {
-        printf("STR %s\n", (char *)op->operand);
+        printf(" %s", (char *)op->operand);
         break;
     }
-    case OP_ADD:   printf("ADD\n");   break;
-    case OP_SUB:   printf("SUB\n");   break;
-    case OP_MUL:   printf("MUL\n");   break;
-    case OP_DIV:   printf("DIV\n");   break;
-    case OP_MOD:   printf("MOD\n");   break;
-    case OP_AND:   printf("AND\n");   break;
-    case OP_OR:    printf("OR\n");    break;
-    case OP_XOR:   printf("XOR\n");   break;
-    case OP_SHL:   printf("SHL\n");   break;
-    case OP_SHR:   printf("SHR\n");   break;
-    case OP_ROL:   printf("ROL\n");   break;
-    case OP_ROR:   printf("ROR\n");   break;
-    case OP_NOT:   printf("NOT\n");   break;
-    case OP_DUP:   printf("DUP\n");   break;
-    case OP_OVER:  printf("OVER\n");  break;
-    case OP_DUP2:  printf("DUP2\n");  break;
-    case OP_DROP:  printf("DROP\n");  break;
-    case OP_SWAP:  printf("SWAP\n");  break;
-    case OP_OVER2: printf("OVER2\n"); break;
-    case OP_SWAP2: printf("SWAP2\n"); break;
-    case OP_NEG:   printf("NEG\n");   break;
-    case OP_ABS:   printf("ABS\n");   break;
-    case OP_EQ:    printf("EQ\n");    break;
-    case OP_LT:    printf("LT\n");    break;
-    case OP_LTEQ:  printf("LTEQ\n");  break;
-    case OP_GT:    printf("GT\n");    break;
-    case OP_GTEQ:  printf("GTEQ\n");  break;
-    case OP_LNOT:  printf("LNOT\n");  break;
-    case OP_ROT:   printf("ROT\n");   break;
-    case OP_RET:   printf("RET\n");   break;
+    case OP_CONVERT: {
+        printf(" %s => %s", type_spelling(op->types[0]), type_spelling(op->types[1]));
     }
+    default: break;
+    }
+    printf("\n");
 }
 
 void print_ops(Ops *ops) {
@@ -115,7 +128,7 @@ void print_ops(Ops *ops) {
     }
 }
 
-inline void make_op(Compilation_Unit *compiler, Opcode opcode, int64_t operand) {
+inline void make_op(Compilation_Unit *compiler, Opcode opcode, uint64_t operand) {
     Op op = {
         .opcode = opcode,
         .operand = operand,
@@ -126,7 +139,7 @@ inline void make_op(Compilation_Unit *compiler, Opcode opcode, int64_t operand) 
     DA_APPEND(&compiler->ops, op);
 }
 
-inline void make_op_at_cur(Compilation_Unit *compiler, Opcode opcode, int64_t operand) {
+inline void make_op_at_cur(Compilation_Unit *compiler, Opcode opcode, uint64_t operand) {
     Op op = {
         .opcode = opcode,
         .operand = operand,
@@ -150,6 +163,7 @@ void compile_stmt(Compilation_Unit *compiler);
 void compile_if_stmt(Compilation_Unit *compiler) {
     int if_start = compiler->ops.count;
     make_op(compiler, OP_JMPF, 0);
+    make_op(compiler, OP_IF, 0);
 
     Token *cur = &compiler->lexer->cur;
     while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_ELSE && cur->type != TOK_EOF)
@@ -161,7 +175,7 @@ void compile_if_stmt(Compilation_Unit *compiler) {
 
         int else_start = compiler->ops.count;
         make_op(compiler, OP_JMP, 0);
-        make_op(compiler, OP_LABEL, compiler->label_count++);
+        make_op_at_cur(compiler, OP_ELSE, compiler->label_count++);
 
         while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_EOF)
             compile_stmt(compiler);
@@ -175,14 +189,14 @@ void compile_if_stmt(Compilation_Unit *compiler) {
     }
 
     lexer_next(compiler->lexer);
-    make_op(compiler, OP_LABEL, compiler->label_count++);
+    make_op(compiler, OP_END, compiler->label_count++);
 }
 
 void compile_while_stmt(Compilation_Unit *compiler) {
     compiler->is_in_loop = 1;
 
     int loop_label = compiler->label_count;
-    make_op(compiler, OP_LABEL, compiler->label_count++);
+    make_op(compiler, OP_START, compiler->label_count++);
 
     Token *cur = &compiler->lexer->cur;
     while (cur->type != TOK_LOOP && cur->type != TOK_LBRACE && cur->type != TOK_EOF)
@@ -190,6 +204,7 @@ void compile_while_stmt(Compilation_Unit *compiler) {
 
     int loop_start = compiler->ops.count;
     make_op_at_cur(compiler, OP_JMPF, 0);
+    make_op_at_cur(compiler, OP_END, compiler->label_count++);
 
     Token_Type end_type;
     if (cur->type == TOK_LBRACE)
@@ -204,6 +219,8 @@ void compile_while_stmt(Compilation_Unit *compiler) {
     }
 
     lexer_next(compiler->lexer);
+    make_op(compiler, OP_START, UINT64_MAX);
+
     while (cur->type != TOK_RBRACE && cur->type != TOK_END && cur->type != TOK_EOF)
         compile_stmt(compiler);
     compiler->ops.items[loop_start].operand = compiler->label_count;
@@ -227,7 +244,7 @@ void compile_while_stmt(Compilation_Unit *compiler) {
         compiler->ops.items[compiler->conts.positions[i]].operand = loop_label;
         compiler->conts.count--;
     }
-    make_op(compiler, OP_LABEL, compiler->label_count++);
+    make_op(compiler, OP_END, compiler->label_count++);
 
     compiler->is_in_loop = 0;
 }
@@ -242,7 +259,7 @@ void compile_loop_stmt(Compilation_Unit *compiler) {
         end_type = TOK_END;
 
     int loop_label = compiler->label_count;
-    make_op(compiler, OP_LABEL, compiler->label_count++);
+    make_op(compiler, OP_START, compiler->label_count++);
     int loop_start = compiler->ops.count;
 
     Token *cur = &compiler->lexer->cur;
@@ -268,9 +285,30 @@ void compile_loop_stmt(Compilation_Unit *compiler) {
         compiler->ops.items[compiler->conts.positions[i]].operand = loop_label;
         compiler->conts.count--;
     }
-    make_op(compiler, OP_LABEL, compiler->label_count++);
+    make_op(compiler, OP_END, compiler->label_count++);
 
     compiler->is_in_loop = 0;
+}
+
+Type get_type(Compilation_Unit *compiler) {
+    switch (compiler->lexer->prev.type) {
+    case TOK_I8:   return TYPE_I8;
+    case TOK_CHAR: return TYPE_CHAR;
+    case TOK_U8:   return TYPE_U8;
+    case TOK_I16:  return TYPE_I16;
+    case TOK_U16:  return TYPE_U16;
+    case TOK_I32:  return TYPE_I32;
+    case TOK_U32:  return TYPE_U32;
+    case TOK_I64:  return TYPE_I64;
+    case TOK_U64:  return TYPE_U64;
+    case TOK_F32:  return TYPE_F32;
+    case TOK_F64:  return TYPE_F64;
+    case TOK_STR:  return TYPE_STR;
+    default:
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Expected type, got %s\n", tok_spelling(compiler->lexer->cur.type));
+        return TYPE_VOID;
+    }
 }
 
 void compile_stmt(Compilation_Unit *compiler) {
@@ -282,36 +320,42 @@ void compile_stmt(Compilation_Unit *compiler) {
 #endif
 
     switch (tok->type) {
-    case TOK_INT_LIT: make_op(compiler, OP_PUSH, tok->as.integer); break;
-    case TOK_ADD:     make_op(compiler, OP_ADD, 0);                break;
-    case TOK_SUB:     make_op(compiler, OP_SUB, 0);                break;
-    case TOK_MUL:     make_op(compiler, OP_MUL, 0);                break;
-    case TOK_DIV:     make_op(compiler, OP_DIV, 0);                break;
-    case TOK_MOD:     make_op(compiler, OP_MOD, 0);                break;
-    case TOK_AND:     make_op(compiler, OP_AND, 0);                break;
-    case TOK_OR:      make_op(compiler, OP_OR, 0);                 break;
-    case TOK_XOR:     make_op(compiler, OP_XOR, 0);                break;
-    case TOK_SHL:     make_op(compiler, OP_SHL, 0);                break;
-    case TOK_SHR:     make_op(compiler, OP_SHR, 0);                break;
-    case TOK_ROL:     make_op(compiler, OP_ROL, 0);                break;
-    case TOK_ROR:     make_op(compiler, OP_ROR, 0);                break;
-    case TOK_NOT:     make_op(compiler, OP_NOT, 0);                break;
-    case TOK_DUP:     make_op(compiler, OP_DUP, 0);                break;
-    case TOK_OVER:    make_op(compiler, OP_OVER, 0);               break;
-    case TOK_DUP2:    make_op(compiler, OP_DUP2, 0);               break;
-    case TOK_DROP:    make_op(compiler, OP_DROP, 0);               break;
-    case TOK_SWAP:    make_op(compiler, OP_SWAP, 0);               break;
-    case TOK_OVER2:   make_op(compiler, OP_OVER2, 0);              break;
-    case TOK_SWAP2:   make_op(compiler, OP_SWAP2, 0);              break;
-    case TOK_NEG:     make_op(compiler, OP_NEG, 0);                break;
-    case TOK_ABS:     make_op(compiler, OP_ABS, 0);                break;
-    case TOK_EQ:      make_op(compiler, OP_EQ, 0);                 break;
-    case TOK_LT:      make_op(compiler, OP_LT, 0);                 break;
-    case TOK_LTEQ:    make_op(compiler, OP_LTEQ, 0);               break;
-    case TOK_GT:      make_op(compiler, OP_GT, 0);                 break;
-    case TOK_GTEQ:    make_op(compiler, OP_GTEQ, 0);               break;
-    case TOK_LNOT:    make_op(compiler, OP_LNOT, 0);               break;
-    case TOK_ROT:     make_op(compiler, OP_ROT, 0);                break;
+    case TOK_INT_LIT:
+        make_op(compiler, OP_PUSH, tok->as.integer);
+        compiler->ops.items[compiler->ops.count-1].types[0] = TYPE_INTEGER;
+        break;
+    case TOK_FLOAT_LIT:
+        make_op(compiler, OP_PUSH, tok->as.integer);
+        compiler->ops.items[compiler->ops.count-1].types[0] = TYPE_REAL;
+        break;
+    case TOK_ADD:   make_op(compiler, OP_ADD, 0);   break;
+    case TOK_SUB:   make_op(compiler, OP_SUB, 0);   break;
+    case TOK_MUL:   make_op(compiler, OP_MUL, 0);   break;
+    case TOK_DIV:   make_op(compiler, OP_DIV, 0);   break;
+    case TOK_MOD:   make_op(compiler, OP_MOD, 0);   break;
+    case TOK_AND:   make_op(compiler, OP_AND, 0);   break;
+    case TOK_OR:    make_op(compiler, OP_OR, 0);    break;
+    case TOK_XOR:   make_op(compiler, OP_XOR, 0);   break;
+    case TOK_SHL:   make_op(compiler, OP_SHL, 0);   break;
+    case TOK_SHR:   make_op(compiler, OP_SHR, 0);   break;
+    case TOK_ROL:   make_op(compiler, OP_ROL, 0);   break;
+    case TOK_ROR:   make_op(compiler, OP_ROR, 0);   break;
+    case TOK_NOT:   make_op(compiler, OP_NOT, 0);   break;
+    case TOK_DUP:   make_op(compiler, OP_DUP, 0);   break;
+    case TOK_OVER:  make_op(compiler, OP_OVER, 0);  break;
+    case TOK_DUP2:  make_op(compiler, OP_DUP2, 0);  break;
+    case TOK_DROP:  make_op(compiler, OP_DROP, 0);  break;
+    case TOK_SWAP:  make_op(compiler, OP_SWAP, 0);  break;
+    case TOK_OVER2: make_op(compiler, OP_OVER2, 0); break;
+    case TOK_SWAP2: make_op(compiler, OP_SWAP2, 0); break;
+    case TOK_NEG:   make_op(compiler, OP_NEG, 0);   break;
+    case TOK_EQ:    make_op(compiler, OP_EQ, 0);    break;
+    case TOK_LT:    make_op(compiler, OP_LT, 0);    break;
+    case TOK_LTEQ:  make_op(compiler, OP_LTEQ, 0);  break;
+    case TOK_GT:    make_op(compiler, OP_GT, 0);    break;
+    case TOK_GTEQ:  make_op(compiler, OP_GTEQ, 0);  break;
+    case TOK_LNOT:  make_op(compiler, OP_LNOT, 0);  break;
+    case TOK_ROT:   make_op(compiler, OP_ROT, 0);   break;
     case TOK_STR_LIT: {
         char *str = arena_calloc(&compiler->global->arena, tok->len + 1);
         strncpy(str, tok->start, tok->len);
@@ -332,6 +376,7 @@ void compile_stmt(Compilation_Unit *compiler) {
         if (!compiler->is_in_loop) {
             compiler->global->had_error = 1;
             COMPILER_EPRINTF(LEVEL_ERR, "Brk can only be in loops\n");
+            return;
         }
         compiler->brks.positions[compiler->brks.count++] = compiler->ops.count;
         make_op(compiler, OP_JMP, -1);
@@ -340,6 +385,7 @@ void compile_stmt(Compilation_Unit *compiler) {
         if (!compiler->is_in_loop) {
             compiler->global->had_error = 1;
             COMPILER_EPRINTF(LEVEL_ERR, "Continue can only be in loops\n");
+            return;
         }
         compiler->conts.positions[compiler->conts.count++] = compiler->ops.count;
         make_op(compiler, OP_JMP, -1);
@@ -370,16 +416,31 @@ void compile_stmt(Compilation_Unit *compiler) {
             if (!entry || !entry->key) {
                 compiler->global->had_error = 1;
                 COMPILER_EPRINTF(LEVEL_ERR, "Unknown function %.*s in module %.*s\n", tok->len, tok->start, module_name_len, module_name);
-                break;
+                return;
             }
         }
         make_op(compiler, OP_CALL, (int64_t)entry);
         break;
     }
+    case TOK_I8:
+    case TOK_U8:
+    case TOK_CHAR:
+    case TOK_I16:
+    case TOK_U16:
+    case TOK_I32:
+    case TOK_U32:
+    case TOK_I64:
+    case TOK_U64:
+    case TOK_F32:
+    case TOK_F64:
+    case TOK_STR:
+        make_op(compiler, OP_CONVERT, 0);
+        compiler->ops.items[compiler->ops.count-1].types[1] = get_type(compiler);
+        break;
     case TOK_ERROR:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "%.*s\n", tok->len, tok->start);
-        break;
+        return;
     case TOK_ELSE:
     case TOK_SEMICOLON:
     case TOK_END:
@@ -387,11 +448,11 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_SCOPE:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Lone %s\n", tok_spelling(tok->type));
-        break;
+        return;
     case TOK_IMPORT:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Import is not allowed here\n");
-        break;
+        return;
     case TOK_FUNC:
     case TOK_EXT_FUNC:
     case TOK_EOF:
@@ -400,7 +461,7 @@ void compile_stmt(Compilation_Unit *compiler) {
     default:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Unimplemented operation starting with token %s\n", tok_spelling(tok->type));
-        break;
+        return;
     }
 }
 
@@ -421,16 +482,16 @@ Hash_Entry *compile_function_signature(Compilation_Unit *compiler) {
 
     expect(compiler, TOK_LPAREN);
     while (compiler->lexer->cur.type != TOK_ARROW && compiler->lexer->cur.type != TOK_RPAREN && compiler->lexer->cur.type != TOK_EOF) {
-        expect(compiler, TOK_WORD);
-        sym->as.func.arity++;
+        lexer_next(compiler->lexer);
+        DA_APPEND(&sym->as.func.param_types, get_type(compiler));
     }
 
     expect(compiler, TOK_ARROW);
     if (compiler->lexer->prev.type == TOK_EOF) return entry;
 
     while (compiler->lexer->cur.type != TOK_RPAREN && compiler->lexer->cur.type != TOK_EOF) {
-        expect(compiler, TOK_WORD);
-        sym->as.func.ret_arity++;
+        lexer_next(compiler->lexer);
+        DA_APPEND(&sym->as.func.return_types, get_type(compiler));
     }
 
     expect(compiler, TOK_RPAREN);
@@ -499,8 +560,7 @@ void compile_functions(Compilation_Unit *compiler) {
 
     Symbol *main = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     main->type = STYPE_FUNC;
-    main->as.func.arity = 0;
-    main->as.func.ret_arity = 1;
+    DA_APPEND(&main->as.func.return_types, TYPE_U8);
     main->as.func.module_name = (String_View){0};
 
     Hash_Entry *entry = hashmap_add(&compiler->symbols, "main", 4, main);
@@ -609,16 +669,19 @@ Module compile_module(Compiler *global, const char *src, const char *file_path) 
     compile_functions(&unit);
     resolve_symbols(&unit);
 
+    global->had_error |= type_check(&unit.ops);
+
+#ifdef PRINT_IR
+    print_ops(&unit.ops);
+#else
     if (!global->had_error) {
-#ifdef DEBUG
-        print_ops(&compiler.ops);
-#endif
         char *output_file = arena_calloc(&global->arena, unit.module.name.len + 1);
         strncpy(output_file, unit.module.name.str, unit.module.name.len);
 
         Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
         generate_x86_64_linux(&unit.ops, output_file, main != NULL && main->key != NULL);
     }
+#endif
 
     free(unit.ops.items);
     free(unit.symbols.entries);
@@ -653,8 +716,10 @@ void compile(Compiler_Options options) {
         hashmap_add(&compiler.modules, module.name.str, module.name.len, module_sym);
     }
 
+#ifndef PRINT_IR
     if (!compiler.had_error)
         link_files(compiler.options);
+#endif
 
     free_arena(&compiler.arena);
 }

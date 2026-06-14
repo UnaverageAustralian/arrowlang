@@ -35,7 +35,6 @@ io::println
 io::print 32 io::printc
 io::print 32 io::printc
 io::print 32 io::printc
-io::print 32 io::printc
 io::println
 
 2 3 9 rot
@@ -44,3 +43,5 @@ io::print 32 io::printc
 io::println
 
 io::flush
+
+0

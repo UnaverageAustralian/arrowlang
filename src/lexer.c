@@ -25,16 +25,14 @@ static const char *keywords[] = {
     "brk",     "continue",
     "macro",   "struct",
     "import",  "neg",
-    "abs",     "ret",
-    "rot",
+    "ret",     "rot",
 
     "i8",      "u8",
     "i16",     "u16",
     "i32",     "u32",
     "i64",     "u64",
     "f32",     "f64",
-    "char",    "tof32",
-    "tof64",   "toint",
+    "char",    "str",
 
     "Integer", "Real",
     "Number",
@@ -622,7 +620,6 @@ char *tok_spelling(Token_Type type) {
     case TOK_OVER2:     return "OVER2";
     case TOK_SWAP2:     return "SWAP2";
     case TOK_NEG:       return "NEG";
-    case TOK_ABS:       return "ABS";
     case TOK_ROT:       return "ROT";
     case TOK_IF:        return "IF";
     case TOK_ELSE:      return "ELSE";

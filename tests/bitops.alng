@@ -9,3 +9,5 @@ import io
 2 4 >>> io::println
 0x8000000000000000 1 <<< io::println
 io::flush
+
+0

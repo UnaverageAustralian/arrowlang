@@ -1,3 +1,33 @@
+.globl "io::print"
+"io::print":
+    pushq %rbp
+    movq %rsp, %rbp
+    movq 16(%rbp), %rax
+    xorq %rcx, %rcx
+    movq $10, %rbx
+    cmpq $0, %rax
+    jge positive
+    pushq $45
+    call "io::printc"
+    negq %rax
+    movq $10, %rbx
+positive:
+    xorq %rdx, %rdx
+    idivq %rbx
+    pushq %rdx
+    incq %rcx
+    cmpq $0, %rax
+    jg positive
+pop_digit:
+    addq $'0, (%rsp)
+    call "io::printc"
+    decq %rcx
+    cmpq $0, %rcx
+    jg pop_digit
+    movq %rbp, %rsp
+    popq %rbp
+    ret $8
+
 .globl "io::prints"
 "io::prints":
     pushq %rbp
