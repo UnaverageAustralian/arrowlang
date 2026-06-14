@@ -12,20 +12,22 @@
 
 char *type_spelling(Type type) {
     switch (type) {
-    case TYPE_VOID: return "void";
-    case TYPE_I8:   return "i8";
-    case TYPE_CHAR: return "char";
-    case TYPE_U8:   return "u8";
-    case TYPE_I16:  return "i16";
-    case TYPE_U16:  return "u16";
-    case TYPE_I32:  return "i32";
-    case TYPE_U32:  return "u32";
-    case TYPE_I64:  return "i64";
-    case TYPE_U64:  return "u64";
-    case TYPE_F32:  return "f32";
-    case TYPE_F64:  return "f64";
-    case TYPE_STR:  return "str";
-    default:        return "unknown";
+    case TYPE_VOID:    return "void";
+    case TYPE_I8:      return "i8";
+    case TYPE_CHAR:    return "char";
+    case TYPE_U8:      return "u8";
+    case TYPE_I16:     return "i16";
+    case TYPE_U16:     return "u16";
+    case TYPE_I32:     return "i32";
+    case TYPE_U32:     return "u32";
+    case TYPE_I64:     return "i64";
+    case TYPE_U64:     return "u64";
+    case TYPE_F32:     return "f32";
+    case TYPE_F64:     return "f64";
+    case TYPE_STR:     return "str";
+    case TYPE_INTEGER: return "int_lit";
+    case TYPE_REAL:    return "real_lit";
+    default:           return "unknown";
     }
 }
 
