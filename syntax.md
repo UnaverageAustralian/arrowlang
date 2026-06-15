@@ -35,12 +35,19 @@ Arrowlang's bit operators are: `&`/`and`, `|`/`or`, `^`/`xor`, `<<`/`shl`, `>>`/
 ## Stack operations
 
 `dup` duplicates the top of the stack.
+
 `over` pushes the second-to-top element onto the stack.
+
 `dup2` duplicates the top two elements.
+
 `.`/`drop` drops the top of the stack.
+
 `\`/`swap` swaps the top two elements.
+
 `over2` pushes the second-to-top pair of elements onto the stack.
+
 `swap2` swaps the top two pairs of elements.
+
 `rot` moves the third-to-top element to the front of the stack.
 
 ```
@@ -104,7 +111,7 @@ To break out of a loop use `brk`, and to immediately go to the next iteration, u
 Functions are declared with the symbol `$` and end with the same symbol. And they must have declared stack effects as well.
 
 ```
- $floor10 ( a -> a )
+ $floor10 ( i64 -> i64 )
      dup 10 mod -
  $
 ```
@@ -112,7 +119,7 @@ Functions are declared with the symbol `$` and end with the same symbol. And the
 You can return early from a function with `ret`.
 
 ```
- $foo ( a -> b )
+ $foo ( i64 -> i64 )
      5 + ret 2
  $
 ```
@@ -126,8 +133,19 @@ The standard library modules are:
 
 Here is an example using the `io` module:
 ```
-import io
-71 io::printc // Prints the character G to the io buffer
-io::flush     // Flushes the io buffer
+ import io
+ 71 io::printc // Prints the character G to the io buffer
+ io::flush     // Flushes the io buffer
 ```
 
+## Types
+
+Arrowlang's types are: `i8`, `char`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`, `int_lit`, `f32`, `f64`, `real_lit`, and `str`.
+Most types are only compatible with themselves, except for `int_lit` and `real_lit`, which are compatible with all integer types (including `char`) and all float types respectively.
+
+You can convert between types just by putting in the type's name:
+
+```
+ 30 f32                    // Converts the 30 from int_lit to f32
+ 255u8 1u8 + i64 io::print // Prints 0
+```
