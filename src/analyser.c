@@ -407,6 +407,7 @@ void type_check_op(Analyser *analyser) {
         }
         break;
     }
+    case OP_CCALL:
     case OP_CALL: {
         Function func = ((Symbol *)((Hash_Entry *)op->operand)->val)->as.func;
         if (!check_operand_count(analyser, func.param_types.count)) break;

@@ -138,6 +138,8 @@ static char *conv_table[12][12] = {
     { i64_i8, i64_i8, i64_i8, i32_i16, i32_i16, i64_i32, i64_i32, NULL,    NULL,    NULL,    NULL,    NULL },
 };
 
+static char *arg_regs[] = { "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9" };
+
 void init_generator(Generator *gen, Ops *ops) {
     *gen = (Generator){0};
     gen->ops = ops;
@@ -498,6 +500,36 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
 
             for (int64_t offs = (func.return_types.count-1)*8; offs >= 0; offs -= 8)
                 sb_appendf(&gen.sb, "    pushq %zu(%%rax)\n", offs);
+            break;
+        }
+        case OP_CCALL: {
+            Hash_Entry *entry = (Hash_Entry *)op->operand;
+            Function func = ((Symbol *)entry->val)->as.func;
+
+            int iparams = 0;
+            int fparams = 0;
+            for (size_t i = 0; i < func.param_types.count; i++) {
+                if ((func.param_types.items[i] & TYPE_REAL) && fparams < 8)
+                    fparams++;
+                else if (iparams < 6)
+                    iparams++;
+            }
+
+            for (int i = func.param_types.count-1; i >= 0; i--) {
+                if ((func.param_types.items[i] & TYPE_REAL) && fparams >= 0) {
+                    sb_appendf(&gen.sb, "    popq %%xmm%d\n", fparams-1);
+                    fparams--;
+                }
+                else if (iparams >= 0) {
+                    sb_appendf(&gen.sb, "    popq %s\n", arg_regs[iparams-1]);
+                    iparams--;
+                }
+            }
+
+            sb_appendf(&gen.sb, "    call \"%.*s\"\n", entry->key_len, entry->key);
+
+            if (func.return_types.count == 1)
+                sb_appendf(&gen.sb, "    pushq %%rax\n");
             break;
         }
         case OP_STR:

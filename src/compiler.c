@@ -87,8 +87,11 @@ char *opcode_spelling(Opcode opcode) {
     case OP_ROT:     return "ROT";
     case OP_RET:     return "RET";
     case OP_CONVERT: return "CONVERT";
+    case OP_CCALL:   return "CCALL";
     case OP_START:   return "START";
     case OP_END:     return "END";
+    case OP_IF:      return "IF";
+    case OP_ELSE:    return "ELSE";
     default:         return "UNKNOWN";
     }
 }
@@ -102,6 +105,7 @@ void print_op(Op *op) {
     case OP_PUSH:
         printf(" %llu", op->operand);
         break;
+    case OP_CCALL:
     case OP_CALL:
     case OP_FUNC: {
         Hash_Entry *entry = (Hash_Entry *)op->operand;
@@ -423,7 +427,11 @@ void compile_stmt(Compilation_Unit *compiler) {
                 return;
             }
         }
-        make_op(compiler, OP_CALL, (int64_t)entry);
+
+        if (((Symbol *)entry->val)->as.func.is_c_func)
+            make_op(compiler, OP_CCALL, (int64_t)entry);
+        else
+            make_op(compiler, OP_CALL, (int64_t)entry);
         break;
     }
     case TOK_I8:
@@ -526,8 +534,9 @@ void compile_function(Compilation_Unit *compiler) {
     }
 }
 
-void compile_external_function(Compilation_Unit *compiler) {
-    compile_function_signature(compiler);
+void compile_external_function(Compilation_Unit *compiler, uint8_t is_c_func) {
+    Hash_Entry *entry = compile_function_signature(compiler);
+    ((Symbol *)entry->val)->as.func.is_c_func = is_c_func;
 
     if (!compiler->module.has_ext_funcs) {
         compiler->module.has_ext_funcs = 1;
@@ -545,7 +554,10 @@ void compile_functions(Compilation_Unit *compiler) {
             compile_function(compiler);
             continue;
         case TOK_EXT_FUNC:
-            compile_external_function(compiler);
+            compile_external_function(compiler, 0);
+            continue;
+        case TOK_C_FUNC:
+            compile_external_function(compiler, 1);
             continue;
         default:;
         }
@@ -588,7 +600,10 @@ void compile_functions(Compilation_Unit *compiler) {
             compile_function(compiler);
             continue;
         case TOK_EXT_FUNC:
-            compile_external_function(compiler);
+            compile_external_function(compiler, 0);
+            continue;
+        case TOK_C_FUNC:
+            compile_external_function(compiler, 1);
             continue;
         default:;
         }
