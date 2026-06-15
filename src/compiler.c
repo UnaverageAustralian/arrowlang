@@ -328,6 +328,10 @@ void compile_stmt(Compilation_Unit *compiler) {
         make_op(compiler, OP_PUSH, tok->as.integer);
         compiler->ops.items[compiler->ops.count-1].types[0] = TYPE_REAL;
         break;
+    case TOK_CHAR_LIT:
+        make_op(compiler, OP_PUSH, tok->as.integer);
+        compiler->ops.items[compiler->ops.count-1].types[0] = TYPE_CHAR;
+        break;
     case TOK_ADD:   make_op(compiler, OP_ADD, 0);   break;
     case TOK_SUB:   make_op(compiler, OP_SUB, 0);   break;
     case TOK_MUL:   make_op(compiler, OP_MUL, 0);   break;

@@ -353,6 +353,33 @@ void lex_string(Lexer *lexer) {
     lexer->cur.len -= 2;
 }
 
+void lex_char(Lexer *lexer) {
+    skip(lexer, 1);
+    char c = peek(lexer, 0);
+
+    int i = 0;
+    while (c && c != '\'' && c != '\n') {
+        c = skip(lexer, 1);
+        i++;
+    }
+    if (c) skip(lexer, 1);
+
+    if (i != 1) {
+        make_err_token(lexer, "Character literals must have only 1 character");
+        return;
+    }
+
+    if (!c || c == '\n') {
+        make_err_token(lexer, "Unterminated character literal");
+        return;
+    }
+
+    make_token(lexer, TOK_CHAR_LIT);
+    lexer->cur.start++;
+    lexer->cur.as.integer = lexer->cur.start[0];
+    lexer->cur.len -= 2;
+}
+
 void single_line_comment(Lexer *lexer) {
     char c = skip(lexer, 2);
     while (c && c != '\n')
@@ -573,6 +600,9 @@ void lexer_next(Lexer *lexer) {
     case '\"':
         lex_string(lexer);
         break;
+    case '\'':
+        lex_char(lexer);
+        break;
     case '\0':
         make_token(lexer, TOK_EOF);
         break;
@@ -642,6 +672,20 @@ char *tok_spelling(Token_Type type) {
     case TOK_SCOPE:     return "SCOPE";
     case TOK_INT_LIT:   return "INT_LIT";
     case TOK_FLOAT_LIT: return "FLOAT_LIT";
+    case TOK_STR_LIT:   return "STR_LIT";
+    case TOK_CHAR_LIT:  return "CHAR_LIT";
+    case TOK_I8:        return "I8";
+    case TOK_CHAR:      return "CHAR";
+    case TOK_U8:        return "U8";
+    case TOK_I16:       return "I16";
+    case TOK_U16:       return "U16";
+    case TOK_I32:       return "I32";
+    case TOK_U32:       return "U32";
+    case TOK_I64:       return "I64";
+    case TOK_U64:       return "U64";
+    case TOK_F32:       return "F32";
+    case TOK_F64:       return "F64";
+    case TOK_STR:       return "STR";
     case TOK_WORD:      return "WORD";
     case TOK_EOF:       return "EOF";
     default:            return "UNKNOWN";

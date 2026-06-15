@@ -5,9 +5,9 @@ import io
     swap
     63 while dup 0 >= loop
         dup2 >> 1 & if
-            35 io::printc
+            '#' io::printc
         else
-            46 io::printc
+            '.' io::printc
         end
         1-
     end drop

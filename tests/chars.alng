@@ -1,0 +1,8 @@
+import io
+
+'!' io::printc
+'?' io::printc
+10 io::printc
+
+io::flush
+0
