@@ -183,8 +183,8 @@ void type_check_op(Analyser *analyser) {
             || (a & (TYPE_INTEGER | TYPE_STR) && b & (TYPE_INTEGER | TYPE_STR) && (op->opcode != OP_ADD || a != b))) {
             op->types[0] = a == TYPE_INTEGER ? TYPE_I64 : a == TYPE_REAL ? TYPE_F64 : a;
             op->types[1] = b == TYPE_INTEGER ? TYPE_I64 : b == TYPE_REAL ? TYPE_F64 : b;
-            DA_APPEND(&analyser->stack, a > b ? a : b);
-            }
+            DA_APPEND(&analyser->stack, op->types[0] > op->types[1] ? op->types[0] : op->types[1]);
+        }
         else {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Invalid operand types for %s: %s %s\n",
@@ -202,7 +202,7 @@ void type_check_op(Analyser *analyser) {
         if ((a & TYPE_INTEGER && b & TYPE_INTEGER) || (a & TYPE_REAL && b & TYPE_REAL)) {
             op->types[0] = a == TYPE_INTEGER ? TYPE_I64 : a == TYPE_REAL ? TYPE_F64 : a;
             op->types[1] = b == TYPE_INTEGER ? TYPE_I64 : b == TYPE_REAL ? TYPE_F64 : b;
-            DA_APPEND(&analyser->stack, a > b ? a : b);
+            DA_APPEND(&analyser->stack, op->types[0] > op->types[1] ? op->types[0] : op->types[1]);
         }
         else {
             analyser->had_error = 1;
@@ -227,7 +227,7 @@ void type_check_op(Analyser *analyser) {
         if (a & TYPE_INTEGER && b & TYPE_INTEGER) {
             op->types[0] = a == TYPE_INTEGER ? TYPE_I64 : a;
             op->types[1] = b == TYPE_INTEGER ? TYPE_I64 : b;
-            DA_APPEND(&analyser->stack, a > b ? a : b);
+            DA_APPEND(&analyser->stack, op->types[0] > op->types[1] ? op->types[0] : op->types[1]);
         }
         else {
             analyser->had_error = 1;

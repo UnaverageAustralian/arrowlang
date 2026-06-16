@@ -517,7 +517,8 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
 
             for (int i = func.param_types.count-1; i >= 0; i--) {
                 if ((func.param_types.items[i] & TYPE_REAL) && fparams >= 0) {
-                    sb_appendf(&gen.sb, "    popq %%xmm%d\n", fparams-1);
+                    sb_appendf(&gen.sb, "    movsd (%%rsp), %%xmm%d\n", fparams-1);
+                    sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
                     fparams--;
                 }
                 else if (iparams >= 0) {
@@ -528,8 +529,16 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
 
             sb_appendf(&gen.sb, "    call \"%.*s\"\n", entry->key_len, entry->key);
 
-            if (func.return_types.count == 1)
+            if (func.return_types.count == 1 && func.return_types.items[0] & TYPE_INTEGER) {
                 sb_appendf(&gen.sb, "    pushq %%rax\n");
+            }
+            else if (func.return_types.count == 1 && func.return_types.items[0] & TYPE_REAL) {
+                sb_appendf(&gen.sb, "    subq $8, %%rsp\n");
+                sb_appendf(&gen.sb, "    movsd %%xmm0, (%%rsp)\n");
+            }
+            else if (func.return_types.count != 0) {
+                GEN_EPRINTF(op, LEVEL_ERR, "Calling C functions with more than one return value is not implemented\n");
+            }
             break;
         }
         case OP_STR:

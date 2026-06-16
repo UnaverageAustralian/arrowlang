@@ -1,0 +1,13 @@
+import io
+
+C$sqrt ( f64 -> f64 )
+
+$distance ( f64 f64 f64 f64 -> f64 )
+    rot - dup *
+    rot rot swap - dup * +
+    sqrt
+$
+
+2.96 -4.15 8.43 -0.43 distance 100.0 * i64 io::println
+io::flush
+0
