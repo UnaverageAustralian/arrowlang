@@ -1,0 +1,17 @@
+C$InitWindow ( i32 i32 str -> )
+C$CloseWindow ( -> )
+C$WindowShouldClose ( -> i32 )
+
+C$BeginDrawing ( -> )
+C$EndDrawing ( -> )
+
+C$ClearBackground( u32 -> )
+
+800 600 "Hello from Arrowlang" InitWindow
+while WindowShouldClose! loop
+    BeginDrawing
+    0xFF0000FF ClearBackground
+    EndDrawing
+end
+CloseWindow
+0

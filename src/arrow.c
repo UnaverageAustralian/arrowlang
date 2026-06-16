@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,6 +9,8 @@ void usage(char *file) {
     fprintf(stderr, "Usage: %s [<options>] <file>\n", file);
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "   -o <file>       - Output file\n");
+    fprintf(stderr, "   -L <path>       - Add path to linker search paths\n");
+    fprintf(stderr, "   -l <library>    - Link with library\n");
     fprintf(stderr, "\n");
 }
 
@@ -33,6 +36,19 @@ Compiler_Options parse_arguments(int argc, char **argv) {
                 exit(1);
             }
             options.output_file = argv[i];
+        }
+        else if (strncmp(argv[i], "-L", 2) == 0 || strncmp(argv[i], "-l", 2) == 0) {
+            if (argv[i][2] == '\0' && i == argc) {
+                usage(argv[0]);
+                fprintf(stderr, "ERROR: Expected argument after %2s\n", argv[i]);
+                exit(1);
+            }
+
+            DA_APPEND(&options.link_cmd, argv[i]);
+            if (argv[i][2] == '\0') {
+                i++;
+                DA_APPEND(&options.link_cmd, argv[i]);
+            }
         }
         else {
             usage(argv[0]);

@@ -60,7 +60,7 @@ void check_expected_types(Analyser *analyser) {
         goto ERROR;
 
     for (size_t i = analyser->expected_types_start; i < analyser->expected_types.count; i++) {
-        if (analyser->expected_types.items[i] != analyser->stack.items[analyser->block_start + i - analyser->expected_types_start]) {
+        if ((analyser->expected_types.items[i] & analyser->stack.items[analyser->block_start + i - analyser->expected_types_start]) == 0) {
 ERROR:
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Blocks cannot change the state of the stack, expected types: [ ");

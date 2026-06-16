@@ -543,7 +543,7 @@ void compile_external_function(Compilation_Unit *compiler, uint8_t is_c_func) {
         char *extern_path = arena_calloc(&compiler->global->arena, compiler->module.path.len + compiler->module.name.len + 7);
         snprintf(extern_path, compiler->module.path.len + compiler->module.name.len + 7, "%.*s%.*s_ext.o", compiler->module.path.len, compiler->module.path.str, compiler->module.name.len, compiler->module.name.str);
         if (access(extern_path, F_OK) == 0)
-            DA_APPEND(&compiler->global->options.linker_files, extern_path);
+            DA_APPEND(&compiler->global->options.link_cmd, extern_path);
     }
 }
 
@@ -642,7 +642,7 @@ Module compile_module(Compiler *global, const char *src, const char *file_path) 
     char *obj_name = arena_calloc(&global->arena, unit.module.name.len + 3);
     snprintf(obj_name, unit.module.name.len + 3, "%.*s.o", unit.module.name.len, unit.module.name.str);
 
-    DA_APPEND(&global->options.linker_files, obj_name);
+    DA_APPEND(&global->options.link_cmd, obj_name);
 
     lexer_next(&lexer);
     if (lexer.cur.type == TOK_EOF)
@@ -710,9 +710,10 @@ Module compile_module(Compiler *global, const char *src, const char *file_path) 
 
 void link_files(Compiler_Options options) {
     Cmd cmd = {0};
-    cmd_append_many(&cmd, 3, "ld", "-o", options.output_file);
-    for (size_t i = 0; i < options.linker_files.count; i++)
-        DA_APPEND(&cmd, options.linker_files.items[i]);
+    cmd_append_many(&cmd, 2, "ld", "-L/usr/lib");
+    memcpy(cmd.items + cmd.count, options.link_cmd.items, options.link_cmd.count * sizeof(char *));
+    cmd.count += options.link_cmd.count;
+    cmd_append_many(&cmd, 4, "-dynamic-linker", "/lib64/ld-linux-x86-64.so.2", "-o", options.output_file);
     cmd_exec(&cmd);
 }
 

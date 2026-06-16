@@ -62,7 +62,7 @@ typedef struct {
 typedef struct {
     char **input_files;
     char *output_file;
-    String_Array linker_files;
+    Cmd link_cmd;
 } Compiler_Options;
 
 typedef struct {
