@@ -1,8 +1,4 @@
-import io
+import errors
 
-'!' io::printc
-'?' io::printc
-10 io::printc
-
-io::flush
-0
+'!' 33 = "'!' = 33" errors::assert
+'?' 63 = "'?' = 63" errors::assert

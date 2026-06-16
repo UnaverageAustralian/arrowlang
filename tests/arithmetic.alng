@@ -1,11 +1,8 @@
-import io
+import errors
 
-2 3 + io::println
-2 3 - io::println
-2 3 * io::println
-5 3 / io::println
-5 3 % io::println
-5 neg io::println
-io::flush
-
-0
+2 3 + 5  = "2 3 + = 5"  errors::assert
+2 3 - -1 = "2 3 - = -1" errors::assert |
+2 3 * 6  = "2 3 * = 6"  errors::assert |
+5 3 / 1  = "5 3 / = 1"  errors::assert |
+5 3 % 2  = "5 3 % = 2"  errors::assert |
+5 neg -5 = "5 neg = -5" errors::assert |

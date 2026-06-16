@@ -1,14 +1,11 @@
-import io
+import errors
 
-2 3 <  if 1 else 0 end io::println
-2 3 >  if 1 else 0 end io::println
-3 2 >  if 1 else 0 end io::println
-3 2 =  if 1 else 0 end io::println
-3 3 =  if 1 else 0 end io::println
-3 3 >  if 1 else 0 end io::println
-3 3 >= if 1 else 0 end io::println
-3 3 <  if 1 else 0 end io::println
-3 3 <= if 1 else 0 end io::println
-io::flush
-
-0
+2 3 <  if 1 else 0 end 1 = "2 < 3"  errors::assert
+2 3 >  if 1 else 0 end 0 = "2 !> 3" errors::assert |
+3 2 >  if 1 else 0 end 1 = "3 > 2"  errors::assert |
+3 2 =  if 1 else 0 end 0 = "3 != 2" errors::assert |
+3 3 =  if 1 else 0 end 1 = "3 = 3"  errors::assert |
+3 3 >  if 1 else 0 end 0 = "3 !> 3" errors::assert |
+3 3 >= if 1 else 0 end 1 = "3 >= 3" errors::assert |
+3 3 <  if 1 else 0 end 0 = "3 !< 3" errors::assert |
+3 3 <= if 1 else 0 end 1 = "3 <= 3" errors::assert |

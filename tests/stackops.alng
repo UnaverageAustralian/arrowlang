@@ -1,47 +1,51 @@
-import io
+import errors
 
 2 3 dup
-io::print 32 io::printc
-io::print 32 io::printc
-io::println
+3 =
+swap 3 = and
+swap 2 = and
+"2 3 dup = [ 2 3 3 ]" errors::assert
 
 2 3 swap
-io::print 32 io::printc
-io::println
+2 =
+swap 3 = and
+"2 3 swap = [ 3 2 ]" errors::assert |
 
 2 3 over
-io::print 32 io::printc
-io::print 32 io::printc
-io::println
+2 =
+swap 3 = and
+swap 2 = and
+"2 3 over = [ 2 3 2 ]" errors::assert |
 
 2 3 dup2
-io::print 32 io::printc
-io::print 32 io::printc
-io::print 32 io::printc
-io::println
+3 =
+swap 2 = and
+swap 3 = and
+swap 2 = and
+"2 3 dup2 = [ 2 3 2 3 ]" errors::assert |
 
 2 3 drop
-io::println
+2 =
+"2 3 drop = [ 2 ]" errors::assert |
 
 2 3 9 8 over2
-io::print 32 io::printc
-io::print 32 io::printc
-io::print 32 io::printc
-io::print 32 io::printc
-io::print 32 io::printc
-io::println
+3 =
+swap 2 = and
+swap 8 = and
+swap 9 = and
+swap 3 = and
+swap 2 = and
+"2 3 9 8 over2 = [ 2 3 9 8 2 3 ]" errors::assert |
 
 2 3 9 8 swap2
-io::print 32 io::printc
-io::print 32 io::printc
-io::print 32 io::printc
-io::println
+3 =
+swap 2 = and
+swap 8 = and
+swap 9 = and
+"2 3 9 8 swap2 = [ 9 8 2 3 ]" errors::assert |
 
 2 3 9 rot
-io::print 32 io::printc
-io::print 32 io::printc
-io::println
-
-io::flush
-
-0
+2 =
+swap 9 = and
+swap 3 = and
+"2 3 9 rot = [ 3 9 2 ]" errors::assert |

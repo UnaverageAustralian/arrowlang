@@ -1,13 +1,11 @@
-import io
+import errors
 
-10 9 &  io::println
-10 9 |  io::println
-10 9 ^  io::println
-10 1 >> io::println
-10 1 << io::println
-56 ~    io::println
-2 4 >>> io::println
-0x8000000000000000 1 <<< io::println
-io::flush
+10 9 &  8 =   "10 9 & = 8"   errors::assert
+10 9 |  11 =  "10 9 | = 11"  errors::assert |
+10 9 ^  3 =   "10 9 ^ = 3"   errors::assert |
+10 1 >> 5 =   "10 1 >> = 5"  errors::assert |
+10 1 << 20 =  "10 1 << = 20" errors::assert |
+56 ~    -57 = "56 ~ = -57"   errors::assert |
 
-0
+2 4 >>> 0x2000000000000000 = "2 4 >>> = 0x2000000000000000" errors::assert |
+0x8000000000000000 1 <<< 1 = "0x8000000000000000 1 <<< = 1" errors::assert |

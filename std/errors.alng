@@ -1,0 +1,9 @@
+import io
+
+$assert ( u8 str -> u8 )
+    over ! if
+        "Assertion failed: " io::prints
+        dup io::printsln
+    end swap !
+    io::flush
+$
