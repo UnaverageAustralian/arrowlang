@@ -70,6 +70,7 @@ typedef struct {
     const char *file_path;
     uint64_t operand;
     Type types[4];
+    Type original[4];
     int pos, line;
 } Op;
 

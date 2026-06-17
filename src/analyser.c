@@ -178,12 +178,22 @@ void type_check_op(Analyser *analyser) {
 
         Type a = pop(analyser);
         Type b = pop(analyser);
+        op->original[0] = a;
+        op->original[1] = b;
 
         if ((a & TYPE_INTEGER && b & TYPE_INTEGER) || (a & TYPE_REAL && b & TYPE_REAL)
             || (a & (TYPE_INTEGER | TYPE_STR) && b & (TYPE_INTEGER | TYPE_STR) && (op->opcode != OP_ADD || a != b))) {
-            op->types[0] = a == TYPE_INTEGER ? TYPE_I64 : a == TYPE_REAL ? TYPE_F64 : a;
-            op->types[1] = b == TYPE_INTEGER ? TYPE_I64 : b == TYPE_REAL ? TYPE_F64 : b;
-            DA_APPEND(&analyser->stack, op->types[0] > op->types[1] ? op->types[0] : op->types[1]);
+            if (b == TYPE_INTEGER || b == TYPE_REAL) {
+                a = a == TYPE_INTEGER ? TYPE_I64 : a == TYPE_REAL ? TYPE_F64 : a;
+                b = a;
+            }
+            else {
+                a = a == TYPE_INTEGER || a == TYPE_REAL ? b : a;
+            }
+
+            op->types[0] = a;
+            op->types[1] = b;
+            DA_APPEND(&analyser->stack, a > b ? a : b);
         }
         else {
             analyser->had_error = 1;
@@ -198,11 +208,21 @@ void type_check_op(Analyser *analyser) {
 
         Type a = pop(analyser);
         Type b = pop(analyser);
+        op->original[0] = a;
+        op->original[1] = b;
 
         if ((a & TYPE_INTEGER && b & TYPE_INTEGER) || (a & TYPE_REAL && b & TYPE_REAL)) {
-            op->types[0] = a == TYPE_INTEGER ? TYPE_I64 : a == TYPE_REAL ? TYPE_F64 : a;
-            op->types[1] = b == TYPE_INTEGER ? TYPE_I64 : b == TYPE_REAL ? TYPE_F64 : b;
-            DA_APPEND(&analyser->stack, op->types[0] > op->types[1] ? op->types[0] : op->types[1]);
+            if (b == TYPE_INTEGER || b == TYPE_REAL) {
+                a = a == TYPE_INTEGER ? TYPE_I64 : a == TYPE_REAL ? TYPE_F64 : a;
+                b = a;
+            }
+            else {
+                a = a == TYPE_INTEGER || a == TYPE_REAL ? b : a;
+            }
+
+            op->types[0] = a;
+            op->types[1] = b;
+            DA_APPEND(&analyser->stack, a > b ? a : b);
         }
         else {
             analyser->had_error = 1;
@@ -223,11 +243,21 @@ void type_check_op(Analyser *analyser) {
 
         Type a = pop(analyser);
         Type b = pop(analyser);
+        op->original[0] = a;
+        op->original[1] = b;
 
         if (a & TYPE_INTEGER && b & TYPE_INTEGER) {
-            op->types[0] = a == TYPE_INTEGER ? TYPE_I64 : a;
-            op->types[1] = b == TYPE_INTEGER ? TYPE_I64 : b;
-            DA_APPEND(&analyser->stack, op->types[0] > op->types[1] ? op->types[0] : op->types[1]);
+            if (b == TYPE_INTEGER) {
+                a = a == TYPE_INTEGER ? TYPE_I64 : a;
+                b = a;
+            }
+            else {
+                a = a == TYPE_INTEGER ? b : a;
+            }
+
+            op->types[0] = a;
+            op->types[1] = b;
+            DA_APPEND(&analyser->stack, a > b ? a : b);
         }
         else {
             analyser->had_error = 1;
@@ -330,10 +360,20 @@ void type_check_op(Analyser *analyser) {
 
         Type a = pop(analyser);
         Type b = pop(analyser);
+        op->original[0] = a;
+        op->original[1] = b;
 
         if ((a & TYPE_INTEGER && b & TYPE_INTEGER) || (a & TYPE_REAL && b & TYPE_REAL)) {
-            op->types[0] = a == TYPE_INTEGER ? TYPE_I64 : a == TYPE_REAL ? TYPE_F64 : a;
-            op->types[1] = b == TYPE_INTEGER ? TYPE_I64 : b == TYPE_REAL ? TYPE_F64 : b;
+            if (b == TYPE_INTEGER || b == TYPE_REAL) {
+                a = a == TYPE_INTEGER ? TYPE_I64 : a == TYPE_REAL ? TYPE_F64 : a;
+                b = a;
+            }
+            else {
+                a = a == TYPE_INTEGER || a == TYPE_REAL ? b : a;
+            }
+
+            op->types[0] = a;
+            op->types[1] = b;
             DA_APPEND(&analyser->stack, TYPE_U8);
         }
         else {
@@ -445,10 +485,6 @@ void type_check_op(Analyser *analyser) {
         Type a = pop(analyser);
         Type b = pop(analyser);
         Type c = pop(analyser);
-
-        op->types[0] = a;
-        op->types[1] = b;
-        op->types[2] = c;
 
         DA_APPEND(&analyser->stack, b);
         DA_APPEND(&analyser->stack, a);

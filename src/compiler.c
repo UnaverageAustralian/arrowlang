@@ -98,28 +98,47 @@ char *opcode_spelling(Opcode opcode) {
 
 void print_op(Op *op) {
     printf("%s", opcode_spelling(op->opcode));
+
     switch (op->opcode) {
     case OP_JMPF:
     case OP_JMP:
     case OP_LABEL:
-    case OP_PUSH:
         printf(" %llu", op->operand);
+        break;
+    case OP_PUSH:
+        printf(" %s ", type_spelling(op->types[0]));
+
+        if (op->types[0] == TYPE_REAL)
+            printf("%lf", *(double *)&op->operand);
+        else
+            printf("%llu", op->operand);
         break;
     case OP_CCALL:
     case OP_CALL:
     case OP_FUNC: {
         Hash_Entry *entry = (Hash_Entry *)op->operand;
-        printf(" %.*s", entry->key_len, entry->key);
+        Function func = ((Symbol *)entry->val)->as.func;
+
+        if (func.module_name.str == NULL)
+            printf(" %.*s", entry->key_len, entry->key);
+        else
+            printf(" %.*s::%.*s", func.module_name.len, func.module_name.str, entry->key_len, entry->key);
         break;
     }
-    case OP_STR: {
-        printf(" %s", (char *)op->operand);
+    case OP_STR:
+        printf(" \"%s\"", (char *)op->operand);
         break;
-    }
-    case OP_CONVERT: {
+    case OP_CONVERT:
         printf(" %s => %s", type_spelling(op->types[0]), type_spelling(op->types[1]));
-    }
-    default: break;
+        break;
+    default:
+        for (int i = 3; i >= 0; i--) {
+            if (op->original[i] != TYPE_VOID && op->original[i] != op->types[i])
+                printf(" (%s => %s)", type_spelling(op->original[i]), type_spelling(op->types[i]));
+            else if (op->types[i] != TYPE_VOID)
+                printf(" %s", type_spelling(op->types[i]));
+        }
+        break;
     }
     printf("\n");
 }

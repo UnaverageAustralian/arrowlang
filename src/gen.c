@@ -177,9 +177,11 @@ int typeid(Type type) {
     case TYPE_U16:  return 4;
     case TYPE_I32:  return 5;
     case TYPE_U32:  return 6;
+    case TYPE_INTEGER:
     case TYPE_I64:  return 7;
     case TYPE_U64:  return 8;
     case TYPE_F32:  return 9;
+    case TYPE_REAL:
     case TYPE_F64:  return 10;
     case TYPE_STR:  return 11;
     default:        return 0;
@@ -204,6 +206,20 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
     for (size_t i = 0; i < ops->count; i++) {
         Op *op = &ops->items[i];
         Type greater = op->types[0] > op->types[1] ? op->types[0] : op->types[1];
+
+        if (op->original[0] != TYPE_VOID) {
+            char *conv_str = conv_table[typeid(op->original[0])][typeid(op->types[0])];
+            if (conv_str != NULL)
+                sb_appendf(&gen.sb, "%s\n", conv_str);
+        }
+        if (op->original[1] != TYPE_VOID) {
+            char *conv_str = conv_table[typeid(op->original[1])][typeid(op->types[1])];
+            if (conv_str != NULL) {
+                sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
+                sb_appendf(&gen.sb, "%s\n", conv_str);
+                sb_appendf(&gen.sb, "    subq $8, %%rsp\n");
+            }
+        }
 
         switch(op->opcode) {
         case OP_PUSH:
