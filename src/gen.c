@@ -529,12 +529,12 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
 
             sb_appendf(&gen.sb, "    call \"%.*s\"\n", entry->key_len, entry->key);
 
-            if (func.return_types.count == 1 && func.return_types.items[0] & TYPE_INTEGER) {
-                sb_appendf(&gen.sb, "    pushq %%rax\n");
-            }
-            else if (func.return_types.count == 1 && func.return_types.items[0] & TYPE_REAL) {
+            if (func.return_types.count == 1 && func.return_types.items[0] & TYPE_REAL) {
                 sb_appendf(&gen.sb, "    subq $8, %%rsp\n");
                 sb_appendf(&gen.sb, "    movsd %%xmm0, (%%rsp)\n");
+            }
+            else if (func.return_types.count == 1) {
+                sb_appendf(&gen.sb, "    pushq %%rax\n");
             }
             else if (func.return_types.count != 0) {
                 GEN_EPRINTF(op, LEVEL_ERR, "Calling C functions with more than one return value is not implemented\n");
