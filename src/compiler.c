@@ -83,8 +83,10 @@ char *opcode_spelling(Opcode opcode) {
     case OP_LTEQ:    return "LTEQ";
     case OP_GT:      return "GT";
     case OP_GTEQ:    return "GTEQ";
+    case OP_NEQ:     return "NEQ";
     case OP_LNOT:    return "LNOT";
     case OP_ROT:     return "ROT";
+    case OP_ROTN:    return "ROTN";
     case OP_RET:     return "RET";
     case OP_CONVERT: return "CONVERT";
     case OP_CCALL:   return "CCALL";
@@ -381,8 +383,10 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_LTEQ:  make_op(compiler, OP_LTEQ, 0);  break;
     case TOK_GT:    make_op(compiler, OP_GT, 0);    break;
     case TOK_GTEQ:  make_op(compiler, OP_GTEQ, 0);  break;
+    case TOK_NEQ:   make_op(compiler, OP_NEQ, 0);   break;
     case TOK_LNOT:  make_op(compiler, OP_LNOT, 0);  break;
     case TOK_ROT:   make_op(compiler, OP_ROT, 0);   break;
+    case TOK_ROTN:  make_op(compiler, OP_ROTN, 0);  break;
     case TOK_STR_LIT: {
         char *str = arena_calloc(&compiler->global->arena, tok->len + 1);
         strncpy(str, tok->start, tok->len);

@@ -49,3 +49,9 @@ swap 9 = and
 swap 9 = and
 swap 3 = and
 "2 3 9 rot = [ 3 9 2 ]" errors::assert |
+
+2 3 9 rotn
+3 =
+swap 2 = and
+swap 9 = and
+"2 3 9 rotn = [ 9 2 3 ]" errors::assert |

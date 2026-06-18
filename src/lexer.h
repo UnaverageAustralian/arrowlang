@@ -32,7 +32,8 @@ typedef enum {
     TOK_SWAP,      TOK_LT,
     TOK_LTEQ,      TOK_GT,
     TOK_GTEQ,      TOK_EQ,
-    TOK_IF,        TOK_ELSE,
+    TOK_NEQ,       TOK_IF,
+    TOK_ELSE,
 
     // Words
     TOK_DUP,       TOK_OVER,
@@ -43,6 +44,7 @@ typedef enum {
     TOK_MACRO,     TOK_STRUCT,
     TOK_IMPORT,    TOK_NEG,
     TOK_RET,       TOK_ROT,
+    TOK_ROTN,
     // Types
     TOK_I8,        TOK_U8,
     TOK_I16,       TOK_U16,

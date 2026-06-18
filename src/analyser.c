@@ -351,6 +351,7 @@ void type_check_op(Analyser *analyser) {
         }
         break;
     }
+    case OP_NEQ:
     case OP_GTEQ:
     case OP_GT:
     case OP_LTEQ:
@@ -489,6 +490,18 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, b);
         DA_APPEND(&analyser->stack, a);
         DA_APPEND(&analyser->stack, c);
+        break;
+    }
+    case OP_ROTN: {
+        if (!check_operand_count(analyser, 3)) break;
+
+        Type a = pop(analyser);
+        Type b = pop(analyser);
+        Type c = pop(analyser);
+
+        DA_APPEND(&analyser->stack, a);
+        DA_APPEND(&analyser->stack, c);
+        DA_APPEND(&analyser->stack, b);
         break;
     }
     case OP_CONVERT: {

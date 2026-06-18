@@ -368,6 +368,13 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    movq %%rax, 8(%%rsp)\n");
             sb_appendf(&gen.sb, "    movq %%rbx, (%%rsp)\n");
             break;
+        case OP_ROTN:
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    movq 8(%%rsp), %%rbx\n");
+            sb_appendf(&gen.sb, "    pushq (%%rsp)\n");
+            sb_appendf(&gen.sb, "    movq %%rbx, 8(%%rsp)\n");
+            sb_appendf(&gen.sb, "    movq %%rax, 16(%%rsp)\n");
+            break;
         case OP_NEG:
             if (op->types[0] == TYPE_F32) {
                 sb_appendf(&gen.sb, "    xorl $0x80000000, (%%rsp)\n");
@@ -455,6 +462,22 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
                 sb_appendf(&gen.sb, "    popq %%rax\n");
                 sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[size(greater)], rax[size(greater)]);
                 sb_appendf(&gen.sb, "    setle %%al\n");
+            }
+            sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
+            sb_appendf(&gen.sb, "    movq %%rax, (%%rsp)\n");
+            break;
+        case OP_NEQ:
+            if (greater & TYPE_REAL) {
+                CONVERT_F32_IF_NEEDED();
+                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[size(greater)]);
+                sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
+                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[size(greater)]);
+                sb_appendf(&gen.sb, "    setne %%al\n");
+            }
+            else {
+                sb_appendf(&gen.sb, "    popq %%rax\n");
+                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[size(greater)], rax[size(greater)]);
+                sb_appendf(&gen.sb, "    setne %%al\n");
             }
             sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
             sb_appendf(&gen.sb, "    movq %%rax, (%%rsp)\n");

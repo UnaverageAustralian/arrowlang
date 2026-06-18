@@ -17,7 +17,7 @@ import io
         rot dup2 swap >>> 7 &
         110 swap >> 1 &
         rot swap over 1+ <<
-        swap2 rot rot |
+        swap2 rotn |
         rot
         1-
     end drop swap drop

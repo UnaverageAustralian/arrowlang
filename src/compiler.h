@@ -27,7 +27,8 @@ typedef enum {
     OP_FUNC,  OP_RET,
     OP_CALL,  OP_STR,
     OP_ROT,   OP_CONVERT,
-    OP_CCALL,
+    OP_CCALL, OP_ROTN,
+    OP_NEQ,
 
     // For the analyser
     OP_START, OP_END,

@@ -16,7 +16,8 @@ static const char *keywords[] = {
     "swap",    "lt",
     "lteq",    "gt",
     "gteq",    "eq",
-    "if",      "else",
+    "neq",     "if",
+    "else",
 
     "dup",     "over",
     "dup2",    "over2",
@@ -26,6 +27,7 @@ static const char *keywords[] = {
     "macro",   "struct",
     "import",  "neg",
     "ret",     "rot",
+    "rotn",
 
     "i8",      "u8",
     "i16",     "u16",
@@ -501,10 +503,6 @@ void lexer_next(Lexer *lexer) {
         skip(lexer, 1);
         make_token(lexer, TOK_SWAP);
         break;
-    case '!':
-        skip(lexer, 1);
-        make_token(lexer, TOK_LNOT);
-        break;
     case '$':
         skip(lexer, 1);
         make_token(lexer, TOK_FUNC);
@@ -516,6 +514,17 @@ void lexer_next(Lexer *lexer) {
     case ')':
         skip(lexer, 1);
         make_token(lexer, TOK_RPAREN);
+        break;
+    case '!':
+        skip(lexer, 1);
+        c = peek(lexer, 0);
+        if (c == '=') {
+            skip(lexer, 1);
+            make_token(lexer, TOK_NEQ);
+        }
+        else {
+            make_token(lexer, TOK_LNOT);
+        }
         break;
     case 'E':
         if (peek(lexer, 1) == '$') {
@@ -641,6 +650,7 @@ char *tok_spelling(Token_Type type) {
     case TOK_LTEQ:      return "LTEQ";
     case TOK_GT:        return "GT";
     case TOK_GTEQ:      return "GTEQ";
+    case TOK_NEQ:       return "NEQ";
     case TOK_LNOT:      return "LNOT";
     case TOK_DUP:       return "DUP";
     case TOK_OVER:      return "OVER";
@@ -651,6 +661,7 @@ char *tok_spelling(Token_Type type) {
     case TOK_SWAP2:     return "SWAP2";
     case TOK_NEG:       return "NEG";
     case TOK_ROT:       return "ROT";
+    case TOK_ROTN:      return "ROTN";
     case TOK_IF:        return "IF";
     case TOK_ELSE:      return "ELSE";
     case TOK_WHILE:     return "WHILE";
