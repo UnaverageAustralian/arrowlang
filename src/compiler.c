@@ -134,12 +134,10 @@ void print_op(Op *op) {
         printf(" %s => %s", type_spelling(op->types[0]), type_spelling(op->types[1]));
         break;
     default:
-        for (int i = 3; i >= 0; i--) {
-            if (op->original[i] != TYPE_VOID && op->original[i] != op->types[i])
-                printf(" (%s => %s)", type_spelling(op->original[i]), type_spelling(op->types[i]));
-            else if (op->types[i] != TYPE_VOID)
-                printf(" %s", type_spelling(op->types[i]));
-        }
+        if (op->types[1] != TYPE_VOID)
+            printf(" %s", type_spelling(op->types[1]));
+        if (op->types[0] != TYPE_VOID)
+            printf(" %s", type_spelling(op->types[0]));
         break;
     }
     printf("\n");
@@ -655,12 +653,15 @@ void resolve_symbols(Compilation_Unit *compiler) {
     }
 }
 
-Module compile_module(Compiler *global, const char *src, const char *file_path) {
+Symbol *compile_module(Compiler *global, const char *src, const char *file_path) {
     Lexer lexer;
     init_lexer(&lexer, src, file_path);
 
     Compilation_Unit unit;
     init_compilation_unit(&unit, &lexer, global);
+
+    Hash_Entry *entry = hashmap_get(&global->modules, unit.module.name.str, unit.module.name.len);
+    if (entry && entry->key) return (Symbol *)entry->val;
 
     char *obj_name = arena_calloc(&global->arena, unit.module.name.len + 3);
     snprintf(obj_name, unit.module.name.len + 3, "%.*s.o", unit.module.name.len, unit.module.name.str);
@@ -685,13 +686,8 @@ Module compile_module(Compiler *global, const char *src, const char *file_path) 
                 exit(1);
             }
 
-            Module module = compile_module(global, contents, path);
-
-            Symbol *sym = arena_calloc(&global->arena, sizeof(Symbol));
-            sym->type = STYPE_MODULE;
-            sym->as.module = module;
-
-            hashmap_add(&unit.symbols, module.name.str, module.name.len, sym);
+            Symbol *sym = compile_module(global, contents, path);
+            hashmap_add(&unit.symbols, sym->as.module.name.str, sym->as.module.name.len, sym);
         }
         else if (lexer.prev.type == TOK_STR_LIT) {
             Hash_Entry *entry = hashmap_get(&global->modules, lexer.prev.start, lexer.prev.len);
@@ -725,10 +721,16 @@ Module compile_module(Compiler *global, const char *src, const char *file_path) 
     }
 #endif
 
+    Symbol *module_sym = arena_calloc(&global->arena, sizeof(Symbol));
+    module_sym->type = STYPE_MODULE;
+    module_sym->as.module = unit.module;
+
+    hashmap_add(&global->modules, unit.module.name.str, unit.module.name.len, module_sym);
+
     free(unit.ops.items);
     free(unit.symbols.entries);
 
-    return unit.module;
+    return module_sym;
 }
 
 void link_files(Compiler_Options options) {
@@ -750,13 +752,7 @@ void compile(Compiler_Options options) {
             fprintf(stderr, "\x1b[31mERROR:\x1b[0m Could not read file: %s\n", strerror(errno));
             exit(1);
         }
-        Module module = compile_module(&compiler, contents, options.input_files[i]);
-
-        Symbol *module_sym = arena_calloc(&compiler.arena, sizeof(Symbol));
-        module_sym->type = STYPE_MODULE;
-        module_sym->as.module = module;
-
-        hashmap_add(&compiler.modules, module.name.str, module.name.len, module_sym);
+        compile_module(&compiler, contents, options.input_files[i]);
     }
 
 #ifndef PRINT_IR
