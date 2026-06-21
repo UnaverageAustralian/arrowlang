@@ -23,7 +23,7 @@ static const char *keywords[] = {
     "dup2",    "over2",
     "swap2",   "while",
     "loop",    "end",
-    "brk",     "continue",
+    "break",     "continue",
     "macro",   "struct",
     "import",  "neg",
     "ret",     "rot",

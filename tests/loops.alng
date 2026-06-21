@@ -6,7 +6,7 @@ import io
 end drop
 
 0 loop
-    dup 10 >= if brk end
+    dup 10 >= if break end
     dup io::println
     1+
 end

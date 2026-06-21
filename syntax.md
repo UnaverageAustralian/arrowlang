@@ -96,12 +96,12 @@ While loops are the same, except with the word `while` followed by a condition.
  end
 ```
 
-To break out of a loop use `brk`, and to immediately go to the next iteration, use `continue`.
+To break out of a loop use `break`, and to immediately go to the next iteration, use `continue`.
 
 ```
  // Same thing but without while
  0 loop
-     dup 10 >= if brk ;
+     dup 10 >= if break ;
      1+
  end
 ```

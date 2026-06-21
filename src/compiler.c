@@ -707,7 +707,8 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
     compile_functions(&unit);
     resolve_symbols(&unit);
 
-    global->had_error |= type_check(&unit.ops);
+    if (!global->had_error)
+        global->had_error = type_check(&unit.ops);
 
 #ifdef PRINT_IR
     print_ops(&unit.ops);
