@@ -71,7 +71,6 @@ typedef struct {
     const char *file_path;
     uint64_t operand;
     Type types[2];
-    Type original[2];
     int pos, line;
 } Op;
 

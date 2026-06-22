@@ -7,6 +7,7 @@ typedef struct {
     Types stack;
     Types expected_types;
     Function func;
+    Ops dst;
     Ops *ops;
     unsigned block_start;
     unsigned expected_types_start;

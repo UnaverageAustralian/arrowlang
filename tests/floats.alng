@@ -6,13 +6,13 @@ import errors
 10.0 2.5  / 4.0  = "10.0 2.5 / = 4.0"   errors::assert |
 9.9 neg     -9.9 = "9.9 neg = -9.9"     errors::assert |
 
-10.0 10.0 =  1 = "10.0 = 10.0"  errors::assert |
-10.0 9.9  =  0 = "10.0 != 9.9"  errors::assert |
-10.0 9.9  >  1 = "10.0 > 9.9"   errors::assert |
-9.9 10.0  >  0 = "9.9 !> 10.0"  errors::assert |
-9.9 10.0  <  1 = "9.9 < 10.0"   errors::assert |
-10.0 9.9  <  0 = "10.0 !< 9.9"  errors::assert |
-10.0 10.0 >= 1 = "10.0 >= 10.0" errors::assert |
-10.0 10.0 >  0 = "10.0 !> 10.0" errors::assert |
-10.0 10.0 <= 1 = "10.0 <= 10.0" errors::assert |
-10.0 10.0 <  0 = "10.0 !< 10.0" errors::assert |
+10.0 10.0 =  1 = "10.0 = 10.0"    errors::assert |
+10.0 9.9  =  0 = "10.0 != 9.9"    errors::assert |
+10.0 9.9  >  1 = "10.0 > 9.9"     errors::assert |
+9.9 10.0  >  0 = "!(9.9 > 10.0)"  errors::assert |
+9.9 10.0  <  1 = "9.9 < 10.0"     errors::assert |
+10.0 9.9  <  0 = "!(10.0 < 9.9)"  errors::assert |
+10.0 10.0 >= 1 = "10.0 >= 10.0"   errors::assert |
+10.0 10.0 >  0 = "!(10.0 > 10.0)" errors::assert |
+10.0 10.0 <= 1 = "10.0 <= 10.0"   errors::assert |
+10.0 10.0 <  0 = "!(10.0 < 10.0)" errors::assert |

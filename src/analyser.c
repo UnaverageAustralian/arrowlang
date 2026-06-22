@@ -54,6 +54,19 @@ inline int check_operand_count(Analyser *analyser, size_t expected) {
     return 1;
 }
 
+inline void make_conversion_op(Analyser *analyser, Type greater, Type lesser, int operand) {
+    Op cur = analyser->ops->items[analyser->pos];
+    Op op = {
+        .opcode = OP_CONVERT,
+        .file_path = cur.file_path,
+        .line = cur.line,
+        .pos = cur.pos,
+        .operand = operand,
+        .types = { lesser, greater },
+    };
+    DA_APPEND(&analyser->dst, op);
+}
+
 void check_expected_types(Analyser *analyser) {
     Op *op = &analyser->ops->items[analyser->pos];
     if (analyser->stack.count - analyser->block_start != analyser->expected_types.count - analyser->expected_types_start)
@@ -91,10 +104,10 @@ void type_check_block(Analyser *analyser) {
     analyser->block_start = analyser->stack.count;
     analyser->expected_types_start = analyser->expected_types.count;
 
-    if (analyser->ops->items[analyser->pos].operand < UINT64_MAX)
+    if (analyser->ops->items[analyser->pos].operand < UINT64_MAX) {
         analyser->ops->items[analyser->pos].opcode = OP_LABEL;
-    else
-        analyser->ops->items[analyser->pos].opcode = OP_NOP;
+        DA_APPEND(&analyser->dst, analyser->ops->items[analyser->pos]);
+    }
 
     analyser->pos++;
     while (analyser->ops->items[analyser->pos].opcode != OP_END && analyser->pos < analyser->ops->count)
@@ -118,8 +131,6 @@ void type_check_if(Analyser *analyser) {
     int expected_types_start = analyser->expected_types_start;
     analyser->block_start = analyser->stack.count;
     analyser->expected_types_start = analyser->expected_types.count;
-
-    analyser->ops->items[analyser->pos].opcode = OP_NOP;
 
     Types copy = {0};
     copy.count = analyser->stack.count;
@@ -178,22 +189,42 @@ void type_check_op(Analyser *analyser) {
 
         Type a = pop(analyser);
         Type b = pop(analyser);
-        op->original[0] = a;
-        op->original[1] = b;
+
+        int depth;
+        Type lesser, greater;
+
+        if (a > b) {
+            lesser = b;
+            greater = a;
+            depth = 1;
+        }
+        else {
+            greater = b;
+            lesser = a;
+            depth = 0;
+        }
 
         if ((a & TYPE_INTEGER && b & TYPE_INTEGER) || (a & TYPE_REAL && b & TYPE_REAL)
             || (a & (TYPE_INTEGER | TYPE_STR) && b & (TYPE_INTEGER | TYPE_STR) && (op->opcode != OP_ADD || a != b))) {
             if (b == TYPE_INTEGER || b == TYPE_REAL) {
                 a = a == TYPE_INTEGER ? TYPE_I64 : a == TYPE_REAL ? TYPE_F64 : a;
+                greater = a;
+                lesser = b == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
+                depth = 1;
                 b = a;
             }
-            else {
-                a = a == TYPE_INTEGER || a == TYPE_REAL ? b : a;
+            else if (a == TYPE_INTEGER || a == TYPE_REAL) {
+                greater = b;
+                lesser = a == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
+                depth = 0;
+                a = b;
             }
 
-            op->types[0] = a;
-            op->types[1] = b;
+            op->types[0] = greater;
             DA_APPEND(&analyser->stack, a > b ? a : b);
+
+            if (greater != lesser)
+                make_conversion_op(analyser, greater, lesser, depth);
         }
         else {
             analyser->had_error = 1;
@@ -208,21 +239,41 @@ void type_check_op(Analyser *analyser) {
 
         Type a = pop(analyser);
         Type b = pop(analyser);
-        op->original[0] = a;
-        op->original[1] = b;
+
+        int depth;
+        Type lesser, greater;
+
+        if (a > b) {
+            lesser = b;
+            greater = a;
+            depth = 1;
+        }
+        else {
+            greater = b;
+            lesser = a;
+            depth = 0;
+        }
 
         if ((a & TYPE_INTEGER && b & TYPE_INTEGER) || (a & TYPE_REAL && b & TYPE_REAL)) {
             if (b == TYPE_INTEGER || b == TYPE_REAL) {
                 a = a == TYPE_INTEGER ? TYPE_I64 : a == TYPE_REAL ? TYPE_F64 : a;
+                greater = a;
+                lesser = b == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
+                depth = 1;
                 b = a;
             }
-            else {
-                a = a == TYPE_INTEGER || a == TYPE_REAL ? b : a;
+            else if (a == TYPE_INTEGER || a == TYPE_REAL) {
+                greater = b;
+                lesser = a == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
+                depth = 0;
+                a = b;
             }
 
-            op->types[0] = a;
-            op->types[1] = b;
+            op->types[0] = greater;
             DA_APPEND(&analyser->stack, a > b ? a : b);
+
+            if (greater != lesser)
+                make_conversion_op(analyser, greater, lesser, depth);
         }
         else {
             analyser->had_error = 1;
@@ -243,21 +294,41 @@ void type_check_op(Analyser *analyser) {
 
         Type a = pop(analyser);
         Type b = pop(analyser);
-        op->original[0] = a;
-        op->original[1] = b;
+
+        int depth;
+        Type lesser, greater;
+
+        if (a > b) {
+            lesser = b;
+            greater = a;
+            depth = 1;
+        }
+        else {
+            greater = b;
+            lesser = a;
+            depth = 0;
+        }
 
         if (a & TYPE_INTEGER && b & TYPE_INTEGER) {
             if (b == TYPE_INTEGER) {
                 a = a == TYPE_INTEGER ? TYPE_I64 : a;
+                greater = a;
+                lesser = TYPE_I64;
+                depth = 1;
                 b = a;
             }
-            else {
-                a = a == TYPE_INTEGER ? b : a;
+            else if (a == TYPE_INTEGER) {
+                greater = b;
+                lesser = TYPE_I64;
+                depth = 0;
+                a = b;
             }
 
-            op->types[0] = a;
-            op->types[1] = b;
+            op->types[0] = greater;
             DA_APPEND(&analyser->stack, a > b ? a : b);
+
+            if (greater != lesser)
+                make_conversion_op(analyser, greater, lesser, depth);
         }
         else {
             analyser->had_error = 1;
@@ -361,21 +432,41 @@ void type_check_op(Analyser *analyser) {
 
         Type a = pop(analyser);
         Type b = pop(analyser);
-        op->original[0] = a;
-        op->original[1] = b;
+
+        int depth;
+        Type lesser, greater;
+
+        if (a > b) {
+            lesser = b;
+            greater = a;
+            depth = 1;
+        }
+        else {
+            greater = b;
+            lesser = a;
+            depth = 0;
+        }
 
         if ((a & TYPE_INTEGER && b & TYPE_INTEGER) || (a & TYPE_REAL && b & TYPE_REAL)) {
             if (b == TYPE_INTEGER || b == TYPE_REAL) {
                 a = a == TYPE_INTEGER ? TYPE_I64 : a == TYPE_REAL ? TYPE_F64 : a;
+                greater = a;
+                lesser = b == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
+                depth = 1;
                 b = a;
             }
-            else {
-                a = a == TYPE_INTEGER || a == TYPE_REAL ? b : a;
+            else if (a == TYPE_INTEGER || a == TYPE_REAL) {
+                greater = b;
+                lesser = a == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
+                depth = 0;
+                a = b;
             }
 
-            op->types[0] = a;
-            op->types[1] = b;
+            op->types[0] = greater;
             DA_APPEND(&analyser->stack, TYPE_U8);
+
+            if (greater != lesser)
+                make_conversion_op(analyser, greater, lesser, depth);
         }
         else {
             analyser->had_error = 1;
@@ -470,6 +561,11 @@ void type_check_op(Analyser *analyser) {
                 fprintf(stderr, "]\n");
                 break;
             }
+
+            if (arg != func.param_types.items[i]) {
+                arg = arg == TYPE_INTEGER ? TYPE_I64 : arg == TYPE_REAL ? TYPE_F64 : arg;
+                make_conversion_op(analyser, func.param_types.items[i], arg, func.param_types.count-i-1);
+            }
         }
         analyser->stack.count -= func.param_types.count;
 
@@ -513,16 +609,18 @@ void type_check_op(Analyser *analyser) {
     case OP_LABEL: break;
     case OP_START:
         type_check_block(analyser);
-        break;
+        return;
     case OP_IF:
         type_check_if(analyser);
-        break;
+        return;
     default:
         analyser->had_error = 1;
         EPRINTF_AT_OP(op, LEVEL_ERR, "Unimplemented instruction in type checking: %s\n", opcode_spelling(op->opcode));
-        break;
+        analyser->pos++;
+        return;
     }
 
+    DA_APPEND(&analyser->dst, *op);
     analyser->pos++;
 }
 
@@ -532,6 +630,9 @@ int type_check(Ops *ops) {
 
     while (analyser.pos < ops->count)
         type_check_op(&analyser);
+
+    free(ops->items);
+    *ops = analyser.dst;
 
     return analyser.had_error;
 }

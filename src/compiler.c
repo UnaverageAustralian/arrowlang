@@ -131,7 +131,7 @@ void print_op(Op *op) {
         printf(" \"%s\"", (char *)op->operand);
         break;
     case OP_CONVERT:
-        printf(" %s => %s", type_spelling(op->types[0]), type_spelling(op->types[1]));
+        printf(" (%s => %s) %llu", type_spelling(op->types[0]), type_spelling(op->types[1]), op->operand);
         break;
     default:
         if (op->types[1] != TYPE_VOID)
