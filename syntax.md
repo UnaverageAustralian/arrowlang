@@ -146,6 +146,6 @@ Most types are only compatible with themselves, except for `int_lit` and `real_l
 You can convert between types just by putting in the type's name:
 
 ```
- 30 f32                    // Converts the 30 from int_lit to f32
- 255u8 1u8 + i64 io::print // Prints 0
+ 30 f32                  // Converts the 30 from int_lit to f32
+ 255u8 1 + i64 io::print // Prints 0
 ```
