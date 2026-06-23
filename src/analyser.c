@@ -560,11 +560,12 @@ void type_check_op(Analyser *analyser) {
         Function func = ((Symbol *)((Hash_Entry *)op->operand)->val)->as.func;
         if (!check_operand_count(analyser, func.param_types.count)) break;
 
-        for (size_t i = 0; i < func.param_types.count; i++) {
-            Type arg = analyser->stack.items[analyser->stack.count-func.param_types.count+i];
+        int had_error = 0;
+        for (int i = (int)func.param_types.count-1; i >= 0; i--) {
+            Type arg = pop(analyser);
 
-            if ((arg & func.param_types.items[i]) == 0) {
-                analyser->had_error = 1;
+            if ((arg & func.param_types.items[i]) == 0 && !had_error) {
+                had_error = 1;
                 EPRINTF_AT_OP(op, LEVEL_ERR, "Argument types don't match function parameters, expected types: [ ");
 
                 for (size_t j = 0; j < func.param_types.count; j++)
@@ -575,7 +576,7 @@ void type_check_op(Analyser *analyser) {
                     fprintf(stderr, "%s ", type_spelling(analyser->stack.items[j]));
 
                 fprintf(stderr, "]\n");
-                break;
+                continue;
             }
 
             if (arg != func.param_types.items[i]) {
@@ -583,7 +584,7 @@ void type_check_op(Analyser *analyser) {
                 make_conversion_op(analyser, func.param_types.items[i], arg, func.param_types.count-i-1);
             }
         }
-        analyser->stack.count -= func.param_types.count;
+        analyser->had_error |= had_error;
 
         for (size_t i = 0; i < func.return_types.count; i++)
             DA_APPEND(&analyser->stack, func.return_types.items[i]);
