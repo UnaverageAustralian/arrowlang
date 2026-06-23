@@ -48,7 +48,8 @@ inline int check_operand_count(Analyser *analyser, size_t expected) {
     Op *op = &analyser->ops->items[analyser->pos];
     if (analyser->stack.count < expected) {
         analyser->had_error = 1;
-        EPRINTF_AT_OP(op, LEVEL_ERR, "Not enough items on the stack for %s\n", opcode_spelling(op->opcode));
+        EPRINTF_AT_OP(op, LEVEL_ERR, "Not enough items on the stack for %s, expected at least %d elements\n",
+                      opcode_spelling(op->opcode), expected);
         return 0;
     }
     return 1;
@@ -69,12 +70,25 @@ inline void make_conversion_op(Analyser *analyser, Type greater, Type lesser, in
 
 void check_expected_types(Analyser *analyser) {
     Op *op = &analyser->ops->items[analyser->pos];
-    if (analyser->stack.count - analyser->block_start != analyser->expected_types.count - analyser->expected_types_start)
-        goto ERROR;
+
+    int expected_count = analyser->in_block ? analyser->expected_types.count - analyser->expected_types_start : analyser->func.return_types.count;
+    int actual_count = analyser->stack.count - analyser->block_start;
+
+    if (actual_count < expected_count && !analyser->in_block) {
+        analyser->had_error = 1;
+        EPRINTF_AT_OP(op, LEVEL_ERR, "Not enough items on the stack for returning, expected at least %d elements\n", expected_count);
+        return;
+    }
+
+    if (actual_count != expected_count && analyser->in_block) {
+        analyser->had_error = 1;
+        EPRINTF_AT_OP(op, LEVEL_ERR, "Blocks cannot change the state of the stack, expected %d elements, got %d elements\n",
+                      expected_count, actual_count);
+        return;
+    }
 
     for (size_t i = analyser->expected_types_start; i < analyser->expected_types.count; i++) {
         if ((analyser->expected_types.items[i] & analyser->stack.items[analyser->block_start + i - analyser->expected_types_start]) == 0) {
-ERROR:
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Blocks cannot change the state of the stack, expected types: [ ");
 
@@ -86,11 +100,6 @@ ERROR:
                 fprintf(stderr, "%s ", type_spelling(analyser->stack.items[j]));
 
             fprintf(stderr, "]\n");
-
-            analyser->stack.count = analyser->block_start + analyser->expected_types.count - analyser->expected_types_start;
-            DA_EXPAND(&analyser->stack, analyser->stack.count);
-            memcpy(analyser->stack.items + analyser->block_start, analyser->expected_types.items + analyser->expected_types_start,
-                   (analyser->expected_types.count - analyser->expected_types_start) * sizeof(Type));
             break;
         }
     }
@@ -99,6 +108,8 @@ ERROR:
 void type_check_op(Analyser *analyser);
 
 void type_check_block(Analyser *analyser) {
+    analyser->in_block = 1;
+
     int block_start = analyser->block_start;
     int expected_types_start = analyser->expected_types_start;
     analyser->block_start = analyser->stack.count;
@@ -124,9 +135,13 @@ void type_check_block(Analyser *analyser) {
     analyser->block_start = block_start;
     analyser->expected_types.count = analyser->expected_types_start;
     analyser->expected_types_start = expected_types_start;
+
+    analyser->in_block = 0;
 }
 
 void type_check_if(Analyser *analyser) {
+    analyser->in_block = 1;
+
     int block_start = analyser->block_start;
     int expected_types_start = analyser->expected_types_start;
     analyser->block_start = analyser->stack.count;
@@ -175,6 +190,7 @@ void type_check_if(Analyser *analyser) {
     analyser->expected_types_start = expected_types_start;
 
     free(copy.items);
+    analyser->in_block = 0;
 }
 
 void type_check_op(Analyser *analyser) {
@@ -204,8 +220,8 @@ void type_check_op(Analyser *analyser) {
             depth = 0;
         }
 
-        if ((a & TYPE_INTEGER && b & TYPE_INTEGER) || (a & TYPE_REAL && b & TYPE_REAL)
-            || (a & (TYPE_INTEGER | TYPE_STR) && b & (TYPE_INTEGER | TYPE_STR) && (op->opcode != OP_ADD || a != b))) {
+        if ((a & TYPE_INTEGER && b & TYPE_INTEGER) || (a & TYPE_REAL && b & TYPE_REAL) ||
+            (a & (TYPE_INTEGER | TYPE_STR) && b & (TYPE_INTEGER | TYPE_STR) && (op->opcode != OP_ADD || a != b))) {
             if (b == TYPE_INTEGER || b == TYPE_REAL) {
                 a = a == TYPE_INTEGER ? TYPE_I64 : a == TYPE_REAL ? TYPE_F64 : a;
                 greater = a;

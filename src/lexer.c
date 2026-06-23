@@ -26,7 +26,7 @@ static const char *keywords[] = {
     "break",     "continue",
     "macro",   "struct",
     "import",  "neg",
-    "ret",     "rot",
+    "return",  "rot",
     "rotn",
 
     "i8",      "u8",

@@ -13,6 +13,7 @@ typedef struct {
     unsigned expected_types_start;
     unsigned pos;
     uint8_t had_error;
+    uint8_t in_block;
 } Analyser;
 
 int type_check(Ops *ops);

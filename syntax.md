@@ -116,11 +116,11 @@ Functions are declared with the symbol `$` and end with the same symbol. And the
  $
 ```
 
-You can return early from a function with `ret`.
+You can return early from a function with `return`.
 
 ```
  $foo ( i64 -> i64 )
-     5 + ret 2
+     5 + return 2
  $
 ```
 
