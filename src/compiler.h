@@ -111,10 +111,27 @@ typedef struct {
 } Function;
 
 typedef struct {
+    char *name;
+    Type type;
+} Field;
+
+typedef struct {
+    size_t count;
+    size_t capacity;
+    Field *items;
+} Fields;
+
+typedef struct {
+    int size;
+    Fields fields;
+} Struct;
+
+typedef struct {
     Symbol_Type type;
     union {
         Function func;
         Module module;
+        Struct structure;
     } as;
 } Symbol;
 

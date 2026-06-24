@@ -34,7 +34,7 @@ inline String_View strip_file_path(const char *path) {
 void init_compiler(Compiler *compiler, Compiler_Options options) {
     *compiler = (Compiler){0};
     compiler->options = options;
-    init_arena(&compiler->arena, 1024 * 1024);
+    init_arena(&compiler->arena, 2 * 1024 * 1024);
 }
 
 void init_compilation_unit(Compilation_Unit *unit, Lexer *lexer, Compiler *global) {
@@ -568,33 +568,7 @@ void compile_external_function(Compilation_Unit *compiler, uint8_t is_c_func) {
     }
 }
 
-void compile_functions(Compilation_Unit *compiler) {
-    for (; ;) {
-        switch (compiler->lexer->cur.type) {
-        case TOK_FUNC:
-            compile_function(compiler);
-            continue;
-        case TOK_EXT_FUNC:
-            compile_external_function(compiler, 0);
-            continue;
-        case TOK_C_FUNC:
-            compile_external_function(compiler, 1);
-            continue;
-        default:;
-        }
-        break;
-    }
-
-    if (compiler->symbols.entries != NULL && hashmap_get(&compiler->symbols, "main", 4)->key) {
-        if (compiler->lexer->cur.type != TOK_EOF) {
-            compiler->global->had_error = 1;
-            COMPILER_EPRINTF(LEVEL_ERR, "Extra tokens at end of file\n");
-        }
-        return;
-    }
-
-    if (compiler->lexer->cur.type == TOK_EOF) return;
-
+void compile_implicit_main(Compilation_Unit *compiler) {
     Symbol *main = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     main->type = STYPE_FUNC;
     DA_APPEND(&main->as.func.return_types, TYPE_U8);
@@ -614,6 +588,35 @@ void compile_functions(Compilation_Unit *compiler) {
 
     make_op_at_cur(compiler, OP_LABEL, compiler->label_count++);
     make_op_at_cur(compiler, OP_RET, 0);
+}
+
+void compile_decls(Compilation_Unit *compiler) {
+    for (; ;) {
+        switch (compiler->lexer->cur.type) {
+        case TOK_FUNC:
+            compile_function(compiler);
+            continue;
+        case TOK_EXT_FUNC:
+            compile_external_function(compiler, 0);
+            continue;
+        case TOK_C_FUNC:
+            compile_external_function(compiler, 1);
+            continue;
+        default: break;
+        }
+        break;
+    }
+
+    if (compiler->symbols.entries != NULL && hashmap_get(&compiler->symbols, "main", 4)->key) {
+        if (compiler->lexer->cur.type != TOK_EOF) {
+            compiler->global->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "Extra tokens at end of file\n");
+        }
+        return;
+    }
+    if (compiler->lexer->cur.type == TOK_EOF) return;
+
+    compile_implicit_main(compiler);
 
     for (; ;) {
         switch (compiler->lexer->cur.type) {
@@ -626,7 +629,7 @@ void compile_functions(Compilation_Unit *compiler) {
         case TOK_C_FUNC:
             compile_external_function(compiler, 1);
             continue;
-        default:;
+        default: break;
         }
         break;
     }
@@ -704,7 +707,7 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
         }
     }
 
-    compile_functions(&unit);
+    compile_decls(&unit);
     resolve_symbols(&unit);
 
     if (!global->had_error)

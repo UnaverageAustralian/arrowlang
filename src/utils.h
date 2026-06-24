@@ -22,6 +22,18 @@
         (a)->items[(a)->count++] = (i); \
     } while (0)
 
+#define ARENA_DA_APPEND(arena, a, i)                            \
+    do {                                                        \
+        if ((a)->capacity == 0) {                               \
+            (a)->items = arena_calloc(arena, INITIAL_CAPACITY); \
+        }                                                       \
+        else if ((a)->count >= (a)->capacity) {                 \
+            arena_calloc(arena, (a)->capacity);                 \
+            (a)->capacity *= 2;                                 \
+        }                                                       \
+        (a)->items[(a)->count++] = (i);                         \
+    } while (0)
+
 typedef enum {
     LEVEL_NOTE,
     LEVEL_WARN,
