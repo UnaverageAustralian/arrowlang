@@ -398,6 +398,10 @@ size_t type_size(Type type) {
     return 0;
 }
 
+inline int is_decl_type(Token_Type type) {
+    return type == TOK_FUNC || type == TOK_STRUCT;
+}
+
 void compile_stmt(Compilation_Unit *compiler) {
     lexer_next(compiler->lexer);
 
@@ -678,7 +682,7 @@ void compile_implicit_main(Compilation_Unit *compiler) {
     hashmap_add(&compiler->module.symbols, "main", 4, main);
 
     make_op_at_cur(compiler, OP_FUNC, (int64_t)entry);
-    while (compiler->lexer->cur.type != TOK_FUNC && compiler->lexer->cur.type != TOK_EOF)
+    while (!is_decl_type(compiler->lexer->cur.type) && compiler->lexer->cur.type != TOK_EOF)
         compile_stmt(compiler);
 
     for (int i = compiler->rets.count-1; i >= 0; i--) {
@@ -765,7 +769,8 @@ void resolve_symbols(Compilation_Unit *compiler) {
             op->operand = (int64_t)entry;
             break;
         case STYPE_STRUCT:
-            op->types[0] = (Type){
+            op->opcode = OP_CONVERT;
+            op->types[1] = (Type){
                 .kind = KIND_STRUCT,
                 .as = { .structure = sym->as.structure },
             };
