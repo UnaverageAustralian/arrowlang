@@ -15,6 +15,8 @@
 #define COMPILER_EPRINTF(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->prev.line, compiler->lexer->prev.pos, level, __VA_ARGS__); 
 #define COMPILER_EPRINTF_AT_CUR(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->cur.line, compiler->lexer->cur.pos, level, __VA_ARGS__);
 
+#define DEBUG
+
 inline String_View strip_file_path(const char *path) {
     String_View stripped = { .len = 0, .str = path };
     while (*path != '\0') {
@@ -110,7 +112,7 @@ void print_op(Op *op) {
     case OP_PUSH:
         printf(" %s ", type_spelling(op->types[0]));
 
-        if (op->types[0] == TYPE_REAL)
+        if (op->types[0].as.basic == TYPE_REAL)
             printf("%lf", *(double *)&op->operand);
         else
             printf("%llu", op->operand);
@@ -134,9 +136,9 @@ void print_op(Op *op) {
         printf(" (%s => %s) %llu", type_spelling(op->types[0]), type_spelling(op->types[1]), op->operand);
         break;
     default:
-        if (op->types[1] != TYPE_VOID)
+        if (op->types[1].as.basic != TYPE_VOID)
             printf(" %s", type_spelling(op->types[1]));
-        if (op->types[0] != TYPE_VOID)
+        if (op->types[0].as.basic != TYPE_VOID)
             printf(" %s", type_spelling(op->types[0]));
         break;
     }
@@ -149,6 +151,23 @@ void print_ops(Ops *ops) {
         printf("%s:%d:%d: ", op->file_path, op->line, op->pos);
         print_op(op);
     }
+}
+
+static inline Type basic_type(Basic_Type type) {
+    return (Type) {
+        .kind = KIND_BASIC,
+        .as = { .basic = type },
+    };
+}
+
+inline Hash_Entry *add_symbol(Compilation_Unit *compiler, Symbol *sym) {
+    Hash_Entry *entry = hashmap_add(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
+    hashmap_add(&compiler->module.symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
+    if (!entry) {
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Redefinition of a symbol\n");
+    }
+    return entry;
 }
 
 inline void make_op(Compilation_Unit *compiler, Opcode opcode, uint64_t operand) {
@@ -189,11 +208,11 @@ void compile_if_stmt(Compilation_Unit *compiler) {
     make_op(compiler, OP_IF, 0);
 
     Token *cur = &compiler->lexer->cur;
-    while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_ELSE && cur->type != TOK_EOF)
+    while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_COLON && cur->type != TOK_EOF)
         compile_stmt(compiler);
     compiler->ops.items[if_start].operand = compiler->label_count;
 
-    if (cur->type == TOK_ELSE) {
+    if (cur->type == TOK_COLON) {
         lexer_next(compiler->lexer);
 
         int else_start = compiler->ops.count;
@@ -315,45 +334,86 @@ void compile_loop_stmt(Compilation_Unit *compiler) {
 
 Type get_type(Compilation_Unit *compiler) {
     switch (compiler->lexer->prev.type) {
-    case TOK_I8:   return TYPE_I8;
-    case TOK_CHAR: return TYPE_CHAR;
-    case TOK_U8:   return TYPE_U8;
-    case TOK_I16:  return TYPE_I16;
-    case TOK_U16:  return TYPE_U16;
-    case TOK_I32:  return TYPE_I32;
-    case TOK_U32:  return TYPE_U32;
-    case TOK_I64:  return TYPE_I64;
-    case TOK_U64:  return TYPE_U64;
-    case TOK_F32:  return TYPE_F32;
-    case TOK_F64:  return TYPE_F64;
-    case TOK_STR:  return TYPE_STR;
+    case TOK_I8:   return basic_type(TYPE_I8);
+    case TOK_CHAR: return basic_type(TYPE_CHAR);
+    case TOK_U8:   return basic_type(TYPE_U8);
+    case TOK_I16:  return basic_type(TYPE_I16);
+    case TOK_U16:  return basic_type(TYPE_U16);
+    case TOK_I32:  return basic_type(TYPE_I32);
+    case TOK_U32:  return basic_type(TYPE_U32);
+    case TOK_I64:  return basic_type(TYPE_I64);
+    case TOK_U64:  return basic_type(TYPE_U64);
+    case TOK_F32:  return basic_type(TYPE_F32);
+    case TOK_F64:  return basic_type(TYPE_F64);
+    case TOK_STR:  return basic_type(TYPE_STR);
+    case TOK_WORD: {
+        Hash_Entry *entry = hashmap_get(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len);
+        if (!entry || !entry->key) {
+            compiler->global->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "Unresolved structure %.*s\n", compiler->lexer->prev.len, compiler->lexer->prev.start);
+            return basic_type(TYPE_VOID);
+        }
+
+        Symbol *sym = (Symbol *)entry->val;
+        if (sym->type != STYPE_STRUCT) {
+            compiler->global->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "%.*s is not a structure\n");
+            return basic_type(TYPE_VOID);
+        }
+
+        return (Type){ .kind = KIND_STRUCT, .as = { .structure = sym->as.structure } };
+    }
     default:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Expected type, got %s\n", tok_spelling(compiler->lexer->cur.type));
-        return TYPE_VOID;
+        return basic_type(TYPE_VOID);
     }
+}
+
+size_t type_size(Type type) {
+    switch (type.kind) {
+    case KIND_BASIC:
+        switch (type.as.basic) {
+        case TYPE_I8:
+        case TYPE_CHAR:
+        case TYPE_U8:
+            return 1;
+        case TYPE_I16:
+        case TYPE_U16:
+            return 2;
+        case TYPE_F32:
+        case TYPE_I32:
+        case TYPE_U32:
+            return 4;
+        case TYPE_STR:
+        case TYPE_F64:
+        case TYPE_I64:
+        case TYPE_U64:
+            return 8;
+        default:
+            return 0;
+        }
+    case KIND_STRUCT: return type.as.structure.size;
+    }
+    return 0;
 }
 
 void compile_stmt(Compilation_Unit *compiler) {
     lexer_next(compiler->lexer);
 
     Token *tok = &compiler->lexer->prev;
-#ifdef DEBUG
-    print_token(*tok);
-#endif
-
     switch (tok->type) {
     case TOK_INT_LIT:
         make_op(compiler, OP_PUSH, tok->as.integer);
-        compiler->ops.items[compiler->ops.count-1].types[0] = TYPE_INTEGER;
+        compiler->ops.items[compiler->ops.count-1].types[0] = basic_type(TYPE_INTEGER);
         break;
     case TOK_FLOAT_LIT:
         make_op(compiler, OP_PUSH, tok->as.integer);
-        compiler->ops.items[compiler->ops.count-1].types[0] = TYPE_REAL;
+        compiler->ops.items[compiler->ops.count-1].types[0] = basic_type(TYPE_REAL);
         break;
     case TOK_CHAR_LIT:
         make_op(compiler, OP_PUSH, tok->as.integer);
-        compiler->ops.items[compiler->ops.count-1].types[0] = TYPE_CHAR;
+        compiler->ops.items[compiler->ops.count-1].types[0] = basic_type(TYPE_CHAR);
         break;
     case TOK_ADD:   make_op(compiler, OP_ADD, 0);   break;
     case TOK_SUB:   make_op(compiler, OP_SUB, 0);   break;
@@ -434,25 +494,38 @@ void compile_stmt(Compilation_Unit *compiler) {
                 .pos = compiler->ops.count,
             };
             DA_APPEND(&compiler->unresolved, sym);
-            make_op(compiler, OP_CALL, 0);
+            make_op(compiler, OP_UNKNOWN, 0);
             break;
         }
-        if (((Symbol *)entry->val)->type == STYPE_MODULE) {
+
+        Symbol *sym = (Symbol *)entry->val;
+        switch (sym->type) {
+        case STYPE_FUNC:
+            if (sym->as.func.is_c_func)
+                make_op(compiler, OP_CCALL, (int64_t)entry);
+            else
+                make_op(compiler, OP_CALL, (int64_t)entry);
+            break;
+        case STYPE_STRUCT: {
+            make_op(compiler, OP_CONVERT, 0);
+            compiler->ops.items[compiler->ops.count-1].types[1] = (Type){
+                .kind = KIND_STRUCT,
+                .as = { .structure = sym->as.structure }
+            };
+            break;
+        }
+        case STYPE_MODULE:
             expect(compiler, TOK_SCOPE);
             expect(compiler, TOK_WORD);
 
             entry = hashmap_get(&((Symbol *)entry->val)->as.module.symbols, tok->start, tok->len);
             if (!entry || !entry->key) {
                 compiler->global->had_error = 1;
-                COMPILER_EPRINTF(LEVEL_ERR, "Unknown function %.*s in module %.*s\n", tok->len, tok->start, module_name_len, module_name);
+                COMPILER_EPRINTF(LEVEL_ERR, "Unknown symbol %.*s in module %.*s\n", tok->len, tok->start, module_name_len, module_name);
                 return;
             }
+            break;
         }
-
-        if (((Symbol *)entry->val)->as.func.is_c_func)
-            make_op(compiler, OP_CCALL, (int64_t)entry);
-        else
-            make_op(compiler, OP_CALL, (int64_t)entry);
         break;
     }
     case TOK_I8:
@@ -474,7 +547,7 @@ void compile_stmt(Compilation_Unit *compiler) {
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "%.*s\n", tok->len, tok->start);
         return;
-    case TOK_ELSE:
+    case TOK_COLON:
     case TOK_SEMICOLON:
     case TOK_END:
     case TOK_RBRACE:
@@ -506,12 +579,7 @@ Hash_Entry *compile_function_signature(Compilation_Unit *compiler) {
     sym->type = STYPE_FUNC;
     sym->as.func.module_name = compiler->module.name;
 
-    Hash_Entry *entry = hashmap_add(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
-    hashmap_add(&compiler->module.symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
-    if (!entry) {
-        compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Redefinition of a function\n");
-    }
+    Hash_Entry *entry = add_symbol(compiler, sym);
 
     expect(compiler, TOK_LPAREN);
     while (compiler->lexer->cur.type != TOK_ARROW && compiler->lexer->cur.type != TOK_RPAREN && compiler->lexer->cur.type != TOK_EOF) {
@@ -568,10 +636,42 @@ void compile_external_function(Compilation_Unit *compiler, uint8_t is_c_func) {
     }
 }
 
+void compile_struct(Compilation_Unit *compiler) {
+    lexer_next(compiler->lexer);
+    expect(compiler, TOK_WORD);
+
+    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
+    sym->type = STYPE_STRUCT;
+
+    add_symbol(compiler, sym);
+
+    size_t offset = 0;
+    while (compiler->lexer->cur.type != TOK_END && compiler->lexer->cur.type != TOK_EOF) {
+        expect(compiler, TOK_WORD);
+        Field field = { .name = { .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start }, };
+
+        expect(compiler, TOK_COLON);
+
+        lexer_next(compiler->lexer);
+        field.type = get_type(compiler);
+        field.offset = offset;
+
+        ARENA_DA_APPEND(&compiler->global->arena, &sym->as.structure.fields, field);
+        offset += type_size(field.type);
+    }
+    sym->as.structure.size = offset + 7 - (offset - 1) % 8;
+
+    if (compiler->lexer->cur.type == TOK_EOF) {
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Expected end of struct, got end of file\n");
+    }
+    lexer_next(compiler->lexer);
+}
+
 void compile_implicit_main(Compilation_Unit *compiler) {
     Symbol *main = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     main->type = STYPE_FUNC;
-    DA_APPEND(&main->as.func.return_types, TYPE_U8);
+    DA_APPEND(&main->as.func.return_types, basic_type(TYPE_U8));
     main->as.func.module_name = (String_View){0};
 
     Hash_Entry *entry = hashmap_add(&compiler->symbols, "main", 4, main);
@@ -602,6 +702,9 @@ void compile_decls(Compilation_Unit *compiler) {
         case TOK_C_FUNC:
             compile_external_function(compiler, 1);
             continue;
+        case TOK_STRUCT:
+            compile_struct(compiler);
+            continue;
         default: break;
         }
         break;
@@ -629,6 +732,9 @@ void compile_decls(Compilation_Unit *compiler) {
         case TOK_C_FUNC:
             compile_external_function(compiler, 1);
             continue;
+        case TOK_STRUCT:
+            compile_struct(compiler);
+            continue;
         default: break;
         }
         break;
@@ -642,17 +748,33 @@ void compile_decls(Compilation_Unit *compiler) {
 
 void resolve_symbols(Compilation_Unit *compiler) {
     for (size_t i = 0; i < compiler->unresolved.count; i++) {
-        Unresolved_Symbol sym = compiler->unresolved.items[i];
-        Op *op = &compiler->ops.items[sym.pos];
+        Unresolved_Symbol unresolved = compiler->unresolved.items[i];
+        Op *op = &compiler->ops.items[unresolved.pos];
 
-        Hash_Entry *entry = hashmap_get(&compiler->symbols, sym.name.str, sym.name.len);
-        if (!entry || !entry->key || ((Symbol *)entry->val)->type != STYPE_FUNC) {
+        Hash_Entry *entry = hashmap_get(&compiler->symbols, unresolved.name.str, unresolved.name.len);
+        if (!entry || !entry->key) {
             compiler->global->had_error = 1;
-            eprintf(op->file_path, op->line, op->pos, LEVEL_ERR, "Unknown function %.*s\n", sym.name.len, sym.name.str);
+            eprintf(op->file_path, op->line, op->pos, LEVEL_ERR, "Unknown symbol %.*s\n", unresolved.name.len, unresolved.name.str);
             continue;
         }
 
-        op->operand = (int64_t)entry;
+        Symbol *sym = (Symbol *)entry->val;
+        switch (sym->type) {
+        case STYPE_FUNC:
+            op->opcode = sym->as.func.is_c_func ? OP_CCALL : OP_CALL;
+            op->operand = (int64_t)entry;
+            break;
+        case STYPE_STRUCT:
+            op->types[0] = (Type){
+                .kind = KIND_STRUCT,
+                .as = { .structure = sym->as.structure },
+            };
+            break;
+        case STYPE_MODULE:
+            compiler->global->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "Unreachable. Please report this as a bug.");
+            break;
+        }
     }
 }
 
@@ -710,6 +832,7 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
     compile_decls(&unit);
     resolve_symbols(&unit);
 
+#ifndef DEBUG
     if (!global->had_error)
         global->had_error = type_check(&unit.ops);
 
@@ -723,6 +846,10 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
         Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
         generate_x86_64_linux(&unit.ops, output_file, main != NULL && main->key != NULL);
     }
+#endif
+
+#else
+    print_ops(&unit.ops);
 #endif
 
     Symbol *module_sym = arena_calloc(&global->arena, sizeof(Symbol));
@@ -759,7 +886,7 @@ void compile(Compiler_Options options) {
         compile_module(&compiler, contents, options.input_files[i]);
     }
 
-#ifndef PRINT_IR
+#if !defined(PRINT_IR) && !defined(DEBUG)
     if (!compiler.had_error)
         link_files(compiler.options);
 #endif

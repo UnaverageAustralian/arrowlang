@@ -22,6 +22,7 @@ typedef enum {
     TOK_ARROW,     TOK_LPAREN,
     TOK_RPAREN,    TOK_SCOPE,
     TOK_EXT_FUNC,  TOK_C_FUNC,
+    TOK_HASH,
 
     // Symbols/Words
     TOK_MOD,       TOK_AND,
@@ -33,7 +34,7 @@ typedef enum {
     TOK_LTEQ,      TOK_GT,
     TOK_GTEQ,      TOK_EQ,
     TOK_NEQ,       TOK_IF,
-    TOK_ELSE,
+    TOK_COLON,
 
     // Words
     TOK_DUP,       TOK_OVER,

@@ -28,7 +28,7 @@ typedef enum {
     OP_CALL,  OP_STR,
     OP_ROT,   OP_CONVERT,
     OP_CCALL, OP_ROTN,
-    OP_NEQ,
+    OP_NEQ,   OP_UNKNOWN,
 
     // For the analyser
     OP_START, OP_END,
@@ -36,7 +36,8 @@ typedef enum {
 } Opcode;
 
 typedef enum {
-    STYPE_FUNC, STYPE_MODULE,
+    STYPE_FUNC,  STYPE_MODULE,
+    STYPE_STRUCT,
 } Symbol_Type;
 
 typedef enum {
@@ -52,6 +53,31 @@ typedef enum {
                    TYPE_U16 | TYPE_I32  | TYPE_U32 | TYPE_I64 | TYPE_U64,
     TYPE_REAL    = TYPE_F32 | TYPE_F64,
     TYPE_NUMBER  = TYPE_INTEGER | TYPE_REAL,
+} Basic_Type;
+
+typedef enum {
+    KIND_BASIC, KIND_STRUCT,
+} Type_Kind;
+
+typedef struct Field Field;
+
+typedef struct {
+    size_t count;
+    size_t capacity;
+    Field *items;
+} Fields;
+
+typedef struct {
+    int size;
+    Fields fields;
+} Struct;
+
+typedef struct {
+    Type_Kind kind;
+    union {
+        Basic_Type basic;
+        Struct structure;
+    } as;
 } Type;
 
 typedef struct {
@@ -110,21 +136,11 @@ typedef struct {
     uint8_t is_c_func;
 } Function;
 
-typedef struct {
-    char *name;
+struct Field {
+    String_View name;
     Type type;
-} Field;
-
-typedef struct {
-    size_t count;
-    size_t capacity;
-    Field *items;
-} Fields;
-
-typedef struct {
-    int size;
-    Fields fields;
-} Struct;
+    size_t offset;
+};
 
 typedef struct {
     Symbol_Type type;

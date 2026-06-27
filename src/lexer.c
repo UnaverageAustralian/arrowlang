@@ -515,6 +515,10 @@ void lexer_next(Lexer *lexer) {
         skip(lexer, 1);
         make_token(lexer, TOK_RPAREN);
         break;
+    case '#':
+        skip(lexer, 1);
+        make_token(lexer, TOK_HASH);
+        break;
     case '!':
         skip(lexer, 1);
         c = peek(lexer, 0);
@@ -552,7 +556,7 @@ void lexer_next(Lexer *lexer) {
             make_token(lexer, TOK_SCOPE);
         }
         else {
-            make_token(lexer, TOK_ELSE);
+            make_token(lexer, TOK_COLON);
         }
         break;
     case '-':
@@ -663,7 +667,7 @@ char *tok_spelling(Token_Type type) {
     case TOK_ROT:       return "ROT";
     case TOK_ROTN:      return "ROTN";
     case TOK_IF:        return "IF";
-    case TOK_ELSE:      return "ELSE";
+    case TOK_COLON:     return "COLON";
     case TOK_WHILE:     return "WHILE";
     case TOK_LBRACE:    return "LBRACE";
     case TOK_RBRACE:    return "RBRACE";
