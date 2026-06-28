@@ -96,6 +96,7 @@ char *opcode_spelling(Opcode opcode) {
     case OP_END:     return "END";
     case OP_IF:      return "IF";
     case OP_ELSE:    return "ELSE";
+    case OP_ACCESS:  return "ACCESS";
     default:         return "UNKNOWN";
     }
 }
@@ -135,6 +136,11 @@ void print_op(Op *op) {
     case OP_CONVERT:
         printf(" (%s => %s) %llu", type_spelling(op->types[0]), type_spelling(op->types[1]), op->operand);
         break;
+    case OP_ACCESS: {
+        String_View *sv = (String_View *)op->operand;
+        printf(" %.*s", sv->len, sv->str);
+        break;
+    }
     default:
         if (op->types[1].as.basic != TYPE_VOID)
             printf(" %s", type_spelling(op->types[1]));
@@ -547,6 +553,13 @@ void compile_stmt(Compilation_Unit *compiler) {
         make_op(compiler, OP_CONVERT, 0);
         compiler->ops.items[compiler->ops.count-1].types[1] = get_type(compiler);
         break;
+    case TOK_HASH: {
+        expect(compiler, TOK_WORD);
+        String_View *sv = arena_calloc(&compiler->global->arena, sizeof(String_View));
+        *sv = (String_View){ .len = tok->len, .str = tok->start };
+        make_op(compiler, OP_ACCESS, (uint64_t)sv);
+        break;
+    }
     case TOK_ERROR:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "%.*s\n", tok->len, tok->start);
