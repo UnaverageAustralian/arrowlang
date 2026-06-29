@@ -15,7 +15,7 @@
 #define COMPILER_EPRINTF(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->prev.line, compiler->lexer->prev.pos, level, __VA_ARGS__); 
 #define COMPILER_EPRINTF_AT_CUR(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->cur.line, compiler->lexer->cur.pos, level, __VA_ARGS__);
 
-#define DEBUG
+#define PRINT_IR
 
 inline String_View strip_file_path(const char *path) {
     String_View stripped = { .len = 0, .str = path };
@@ -661,6 +661,7 @@ void compile_struct(Compilation_Unit *compiler) {
     sym->type = STYPE_STRUCT;
 
     add_symbol(compiler, sym);
+    sym->as.structure.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
 
     size_t offset = 0;
     while (compiler->lexer->cur.type != TOK_END && compiler->lexer->cur.type != TOK_EOF) {

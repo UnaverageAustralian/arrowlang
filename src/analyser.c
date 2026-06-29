@@ -43,10 +43,7 @@ char *type_spelling(Type type) {
     case KIND_BASIC: return basic_type_spelling(type.as.basic);
     case KIND_STRUCT: {
         String_Builder sb = {0};
-        sb_appendf(&sb, "{ ");
-        for (size_t i = 0; i < type.as.structure.fields.count; i++)
-            sb_appendf(&sb, "%s ", type_spelling(type.as.structure.fields.items[i].type));
-        sb_appendf(&sb, "}");
+        sb_appendf(&sb, "%.*s", type.as.structure.name.len, type.as.structure.name.str);
         return sb.items;
     }
     }
@@ -90,6 +87,26 @@ inline void make_conversion_op(Analyser *analyser, Type greater, Type lesser, in
     DA_APPEND(&analyser->dst, op);
 }
 
+inline int types_compatible(Type a, Type b) {
+    if (a.kind != b.kind) return 0;
+
+    switch (a.kind) {
+    case KIND_BASIC:  return (a.as.basic & b.as.basic) != 0;
+    case KIND_STRUCT: return a.as.structure.name.str == b.as.structure.name.str;
+    default:          return 0;
+    }
+}
+
+inline int types_equal(Type a, Type b) {
+    if (a.kind != b.kind) return 0;
+
+    switch (a.kind) {
+    case KIND_BASIC:  return a.as.basic == b.as.basic;
+    case KIND_STRUCT: return a.as.structure.name.str == b.as.structure.name.str;
+    default:          return 0;
+    }
+}
+
 void check_expected_types(Analyser *analyser) {
     Op *op = &analyser->ops->items[analyser->pos];
 
@@ -110,7 +127,7 @@ void check_expected_types(Analyser *analyser) {
     }
 
     for (size_t i = analyser->expected_types_start; i < analyser->expected_types.count; i++) {
-        if ((analyser->expected_types.items[i].as.basic & analyser->stack.items[analyser->block_start + i - analyser->expected_types_start].as.basic) == 0) {
+        if (types_compatible(analyser->expected_types.items[i], analyser->stack.items[analyser->block_start + i - analyser->expected_types_start])) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Blocks cannot change the state of the stack, expected types: [ ");
 
@@ -215,111 +232,62 @@ void type_check_if(Analyser *analyser) {
     analyser->in_block = 0;
 }
 
+void expected_types_error(Analyser *analyser, char *msg, Types expected) {
+    analyser->had_error = 1;
+    EPRINTF_AT_OP(&analyser->ops->items[analyser->ops->count-1], LEVEL_ERR, "%s, expected types: [ ", msg);
+
+    for (size_t i = 0; i < expected.count; i++)
+        fprintf(stderr, "%s ", type_spelling(expected.items[i]));
+
+    fprintf(stderr, "], actual types: [ ");
+    for (size_t i = analyser->stack.count - expected.count; i < analyser->stack.count; i++)
+        fprintf(stderr, "%s ", type_spelling(analyser->stack.items[i]));
+
+    fprintf(stderr, "]\n");
+}
+
+int binop_operands_valid(Op *op, Type a, Type b) {
+    int valid = a.kind == KIND_BASIC && b.kind == KIND_BASIC;
+    switch (op->operand) {
+    case OP_ADD:
+    case OP_SUB:
+        valid |= (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL) ||
+                 (a.as.basic & (TYPE_INTEGER | TYPE_STR) && b.as.basic & (TYPE_INTEGER | TYPE_STR) && (op->opcode != OP_ADD || a.as.basic != b.as.basic));
+        break;
+    case OP_MUL:
+    case OP_DIV:
+    case OP_NEQ:
+    case OP_GTEQ:
+    case OP_GT:
+    case OP_LTEQ:
+    case OP_LT:
+    case OP_EQ:
+        valid |= (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL);
+        break;
+    case OP_MOD:
+    case OP_ROR:
+    case OP_ROL:
+    case OP_SHR:
+    case OP_SHL:
+    case OP_XOR:
+    case OP_OR:
+    case OP_AND:
+        valid |= a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER;
+        break;
+    }
+    return valid;
+}
+
 void type_check_op(Analyser *analyser) {
     Op *op = &analyser->ops->items[analyser->pos];
     switch (op->opcode) {
     case OP_PUSH:
         DA_APPEND(&analyser->stack, op->types[0]);
         break;
+    case OP_ADD:
     case OP_SUB:
-    case OP_ADD: {
-        if (!check_operand_count(analyser, 2)) break;
-
-        Type a = pop(analyser);
-        Type b = pop(analyser);
-
-        int depth;
-        Type lesser, greater;
-
-        if (a.as.basic > b.as.basic) {
-            lesser = b;
-            greater = a;
-            depth = 1;
-        }
-        else {
-            greater = b;
-            lesser = a;
-            depth = 0;
-        }
-
-        if ((a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL) ||
-            (a.as.basic & (TYPE_INTEGER | TYPE_STR) && b.as.basic & (TYPE_INTEGER | TYPE_STR) && (op->opcode != OP_ADD || a.as.basic != b.as.basic))) {
-            if (b.as.basic == TYPE_INTEGER || b.as.basic == TYPE_REAL) {
-                a.as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
-                greater = a;
-                lesser.as.basic = b.as.basic == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
-                depth = 1;
-                b = a;
-            }
-            else if (a.as.basic == TYPE_INTEGER || a.as.basic == TYPE_REAL) {
-                greater = b;
-                lesser.as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
-                depth = 0;
-                a = b;
-            }
-
-            op->types[0] = greater;
-            DA_APPEND(&analyser->stack, a.as.basic > b.as.basic ? a : b);
-
-            if (greater.as.basic != lesser.as.basic)
-                make_conversion_op(analyser, greater, lesser, depth);
-        }
-        else {
-            analyser->had_error = 1;
-            EPRINTF_AT_OP(op, LEVEL_ERR, "Invalid operand types for %s: %s %s\n",
-                             opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
-        }
-        break;
-    }
+    case OP_MUL:
     case OP_DIV:
-    case OP_MUL: {
-        if (!check_operand_count(analyser, 2)) break;
-
-        Type a = pop(analyser);
-        Type b = pop(analyser);
-
-        int depth;
-        Type lesser, greater;
-
-        if (a.as.basic > b.as.basic) {
-            lesser = b;
-            greater = a;
-            depth = 1;
-        }
-        else {
-            greater = b;
-            lesser = a;
-            depth = 0;
-        }
-
-        if ((a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL)) {
-            if (b.as.basic == TYPE_INTEGER || b.as.basic == TYPE_REAL) {
-                a.as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
-                greater = a;
-                lesser.as.basic = b.as.basic == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
-                depth = 1;
-                b = a;
-            }
-            else if (a.as.basic == TYPE_INTEGER || a.as.basic == TYPE_REAL) {
-                greater = b;
-                lesser.as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
-                depth = 0;
-                a = b;
-            }
-
-            op->types[0] = greater;
-            DA_APPEND(&analyser->stack, a.as.basic > b.as.basic ? a : b);
-
-            if (greater.as.basic != lesser.as.basic)
-                make_conversion_op(analyser, greater, lesser, depth);
-        }
-        else {
-            analyser->had_error = 1;
-            EPRINTF_AT_OP(op, LEVEL_ERR, "Invalid operand types for %s: %s %s\n",
-                             opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
-        }
-        break;
-    }
     case OP_MOD:
     case OP_ROR:
     case OP_ROL:
@@ -347,7 +315,7 @@ void type_check_op(Analyser *analyser) {
             depth = 0;
         }
 
-        if (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) {
+        if (binop_operands_valid(op, a, b)) {
             if (b.as.basic == TYPE_INTEGER) {
                 a.as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic;
                 greater = a;
@@ -379,7 +347,7 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
         Type a = analyser->stack.items[analyser->stack.count-1];
 
-        if (a.as.basic & TYPE_INTEGER) {
+        if (a.kind == KIND_BASIC && a.as.basic & TYPE_INTEGER) {
             op->types[0].as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic;
         }
         else {
@@ -451,7 +419,7 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
         Type a = analyser->stack.items[analyser->stack.count-1];
 
-        if (a.as.basic & TYPE_NUMBER) {
+        if (a.kind == KIND_BASIC && a.as.basic & TYPE_NUMBER) {
             op->types[0].as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
         }
         else {
@@ -485,7 +453,7 @@ void type_check_op(Analyser *analyser) {
             depth = 0;
         }
 
-        if ((a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL)) {
+        if (binop_operands_valid(op, a, b)) {
             if (b.as.basic == TYPE_INTEGER || b.as.basic == TYPE_REAL) {
                 a.as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
                 greater = a;
@@ -517,7 +485,7 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
         Type a = pop(analyser);
 
-        if (a.as.basic & TYPE_INTEGER) {
+        if (a.kind == KIND_BASIC && a.as.basic & TYPE_INTEGER) {
             op->types[0].as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic;
         }
         else {
@@ -544,18 +512,8 @@ void type_check_op(Analyser *analyser) {
         for (size_t i = 0; i < func.return_types.count; i++) {
             Type a = analyser->stack.items[analyser->stack.count-func.return_types.count+i];
 
-            if ((a.as.basic & func.return_types.items[i].as.basic) == 0) {
-                analyser->had_error = 1;
-                EPRINTF_AT_OP(op, LEVEL_ERR, "Return types don't match expected return types, expected types: [ ");
-
-                for (size_t j = 0; j < func.return_types.count; j++)
-                    fprintf(stderr, "%s ", type_spelling(func.return_types.items[j]));
-
-                fprintf(stderr, "], actual types: [ ");
-                for (size_t j = analyser->stack.count - func.return_types.count; j < analyser->stack.count; j++)
-                    fprintf(stderr, "%s ", type_spelling(analyser->stack.items[j]));
-
-                fprintf(stderr, "]\n");
+            if (!types_compatible(a, func.return_types.items[i])) {
+                expected_types_error(analyser, "Return types don't match expected return types", func.return_types);
                 break;
             }
         }
@@ -567,7 +525,7 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
         Type a = pop(analyser);
 
-        if (a.as.basic & TYPE_NUMBER) {
+        if (a.kind == KIND_BASIC && a.as.basic & TYPE_NUMBER) {
             op->types[0].as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
             DA_APPEND(&analyser->stack, basic_type(TYPE_U8));
         }
@@ -583,31 +541,28 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, func.param_types.count)) break;
 
         int had_error = 0;
-        for (int i = (int)func.param_types.count-1; i >= 0; i--) {
-            Type arg = pop(analyser);
+        for (size_t i = 0; i < func.param_types.count; i++) {
+            Type arg = analyser->stack.items[analyser->stack.count-func.param_types.count+i];
+            Type param = func.param_types.items[i];
 
-            if ((arg.as.basic & func.param_types.items[i].as.basic) == 0 && !had_error) {
+            if (!types_compatible(arg, param) && !had_error) {
                 had_error = 1;
-                EPRINTF_AT_OP(op, LEVEL_ERR, "Argument types don't match function parameters, expected types: [ ");
-
-                for (size_t j = 0; j < func.param_types.count; j++)
-                    fprintf(stderr, "%s ", type_spelling(func.param_types.items[j]));
-
-                fprintf(stderr, "], actual types: [ ");
-                for (size_t j = analyser->stack.count-i-1; j < analyser->stack.count; j++)
-                    fprintf(stderr, "%s ", type_spelling(analyser->stack.items[j]));
-
-                fprintf(stderr, "]\n");
                 continue;
             }
 
-            if (arg.as.basic != func.param_types.items[i].as.basic) {
-                arg.as.basic = arg.as.basic == TYPE_INTEGER ? TYPE_I64 : arg.as.basic == TYPE_REAL ? TYPE_F64 : arg.as.basic;
+            if (!types_equal(arg, param)) {
+                if (arg.kind == KIND_BASIC)
+                    arg.as.basic = arg.as.basic == TYPE_INTEGER ? TYPE_I64 : arg.as.basic == TYPE_REAL ? TYPE_F64 : arg.as.basic;
                 make_conversion_op(analyser, func.param_types.items[i], arg, func.param_types.count-i-1);
             }
         }
-        analyser->had_error |= had_error;
 
+        if (had_error) {
+            expected_types_error(analyser, "Argument types don't match function parameters", func.param_types);
+            break;
+        }
+
+        analyser->stack.count -= func.param_types.count;
         for (size_t i = 0; i < func.return_types.count; i++)
             DA_APPEND(&analyser->stack, func.return_types.items[i]);
         break;
@@ -641,8 +596,80 @@ void type_check_op(Analyser *analyser) {
     }
     case OP_CONVERT: {
         Type a = analyser->stack.items[analyser->stack.count-1];
-        op->types[0].as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
-        analyser->stack.items[analyser->stack.count-1] = op->types[1];
+        if (a.kind == KIND_STRUCT) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct\n");
+            break;
+        }
+
+        if (op->types[1].kind == KIND_BASIC) {
+            op->types[0].as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
+            analyser->stack.items[analyser->stack.count-1] = op->types[1];
+        }
+        else {
+            Fields fields = op->types[1].as.structure.fields;
+
+            int had_error = 0;
+            for (size_t i = 0; i < fields.count; i++) {
+                a = analyser->stack.items[analyser->stack.count - fields.count + i];
+                Type field = fields.items[i].type;
+
+                if (!types_compatible(a, field) && !had_error) {
+                    had_error = 1;
+                    continue;
+                }
+
+                if (!types_equal(a, field)) {
+                    if (a.kind == KIND_BASIC)
+                        a.as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
+                    make_conversion_op(analyser, field, a, op->types[1].as.structure.fields.count-i-1);
+                }
+            }
+
+            if (had_error) {
+                EPRINTF_AT_OP(op, LEVEL_ERR, "Operand types don't match struct fields, expected [ ");
+
+                for (size_t i = 0; i < fields.count; i++)
+                    fprintf(stderr, "%s ", type_spelling(fields.items[i].type));
+
+                fprintf(stderr, "], actual types: [ ");
+                for (size_t i = analyser->stack.count - fields.count; i < analyser->stack.count; i++)
+                    fprintf(stderr, "%s ", type_spelling(analyser->stack.items[i]));
+
+                fprintf(stderr, "]\n");
+            }
+
+            analyser->stack.count -= fields.count;
+            DA_APPEND(&analyser->stack, op->types[1]);
+        }
+        break;
+    }
+    case OP_ACCESS: {
+        Type a = pop(analyser);
+        if (a.kind != KIND_STRUCT) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot access field: operand is not a struct\n");
+            break;
+        }
+
+        Struct *structure = &a.as.structure;
+        String_View *sv = (String_View *)op->operand;
+
+        for (size_t i = 0; i < structure->fields.count; i++) {
+            if (sv->len != structure->fields.items[i].name.len) continue;
+            if (strncmp(sv->str, structure->fields.items[i].name.str, sv->len) == 0) {
+                op->operand = (uint64_t)&structure->fields.items[i];
+                break;
+            }
+        }
+
+        if (op->operand == (uint64_t)sv) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", structure->name.len, structure->name.str, sv->len, sv->str);
+            break;
+        }
+
+        DA_APPEND(&analyser->stack, ((Field *)op->operand)->type);
         break;
     }
     case OP_LABEL: break;
