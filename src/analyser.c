@@ -246,6 +246,15 @@ void expected_types_error(Analyser *analyser, char *msg, Types expected) {
     fprintf(stderr, "]\n");
 }
 
+Field *find_field(Struct *structure, String_View *sv) {
+    for (size_t i = 0; i < structure->fields.count; i++) {
+        if (sv->len != structure->fields.items[i].name.len) continue;
+        if (strncmp(sv->str, structure->fields.items[i].name.str, sv->len) == 0)
+            return &structure->fields.items[i];
+    }
+    return NULL;
+}
+
 int binop_operands_valid(Op *op, Type a, Type b) {
     int valid = a.kind == KIND_BASIC && b.kind == KIND_BASIC;
     switch (op->operand) {
@@ -608,6 +617,7 @@ void type_check_op(Analyser *analyser) {
         }
         else {
             Fields fields = op->types[1].as.structure.fields;
+            if (!check_operand_count(analyser, fields.count)) break;
 
             int had_error = 0;
             for (size_t i = 0; i < fields.count; i++) {
@@ -627,6 +637,7 @@ void type_check_op(Analyser *analyser) {
             }
 
             if (had_error) {
+                analyser->had_error = 1;
                 EPRINTF_AT_OP(op, LEVEL_ERR, "Operand types don't match struct fields, expected [ ");
 
                 for (size_t i = 0; i < fields.count; i++)
@@ -645,31 +656,59 @@ void type_check_op(Analyser *analyser) {
         break;
     }
     case OP_ACCESS: {
-        Type a = pop(analyser);
+        if (!check_operand_count(analyser, 1)) break;
+
+        Type a = analyser->stack.items[analyser->stack.count-1];
         if (a.kind != KIND_STRUCT) {
             analyser->had_error = 1;
-            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot access field: operand is not a struct\n");
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Source is not a struct\n");
             break;
         }
 
         Struct *structure = &a.as.structure;
         String_View *sv = (String_View *)op->operand;
 
-        for (size_t i = 0; i < structure->fields.count; i++) {
-            if (sv->len != structure->fields.items[i].name.len) continue;
-            if (strncmp(sv->str, structure->fields.items[i].name.str, sv->len) == 0) {
-                op->operand = (uint64_t)&structure->fields.items[i];
-                break;
-            }
-        }
-
-        if (op->operand == (uint64_t)sv) {
+        Field *field = find_field(structure, sv);
+        if (!field) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", structure->name.len, structure->name.str, sv->len, sv->str);
             break;
         }
 
+        op->operand = (uint64_t)field;
         DA_APPEND(&analyser->stack, ((Field *)op->operand)->type);
+        break;
+    }
+    case OP_STORE: {
+        if (!check_operand_count(analyser, 2)) break;
+
+        Type a = pop(analyser);
+        Type b = analyser->stack.items[analyser->stack.count-1];
+
+        if (b.kind != KIND_STRUCT) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Destination is not a struct\n");
+            break;
+        }
+
+        Struct *structure = &b.as.structure;
+        String_View *sv = (String_View *)op->operand;
+
+        Field *field = find_field(structure, sv);
+        if (!field) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", structure->name.len, structure->name.str, sv->len, sv->str);
+            break;
+        }
+
+        if (!types_compatible(a, field->type)) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Source type does not match destination type, expected %s, got %s\n",
+                          type_spelling(field->type), type_spelling(a));
+            break;
+        }
+
+        op->operand = (uint64_t)field;
         break;
     }
     case OP_LABEL: break;

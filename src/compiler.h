@@ -29,7 +29,7 @@ typedef enum {
     OP_ROT,    OP_CONVERT,
     OP_CCALL,  OP_ROTN,
     OP_NEQ,    OP_UNKNOWN,
-    OP_ACCESS,
+    OP_ACCESS, OP_STORE,
 
     // For the analyser
     OP_START, OP_END,

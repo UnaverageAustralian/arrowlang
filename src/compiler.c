@@ -97,6 +97,7 @@ char *opcode_spelling(Opcode opcode) {
     case OP_IF:      return "IF";
     case OP_ELSE:    return "ELSE";
     case OP_ACCESS:  return "ACCESS";
+    case OP_STORE:   return "STORE";
     default:         return "UNKNOWN";
     }
 }
@@ -136,6 +137,7 @@ void print_op(Op *op) {
     case OP_CONVERT:
         printf(" (%s => %s) %llu", type_spelling(op->types[0]), type_spelling(op->types[1]), op->operand);
         break;
+    case OP_STORE:
     case OP_ACCESS: {
         String_View *sv = (String_View *)op->operand;
         printf(" %.*s", sv->len, sv->str);
@@ -560,6 +562,13 @@ void compile_stmt(Compilation_Unit *compiler) {
         make_op(compiler, OP_ACCESS, (uint64_t)sv);
         break;
     }
+    case TOK_ARROW_HASH: {
+        expect(compiler, TOK_WORD);
+        String_View *sv = arena_calloc(&compiler->global->arena, sizeof(String_View));
+        *sv = (String_View){ .len = tok->len, .str = tok->start };
+        make_op(compiler, OP_STORE, (uint64_t)sv);
+        break;
+    }
     case TOK_ERROR:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "%.*s\n", tok->len, tok->start);
@@ -826,7 +835,8 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
 
             char *contents = open_file(path);
             if (!contents) {
-                fprintf(stderr, "\x1b[31mERROR:\x1b[0m Could not read file %s for module %.*s: %s\n", path, lexer.prev.len, lexer.prev.start, strerror(errno));
+                fprintf(stderr, "\x1b[31mERROR:\x1b[0m Could not read file %s for module %.*s: %s\n",
+                        path, lexer.prev.len, lexer.prev.start, strerror(errno));
                 exit(1);
             }
 
@@ -836,7 +846,8 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
         else if (lexer.prev.type == TOK_STR_LIT) {
             Hash_Entry *entry = hashmap_get(&global->modules, lexer.prev.start, lexer.prev.len);
             if (!entry || !entry->key) {
-                eprintf(unit.lexer->file_path, unit.lexer->prev.line, unit.lexer->prev.pos, LEVEL_ERR, "Unresolved module %.*s\n", lexer.prev.len, lexer.prev.start);
+                eprintf(unit.lexer->file_path, unit.lexer->prev.line, unit.lexer->prev.pos, LEVEL_ERR,
+                        "Unresolved module %.*s\n", lexer.prev.len, lexer.prev.start);
                 continue;
             }
 
@@ -844,7 +855,8 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
             hashmap_add(&unit.symbols, entry->key, entry->key_len, module);
         }
         else {
-            eprintf(unit.lexer->file_path, unit.lexer->prev.line, unit.lexer->prev.pos, LEVEL_ERR, "Expected word or string, got %s\n", tok_spelling(lexer.prev.type));
+            eprintf(unit.lexer->file_path, unit.lexer->prev.line, unit.lexer->prev.pos, LEVEL_ERR,
+                    "Expected word or string, got %s\n", tok_spelling(lexer.prev.type));
         }
     }
 
