@@ -408,6 +408,55 @@ inline int is_decl_type(Token_Type type) {
     return type == TOK_FUNC || type == TOK_STRUCT;
 }
 
+void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
+    Token *tok = &compiler->lexer->prev;
+
+    if (!entry || !entry->key) {
+        Unresolved_Symbol sym = {
+            .name = { .len = tok->len, .str = tok->start },
+            .pos = compiler->ops.count,
+        };
+        DA_APPEND(&compiler->unresolved, sym);
+        make_op(compiler, OP_UNKNOWN, 0);
+        return;
+    }
+
+    Symbol *sym = (Symbol *)entry->val;
+    switch (sym->type) {
+    case STYPE_FUNC:
+        if (sym->as.func.is_c_func)
+            make_op(compiler, OP_CCALL, (int64_t)entry);
+        else
+            make_op(compiler, OP_CALL, (int64_t)entry);
+        break;
+    case STYPE_STRUCT: {
+        make_op(compiler, OP_INIT, 0);
+        compiler->ops.items[compiler->ops.count-1].types[0] = (Type){
+            .kind = KIND_STRUCT,
+            .as = { .structure = sym->as.structure }
+        };
+        break;
+    }
+    case STYPE_MODULE: {
+        const char *module_name = tok->start;
+        size_t module_name_len = tok->len;
+
+        expect(compiler, TOK_SCOPE);
+        expect(compiler, TOK_WORD);
+
+        entry = hashmap_get(&((Symbol *)entry->val)->as.module.symbols, tok->start, tok->len);
+        if (!entry || !entry->key) {
+            compiler->global->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "Unknown symbol %.*s in module %.*s\n", tok->len, tok->start, module_name_len, module_name);
+            return;
+        }
+
+        compile_entry(compiler, entry);
+        break;
+    }
+    }
+}
+
 void compile_stmt(Compilation_Unit *compiler) {
     lexer_next(compiler->lexer);
 
@@ -494,48 +543,8 @@ void compile_stmt(Compilation_Unit *compiler) {
         make_op(compiler, OP_JMP, -1);
         break;
     case TOK_WORD: {
-        const char *module_name = tok->start;
-        size_t module_name_len = tok->len;
-
         Hash_Entry *entry = hashmap_get(&compiler->symbols, tok->start, tok->len);
-        if (!entry || !entry->key) {
-            Unresolved_Symbol sym = {
-                .name = { .len = tok->len, .str = tok->start },
-                .pos = compiler->ops.count,
-            };
-            DA_APPEND(&compiler->unresolved, sym);
-            make_op(compiler, OP_UNKNOWN, 0);
-            break;
-        }
-
-        Symbol *sym = (Symbol *)entry->val;
-        switch (sym->type) {
-        case STYPE_FUNC:
-            if (sym->as.func.is_c_func)
-                make_op(compiler, OP_CCALL, (int64_t)entry);
-            else
-                make_op(compiler, OP_CALL, (int64_t)entry);
-            break;
-        case STYPE_STRUCT: {
-            make_op(compiler, OP_INIT, 0);
-            compiler->ops.items[compiler->ops.count-1].types[0] = (Type){
-                .kind = KIND_STRUCT,
-                .as = { .structure = sym->as.structure }
-            };
-            break;
-        }
-        case STYPE_MODULE:
-            expect(compiler, TOK_SCOPE);
-            expect(compiler, TOK_WORD);
-
-            entry = hashmap_get(&((Symbol *)entry->val)->as.module.symbols, tok->start, tok->len);
-            if (!entry || !entry->key) {
-                compiler->global->had_error = 1;
-                COMPILER_EPRINTF(LEVEL_ERR, "Unknown symbol %.*s in module %.*s\n", tok->len, tok->start, module_name_len, module_name);
-                return;
-            }
-            break;
-        }
+        compile_entry(compiler, entry);
         break;
     }
     case TOK_I8:
