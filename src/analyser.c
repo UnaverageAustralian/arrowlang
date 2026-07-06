@@ -710,7 +710,7 @@ void type_check_op(Analyser *analyser) {
         }
 
         op->operand = (uint64_t)field;
-        DA_APPEND(&analyser->stack, ((Field *)op->operand)->type);
+        DA_APPEND(&analyser->stack, field->type);
         break;
     }
     case OP_STORE: {

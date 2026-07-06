@@ -1,0 +1,21 @@
+import errors
+
+struct Foo
+    x : f32
+    y : f32
+    z : f32
+end
+
+struct Bar
+    a   : i32
+    foo : Foo
+end
+
+3.0 2.0 1.0 Foo #x 3.0 = "#x = 3.0" errors::assert
+swap            #y 2.0 = "#y = 2.0" errors::assert rot |
+swap            #z 1.0 = "#z = 1.0" errors::assert rot |
+
+2 rot Bar #foo#x swap drop 3.0 = "#foo#x = 3.0" errors::assert rot |
+swap      #foo#y swap drop 2.0 = "#foo#y = 2.0" errors::assert rot |
+swap      #foo#z swap drop 1.0 = "#foo#z = 1.0" errors::assert rot |
+swap                      #a 2 = "#a = 2"       errors::assert rot |

@@ -159,7 +159,7 @@ static int size(Type type) {
             return 0;
         }
     case KIND_STRUCT:
-        return type.as.structure.size;
+        return 8;
     }
     return 0;
 }
@@ -615,6 +615,20 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
                 }
             }
             sb_appendf(&gen.sb, "    pushq %%rdi\n");
+            break;
+        }
+        case OP_ACCESS: {
+            Field *field = (Field *)op->operand;
+
+            sb_appendf(&gen.sb, "    movq (%%rsp), %%rsi\n");
+            if (field->type.kind == KIND_STRUCT) {
+                sb_appendf(&gen.sb, "    leaq %d(%%rsi), %%rax\n", field->offset);
+            }
+            else {
+                sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
+                sb_appendf(&gen.sb, "    mov%c %d(%%rsi), %s\n", size_sufs[size(field->type)], field->offset, rax[size(field->type)]);
+            }
+            sb_appendf(&gen.sb, "    pushq %%rax\n");
             break;
         }
         case OP_NOP: break;
