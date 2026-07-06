@@ -12,6 +12,8 @@ typedef struct {
     unsigned block_start;
     unsigned expected_types_start;
     unsigned pos;
+    int allocated;
+    int max_allocated;
     uint8_t had_error;
     uint8_t in_block;
 } Analyser;

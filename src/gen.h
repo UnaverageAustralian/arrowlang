@@ -7,7 +7,9 @@
 typedef struct {
     String_Builder sb;
     String_Array strs;
+    Function func;
     Ops *ops;
+    int allocated;
     int had_error;
 } Generator;
 

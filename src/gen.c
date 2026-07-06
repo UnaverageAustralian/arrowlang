@@ -184,6 +184,17 @@ int typeid(Type type) {
     }
 }
 
+void duplicate_struct(Generator *gen, Struct a) {
+    sb_appendf(&gen->sb, "    popq %%rsi\n");
+    sb_appendf(&gen->sb, "    leaq %d(%%rbp), %%rdi\n", gen->allocated - gen->func.max_allocated);
+    for (int i = 0; i < a.size; i += 8) {
+        sb_appendf(&gen->sb, "    movq %d(%%rsi), %%rax\n", i);
+        sb_appendf(&gen->sb, "    movq %%rax, %d(%%rdi)\n", i);
+    }
+    sb_appendf(&gen->sb, "    pushq %%rdi\n");
+    gen->allocated += a.size;
+}
+
 void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
     Generator gen;
     init_generator(&gen, ops);
@@ -196,8 +207,6 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
         sb_appendf(&gen.sb, "    movq $60, %%rax\n");
         sb_appendf(&gen.sb, "    syscall\n");
     }
-
-    Function cur_func = {0};
 
     for (size_t i = 0; i < ops->count; i++) {
         Op *op = &ops->items[i];
@@ -309,18 +318,27 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_DUP:
             sb_appendf(&gen.sb, "    pushq (%%rsp)\n");
+            if (op->types[0].kind == KIND_STRUCT)
+                duplicate_struct(&gen, op->types[0].as.structure);
             break;
         case OP_OVER:
             sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
+            if (op->types[0].kind == KIND_STRUCT)
+                duplicate_struct(&gen, op->types[0].as.structure);
             break;
         case OP_DUP2:
             sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
+            if (op->types[0].kind == KIND_STRUCT)
+                duplicate_struct(&gen, op->types[0].as.structure);
+
             sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
+            if (op->types[1].kind == KIND_STRUCT)
+                duplicate_struct(&gen, op->types[1].as.structure);
             break;
         case OP_DROP:
             sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
             if (op->types[0].kind == KIND_STRUCT)
-                cur_func.allocated -= op->types[0].as.structure.size;
+                gen.allocated -= op->types[0].as.structure.size;
             break;
         case OP_SWAP:
             sb_appendf(&gen.sb, "    popq %%rbx\n");
@@ -475,21 +493,21 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_FUNC: {
             Hash_Entry *func_entry = (Hash_Entry *)op->operand;
-            cur_func = ((Symbol *)func_entry->val)->as.func;
+            gen.func = ((Symbol *)func_entry->val)->as.func;
 
-            if (cur_func.module_name.str == NULL) {
+            if (gen.func.module_name.str == NULL) {
                 sb_appendf(&gen.sb, ".globl \"%.*s\"\n", func_entry->key_len, func_entry->key);
                 sb_appendf(&gen.sb, "\"%.*s\":\n", func_entry->key_len, func_entry->key);
             }
             else {
-                sb_appendf(&gen.sb, ".globl \"%.*s::%.*s\"\n", cur_func.module_name.len, cur_func.module_name.str, func_entry->key_len, func_entry->key);
-                sb_appendf(&gen.sb, "\"%.*s::%.*s\":\n", cur_func.module_name.len, cur_func.module_name.str, func_entry->key_len, func_entry->key);
+                sb_appendf(&gen.sb, ".globl \"%.*s::%.*s\"\n", gen.func.module_name.len, gen.func.module_name.str, func_entry->key_len, func_entry->key);
+                sb_appendf(&gen.sb, "\"%.*s::%.*s\":\n", gen.func.module_name.len, gen.func.module_name.str, func_entry->key_len, func_entry->key);
             }
             sb_appendf(&gen.sb, "    pushq %%rbp\n");
             sb_appendf(&gen.sb, "    movq %%rsp, %%rbp\n");
-            sb_appendf(&gen.sb, "    subq $%d, %%rsp\n", cur_func.max_allocated);
+            sb_appendf(&gen.sb, "    subq $%d, %%rsp\n", gen.func.max_allocated);
 
-            for (size_t offs = (cur_func.param_types.count-1)*8 + 16; offs >= 16; offs -= 8)
+            for (size_t offs = (gen.func.param_types.count-1)*8 + 16; offs >= 16; offs -= 8)
                 sb_appendf(&gen.sb, "    pushq %zu(%%rbp)\n", offs);
             break;
         }
@@ -498,8 +516,10 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    movq %%rbp, %%rsp\n");
             sb_appendf(&gen.sb, "    popq %%rbp\n");
 
-            Function func = cur_func;
+            Function func = gen.func;
             sb_appendf(&gen.sb, "    ret $%zu\n", func.param_types.count*8);
+
+            gen.allocated = 0;
             break;
         }
         case OP_CALL: {
@@ -574,10 +594,9 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
         }
         case OP_INIT: {
             Struct structure = op->types[0].as.structure;
-            // int start_offs = size(op->types[0].as.structure.fields.items[0].type) + structure.size;
 
-            sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", cur_func.allocated - cur_func.max_allocated);
-            cur_func.allocated += structure.size;
+            sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", gen.allocated - gen.func.max_allocated);
+            gen.allocated += structure.size;
 
             sb_appendf(&gen.sb, "    addq $%lld, %%rsp\n", structure.fields.count*8);
             for (size_t i = 0; i < structure.fields.count; i++) {

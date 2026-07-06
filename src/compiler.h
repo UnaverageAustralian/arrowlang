@@ -136,7 +136,6 @@ typedef struct {
     String_View module_name;
     Types param_types;
     Types return_types;
-    int allocated;
     int max_allocated;
     uint8_t is_c_func;
 } Function;

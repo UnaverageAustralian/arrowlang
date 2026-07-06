@@ -287,6 +287,12 @@ int binop_operands_valid(Op *op, Type a, Type b) {
     return valid;
 }
 
+static inline void allocate(Analyser *analyser, Type a) {
+    analyser->allocated += a.as.structure.size;
+    if (analyser->allocated > analyser->max_allocated)
+        analyser->max_allocated = analyser->allocated;
+}
+
 void type_check_op(Analyser *analyser) {
     Op *op = &analyser->ops->items[analyser->pos];
     switch (op->opcode) {
@@ -369,12 +375,20 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
         Type a = analyser->stack.items[analyser->stack.count-1];
         DA_APPEND(&analyser->stack, a);
+        op->types[0] = a;
+
+        if (a.kind == KIND_STRUCT)
+            allocate(analyser, a);
         break;
     }
     case OP_OVER: {
         if (!check_operand_count(analyser, 2)) break;
         Type a = analyser->stack.items[analyser->stack.count-2];
         DA_APPEND(&analyser->stack, a);
+        op->types[0] = a;
+
+        if (a.kind == KIND_STRUCT)
+            allocate(analyser, a);
         break;
     }
     case OP_DUP2: {
@@ -382,9 +396,17 @@ void type_check_op(Analyser *analyser) {
 
         Type a = analyser->stack.items[analyser->stack.count-2];
         DA_APPEND(&analyser->stack, a);
+        op->types[0] = a;
+
+        if (a.kind == KIND_STRUCT)
+            allocate(analyser, a);
 
         a = analyser->stack.items[analyser->stack.count-2];
         DA_APPEND(&analyser->stack, a);
+        op->types[1] = a;
+
+        if (a.kind == KIND_STRUCT)
+            allocate(analyser, a);
         break;
     }
     case OP_DROP: {
@@ -392,7 +414,7 @@ void type_check_op(Analyser *analyser) {
         Type a = pop(analyser);
 
         if (a.kind == KIND_STRUCT)
-            analyser->func->allocated -= a.as.structure.size;
+            analyser->allocated -= a.as.structure.size;
 
         op->types[0] = a;
         break;
@@ -534,7 +556,9 @@ void type_check_op(Analyser *analyser) {
         }
 
         analyser->stack.count = 0;
-        analyser->func->allocated = 0;
+        analyser->allocated = 0;
+
+        analyser->func->max_allocated = analyser->max_allocated;
         break;
     }
     case OP_LNOT: {
@@ -661,9 +685,8 @@ void type_check_op(Analyser *analyser) {
         analyser->stack.count -= fields.count;
         DA_APPEND(&analyser->stack, op->types[0]);
 
-        analyser->func->allocated += op->types[0].as.structure.size;
-        if (analyser->func->allocated > analyser->func->max_allocated)
-            analyser->func->max_allocated = analyser->func->allocated;
+        if (op->types[0].kind == KIND_STRUCT)
+            allocate(analyser, op->types[0]);
         break;
     }
     case OP_ACCESS: {
