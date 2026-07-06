@@ -30,6 +30,7 @@ typedef enum {
     OP_CCALL,  OP_ROTN,
     OP_NEQ,    OP_UNKNOWN,
     OP_ACCESS, OP_STORE,
+    OP_INIT,
 
     // For the analyser
     OP_START, OP_END,
@@ -135,6 +136,8 @@ typedef struct {
     String_View module_name;
     Types param_types;
     Types return_types;
+    int allocated;
+    int max_allocated;
     uint8_t is_c_func;
 } Function;
 

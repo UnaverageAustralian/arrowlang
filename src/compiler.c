@@ -15,8 +15,6 @@
 #define COMPILER_EPRINTF(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->prev.line, compiler->lexer->prev.pos, level, __VA_ARGS__); 
 #define COMPILER_EPRINTF_AT_CUR(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->cur.line, compiler->lexer->cur.pos, level, __VA_ARGS__);
 
-#define PRINT_IR
-
 inline String_View strip_file_path(const char *path) {
     String_View stripped = { .len = 0, .str = path };
     while (*path != '\0') {
@@ -519,8 +517,8 @@ void compile_stmt(Compilation_Unit *compiler) {
                 make_op(compiler, OP_CALL, (int64_t)entry);
             break;
         case STYPE_STRUCT: {
-            make_op(compiler, OP_CONVERT, 0);
-            compiler->ops.items[compiler->ops.count-1].types[1] = (Type){
+            make_op(compiler, OP_INIT, 0);
+            compiler->ops.items[compiler->ops.count-1].types[0] = (Type){
                 .kind = KIND_STRUCT,
                 .as = { .structure = sym->as.structure }
             };
@@ -792,8 +790,8 @@ void resolve_symbols(Compilation_Unit *compiler) {
             op->operand = (int64_t)entry;
             break;
         case STYPE_STRUCT:
-            op->opcode = OP_CONVERT;
-            op->types[1] = (Type){
+            op->opcode = OP_INIT;
+            op->types[0] = (Type){
                 .kind = KIND_STRUCT,
                 .as = { .structure = sym->as.structure },
             };
