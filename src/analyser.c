@@ -433,9 +433,17 @@ void type_check_op(Analyser *analyser) {
 
         Type a = analyser->stack.items[analyser->stack.count-4];
         DA_APPEND(&analyser->stack, a);
+        op->types[0] = a;
+
+        if (a.kind == KIND_STRUCT)
+            allocate(analyser, a);
 
         a = analyser->stack.items[analyser->stack.count-4];
         DA_APPEND(&analyser->stack, a);
+        op->types[1] = a;
+
+        if (a.kind == KIND_STRUCT)
+            allocate(analyser, a);
         break;
     }
     case OP_SWAP2: {

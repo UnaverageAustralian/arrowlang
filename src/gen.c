@@ -345,7 +345,12 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_OVER2:
             sb_appendf(&gen.sb, "    pushq 24(%%rsp)\n");
+            if (op->types[0].kind == KIND_STRUCT)
+                duplicate_struct(&gen, op->types[0].as.structure);
+
             sb_appendf(&gen.sb, "    pushq 24(%%rsp)\n");
+            if (op->types[1].kind == KIND_STRUCT)
+                duplicate_struct(&gen, op->types[1].as.structure);
             break;
         case OP_SWAP2:
             sb_appendf(&gen.sb, "    popq %%rax\n");

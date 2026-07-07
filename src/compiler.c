@@ -159,6 +159,10 @@ void print_ops(Ops *ops) {
     }
 }
 
+static inline int align(int a, int b) {
+    return a + (b - 1) - ((a - 1) & (b - 1));
+}
+
 static inline Type basic_type(Basic_Type type) {
     return (Type) {
         .kind = KIND_BASIC,
@@ -672,7 +676,7 @@ void compile_struct(Compilation_Unit *compiler) {
         field.type = get_type(compiler);
 
         size_t alignment = type_alignment(field.type);
-        offset = offset + (alignment-1) - ((offset-1) & (alignment-1));
+        offset = align(offset, alignment);
         field.offset = offset;
 
         if (alignment > struct_alignment)
@@ -682,7 +686,7 @@ void compile_struct(Compilation_Unit *compiler) {
         offset += type_size(field.type);
     }
 
-    sym->as.structure.size = offset + 7 - (offset - 1) % 8;
+    sym->as.structure.size = align(offset, 8);
     sym->as.structure.alignment = struct_alignment;
 
     if (compiler->lexer->cur.type == TOK_EOF) {
@@ -710,7 +714,8 @@ void compile_implicit_main(Compilation_Unit *compiler) {
         compiler->rets.count--;
     }
 
-    make_op_at_cur(compiler, OP_LABEL, compiler->label_count++);
+    if (compiler->rets.count > 0)
+        make_op_at_cur(compiler, OP_LABEL, compiler->label_count++);
     make_op_at_cur(compiler, OP_RET, 0);
 }
 
