@@ -711,6 +711,9 @@ void type_check_op(Analyser *analyser) {
 
         op->operand = (uint64_t)field;
         DA_APPEND(&analyser->stack, field->type);
+
+        if (field->type.kind == KIND_STRUCT)
+            allocate(analyser, field->type);
         break;
     }
     case OP_STORE: {

@@ -376,34 +376,6 @@ Type get_type(Compilation_Unit *compiler) {
     }
 }
 
-size_t type_size(Type type) {
-    switch (type.kind) {
-    case KIND_BASIC:
-        switch (type.as.basic) {
-        case TYPE_I8:
-        case TYPE_CHAR:
-        case TYPE_U8:
-            return 1;
-        case TYPE_I16:
-        case TYPE_U16:
-            return 2;
-        case TYPE_F32:
-        case TYPE_I32:
-        case TYPE_U32:
-            return 4;
-        case TYPE_STR:
-        case TYPE_F64:
-        case TYPE_I64:
-        case TYPE_U64:
-            return 8;
-        default:
-            return 0;
-        }
-    case KIND_STRUCT: return type.as.structure.size;
-    }
-    return 0;
-}
-
 inline int is_decl_type(Token_Type type) {
     return type == TOK_FUNC || type == TOK_STRUCT;
 }

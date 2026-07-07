@@ -135,7 +135,7 @@ void init_generator(Generator *gen, Ops *ops) {
     gen->ops = ops;
 }
 
-static int size(Type type) {
+int type_size(Type type) {
     switch (type.kind) {
     case KIND_BASIC:
         switch (type.as.basic) {
@@ -158,8 +158,7 @@ static int size(Type type) {
         default:
             return 0;
         }
-    case KIND_STRUCT:
-        return 8;
+    case KIND_STRUCT: return 8;
     }
     return 0;
 }
@@ -227,54 +226,54 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_ADD:
             if (op->types[0].as.basic & TYPE_REAL) {
-                sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
-                sb_appendf(&gen.sb, "    adds%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
+                sb_appendf(&gen.sb, "    adds%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
-                sb_appendf(&gen.sb, "    movs%c %%xmm0, (%%rsp)\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c %%xmm0, (%%rsp)\n", fsize_sufs[type_size(op->types[0])]);
             }
             else {
                 sb_appendf(&gen.sb, "    popq %%rax\n");
-                sb_appendf(&gen.sb, "    add%c %s, (%%rsp)\n", size_sufs[size(op->types[0])], rax[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    add%c %s, (%%rsp)\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
             }
             break;
         case OP_SUB:
             if (op->types[0].as.basic & TYPE_REAL) {
-                sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
-                sb_appendf(&gen.sb, "    subs%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
+                sb_appendf(&gen.sb, "    subs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
-                sb_appendf(&gen.sb, "    movs%c %%xmm0, (%%rsp)\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c %%xmm0, (%%rsp)\n", fsize_sufs[type_size(op->types[0])]);
             }
             else {
                 sb_appendf(&gen.sb, "    popq %%rax\n");
-                sb_appendf(&gen.sb, "    sub%c %s, (%%rsp)\n", size_sufs[size(op->types[0])], rax[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    sub%c %s, (%%rsp)\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
             }
             break;
         case OP_MUL:
             if (op->types[0].as.basic & TYPE_REAL) {
-                sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
-                sb_appendf(&gen.sb, "    muls%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
+                sb_appendf(&gen.sb, "    muls%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
-                sb_appendf(&gen.sb, "    movs%c %%xmm0, (%%rsp)\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c %%xmm0, (%%rsp)\n", fsize_sufs[type_size(op->types[0])]);
             }
             else {
                 sb_appendf(&gen.sb, "    popq %%rbx\n");
                 sb_appendf(&gen.sb, "    popq %%rax\n");
-                sb_appendf(&gen.sb, "    imul%c %s\n", size_sufs[size(op->types[0])], rbx[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    imul%c %s\n", size_sufs[type_size(op->types[0])], rbx[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    pushq %%rax\n");
             }
             break;
         case OP_DIV:
             if (op->types[0].as.basic & TYPE_REAL) {
-                sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
-                sb_appendf(&gen.sb, "    divs%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
+                sb_appendf(&gen.sb, "    divs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
-                sb_appendf(&gen.sb, "    movs%c %%xmm0, (%%rsp)\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c %%xmm0, (%%rsp)\n", fsize_sufs[type_size(op->types[0])]);
             }
             else {
                 sb_appendf(&gen.sb, "    popq %%rbx\n");
                 sb_appendf(&gen.sb, "    popq %%rax\n");
                 sb_appendf(&gen.sb, "    xorq %%rdx, %%rdx\n");
-                sb_appendf(&gen.sb, "    idiv%c %s\n", size_sufs[size(op->types[0])], rbx[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    idiv%c %s\n", size_sufs[type_size(op->types[0])], rbx[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    pushq %%rax\n");
             }
             break;
@@ -282,39 +281,39 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    popq %%rbx\n");
             sb_appendf(&gen.sb, "    popq %%rax\n");
             sb_appendf(&gen.sb, "    xorq %%rdx, %%rdx\n");
-            sb_appendf(&gen.sb, "    idiv%c %s\n", size_sufs[size(op->types[0])], rbx[size(op->types[0])]);
+            sb_appendf(&gen.sb, "    idiv%c %s\n", size_sufs[type_size(op->types[0])], rbx[type_size(op->types[0])]);
             sb_appendf(&gen.sb, "    pushq %%rdx\n");
             break;
         case OP_AND:
             sb_appendf(&gen.sb, "    popq %%rax\n");
-            sb_appendf(&gen.sb, "    and%c %s, (%%rsp)\n", size_sufs[size(op->types[0])], rax[size(op->types[0])]);
+            sb_appendf(&gen.sb, "    and%c %s, (%%rsp)\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
             break;
         case OP_OR:
             sb_appendf(&gen.sb, "    popq %%rax\n");
-            sb_appendf(&gen.sb, "    or%c %s, (%%rsp)\n", size_sufs[size(op->types[0])], rax[size(op->types[0])]);
+            sb_appendf(&gen.sb, "    or%c %s, (%%rsp)\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
             break;
         case OP_XOR:
             sb_appendf(&gen.sb, "    popq %%rax\n");
-            sb_appendf(&gen.sb, "    xor%c %s, (%%rsp)\n", size_sufs[size(op->types[0])], rax[size(op->types[0])]);
+            sb_appendf(&gen.sb, "    xor%c %s, (%%rsp)\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
             break;
         case OP_SHL:
             sb_appendf(&gen.sb, "    popq %%rcx\n");
-            sb_appendf(&gen.sb, "    sal%c %%cl, (%%rsp)\n", size_sufs[size(op->types[0])]);
+            sb_appendf(&gen.sb, "    sal%c %%cl, (%%rsp)\n", size_sufs[type_size(op->types[0])]);
             break;
         case OP_SHR:
             sb_appendf(&gen.sb, "    popq %%rcx\n");
-            sb_appendf(&gen.sb, "    sar%c %%cl, (%%rsp)\n", size_sufs[size(op->types[0])]);
+            sb_appendf(&gen.sb, "    sar%c %%cl, (%%rsp)\n", size_sufs[type_size(op->types[0])]);
             break;
         case OP_ROL:
             sb_appendf(&gen.sb, "    popq %%rcx\n");
-            sb_appendf(&gen.sb, "    rol%c %%cl, (%%rsp)\n", size_sufs[size(op->types[0])]);
+            sb_appendf(&gen.sb, "    rol%c %%cl, (%%rsp)\n", size_sufs[type_size(op->types[0])]);
             break;
         case OP_ROR:
             sb_appendf(&gen.sb, "    popq %%rcx\n");
-            sb_appendf(&gen.sb, "    ror%c %%cl, (%%rsp)\n", size_sufs[size(op->types[0])]);
+            sb_appendf(&gen.sb, "    ror%c %%cl, (%%rsp)\n", size_sufs[type_size(op->types[0])]);
             break;
         case OP_NOT:
-            sb_appendf(&gen.sb, "    not%c (%%rsp)\n", size_sufs[size(op->types[0])]);
+            sb_appendf(&gen.sb, "    not%c (%%rsp)\n", size_sufs[type_size(op->types[0])]);
             break;
         case OP_DUP:
             sb_appendf(&gen.sb, "    pushq (%%rsp)\n");
@@ -381,18 +380,18 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
                 sb_appendf(&gen.sb, "    xorq %%rax, (%%rsp)\n");
             }
             else {
-                sb_appendf(&gen.sb, "    neg%c (%%rsp)\n", size_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    neg%c (%%rsp)\n", size_sufs[type_size(op->types[0])]);
             }
             break;
         case OP_EQ:
             if (op->types[0].as.basic & TYPE_REAL) {
-                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
-                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
             }
             else {
                 sb_appendf(&gen.sb, "    popq %%rax\n");
-                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[size(op->types[0])], rax[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
             }
             sb_appendf(&gen.sb, "    sete %%al\n");
             sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
@@ -400,14 +399,14 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_LT:
             if (op->types[0].as.basic & TYPE_REAL) {
-                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
-                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    seta %%al\n");
             }
             else {
                 sb_appendf(&gen.sb, "    popq %%rax\n");
-                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[size(op->types[0])], rax[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    setg %%al\n");
             }
             sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
@@ -415,14 +414,14 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_GT:
             if (op->types[0].as.basic & TYPE_REAL) {
-                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
-                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    setb %%al\n");
             }
             else {
                 sb_appendf(&gen.sb, "    popq %%rax\n");
-                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[size(op->types[0])], rax[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    setl %%al\n");
             }
             sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
@@ -430,14 +429,14 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_LTEQ:
             if (op->types[0].as.basic & TYPE_REAL) {
-                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
-                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    setae %%al\n");
             }
             else {
                 sb_appendf(&gen.sb, "    popq %%rax\n");
-                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[size(op->types[0])], rax[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    setge %%al\n");
             }
             sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
@@ -445,14 +444,14 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_GTEQ:
             if (op->types[0].as.basic & TYPE_REAL) {
-                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
-                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    setbe %%al\n");
             }
             else {
                 sb_appendf(&gen.sb, "    popq %%rax\n");
-                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[size(op->types[0])], rax[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    setle %%al\n");
             }
             sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
@@ -460,14 +459,14 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_NEQ:
             if (op->types[0].as.basic & TYPE_REAL) {
-                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
-                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    setne %%al\n");
             }
             else {
                 sb_appendf(&gen.sb, "    popq %%rax\n");
-                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[size(op->types[0])], rax[size(op->types[0])]);
+                sb_appendf(&gen.sb, "    cmp%c (%%rsp), %s\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    setne %%al\n");
             }
             sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
@@ -475,14 +474,14 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_LNOT:
             sb_appendf(&gen.sb, "    popq %%rax\n");
-            sb_appendf(&gen.sb, "    test%c %s, %s\n", size_sufs[size(op->types[0])], rax[size(op->types[0])], rax[size(op->types[0])]);
+            sb_appendf(&gen.sb, "    test%c %s, %s\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])], rax[type_size(op->types[0])]);
             sb_appendf(&gen.sb, "    setz %%al\n");
             sb_appendf(&gen.sb, "    movzbq %%al, %%rax\n");
             sb_appendf(&gen.sb, "    pushq %%rax\n");
             break;
         case OP_JMPF:
             sb_appendf(&gen.sb, "    popq %%rax\n");
-            sb_appendf(&gen.sb, "    test%c %s, %s\n", size_sufs[size(op->types[0])], rax[size(op->types[0])], rax[size(op->types[0])]);
+            sb_appendf(&gen.sb, "    test%c %s, %s\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])], rax[type_size(op->types[0])]);
             sb_appendf(&gen.sb, "    jz .L%lld\n", op->operand);
             break;
         case OP_JMP:
@@ -601,18 +600,8 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    addq $%lld, %%rsp\n", structure.fields.count*8);
             for (size_t i = 0; i < structure.fields.count; i++) {
                 Field *field = &structure.fields.items[i];
-
-                if (field->type.kind == KIND_STRUCT) {
-                    sb_appendf(&gen.sb, "    movq %d(%%rsp), %%rsi\n", -i*8 - 8);
-                    for (int j = 0; j < field->type.as.structure.size; j += 8) {
-                        sb_appendf(&gen.sb, "    movq %d(%%rsi), %%rax\n", j);
-                        sb_appendf(&gen.sb, "    movq %%rax, %d(%%rdi)\n", field->offset + j);
-                    }
-                }
-                else {
-                    sb_appendf(&gen.sb, "    mov%c %lld(%%rsp), %s\n", size_sufs[size(field->type)], -i*8 - 8, rax[size(field->type)]);
-                    sb_appendf(&gen.sb, "    mov%c %s, %lld(%%rdi)\n", size_sufs[size(field->type)], rax[size(field->type)], field->offset);
-                }
+                sb_appendf(&gen.sb, "    mov%c %lld(%%rsp), %s\n", size_sufs[type_size(field->type)], -i*8 - 8, rax[type_size(field->type)]);
+                sb_appendf(&gen.sb, "    mov%c %s, %lld(%%rdi)\n", size_sufs[type_size(field->type)], rax[type_size(field->type)], field->offset);
             }
             sb_appendf(&gen.sb, "    pushq %%rdi\n");
             break;
@@ -621,14 +610,20 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             Field *field = (Field *)op->operand;
 
             sb_appendf(&gen.sb, "    movq (%%rsp), %%rsi\n");
-            if (field->type.kind == KIND_STRUCT) {
-                sb_appendf(&gen.sb, "    leaq %d(%%rsi), %%rax\n", field->offset);
-            }
-            else {
-                sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
-                sb_appendf(&gen.sb, "    mov%c %d(%%rsi), %s\n", size_sufs[size(field->type)], field->offset, rax[size(field->type)]);
-            }
+            sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
+            sb_appendf(&gen.sb, "    mov%c %d(%%rsi), %s\n", size_sufs[type_size(field->type)], field->offset, rax[type_size(field->type)]);
             sb_appendf(&gen.sb, "    pushq %%rax\n");
+
+            if (field->type.kind == KIND_STRUCT)
+                duplicate_struct(&gen, field->type.as.structure);
+            break;
+        }
+        case OP_STORE: {
+            Field *field = (Field *)op->operand;
+
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    movq (%%rsp), %%rdi\n");
+            sb_appendf(&gen.sb, "    mov%c %s, %d(%%rdi)\n", size_sufs[type_size(field->type)], rax[type_size(field->type)], field->offset);
             break;
         }
         case OP_NOP: break;
