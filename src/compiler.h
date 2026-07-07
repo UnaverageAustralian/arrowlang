@@ -72,6 +72,7 @@ typedef struct {
 typedef struct {
     String_View name;
     int size;
+    int alignment;
     Fields fields;
 } Struct;
 

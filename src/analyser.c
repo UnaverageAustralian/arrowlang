@@ -127,7 +127,7 @@ void check_expected_types(Analyser *analyser) {
     }
 
     for (size_t i = analyser->expected_types_start; i < analyser->expected_types.count; i++) {
-        if (types_compatible(analyser->expected_types.items[i], analyser->stack.items[analyser->block_start + i - analyser->expected_types_start])) {
+        if (!types_compatible(analyser->expected_types.items[i], analyser->stack.items[analyser->block_start + i - analyser->expected_types_start])) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Blocks cannot change the state of the stack, expected types: [ ");
 
@@ -331,16 +331,16 @@ void type_check_op(Analyser *analyser) {
         }
 
         if (binop_operands_valid(op, a, b)) {
-            if (b.as.basic == TYPE_INTEGER) {
-                a.as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic;
+            if (b.as.basic == TYPE_INTEGER || b.as.basic == TYPE_REAL) {
+                a.as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
                 greater = a;
-                lesser.as.basic = TYPE_I64;
+                lesser.as.basic = b.as.basic == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
                 depth = 8;
                 b = a;
             }
-            else if (a.as.basic == TYPE_INTEGER) {
+            else if (a.as.basic == TYPE_INTEGER || a.as.basic == TYPE_REAL) {
                 greater = b;
-                lesser.as.basic = TYPE_I64;
+                lesser.as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
                 depth = 0;
                 a = b;
             }
@@ -746,6 +746,9 @@ void type_check_op(Analyser *analyser) {
         }
 
         op->operand = (uint64_t)field;
+
+        if (field->type.kind == KIND_STRUCT)
+            analyser->allocated -= field->type.as.structure.size;
         break;
     }
     case OP_LABEL: break;

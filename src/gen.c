@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "analyser.h"
 #include "gen.h"
 #include "compiler.h"
 #include "utils.h"
@@ -624,6 +623,9 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    popq %%rax\n");
             sb_appendf(&gen.sb, "    movq (%%rsp), %%rdi\n");
             sb_appendf(&gen.sb, "    mov%c %s, %d(%%rdi)\n", size_sufs[type_size(field->type)], rax[type_size(field->type)], field->offset);
+
+            if (field->type.kind == KIND_STRUCT)
+                gen.allocated -= field->type.as.structure.size;
             break;
         }
         case OP_NOP: break;

@@ -376,6 +376,14 @@ Type get_type(Compilation_Unit *compiler) {
     }
 }
 
+static int type_alignment(Type type) {
+    switch (type.kind) {
+    case KIND_BASIC:  return type_size(type);
+    case KIND_STRUCT: return type.as.structure.alignment;
+    default:          return 0;
+    }
+}
+
 inline int is_decl_type(Token_Type type) {
     return type == TOK_FUNC || type == TOK_STRUCT;
 }
@@ -652,6 +660,8 @@ void compile_struct(Compilation_Unit *compiler) {
     sym->as.structure.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
 
     size_t offset = 0;
+    size_t struct_alignment = 0;
+
     while (compiler->lexer->cur.type != TOK_END && compiler->lexer->cur.type != TOK_EOF) {
         expect(compiler, TOK_WORD);
         Field field = { .name = { .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start }, };
@@ -660,12 +670,20 @@ void compile_struct(Compilation_Unit *compiler) {
 
         lexer_next(compiler->lexer);
         field.type = get_type(compiler);
+
+        size_t alignment = type_alignment(field.type);
+        offset = offset + (alignment-1) - ((offset-1) & (alignment-1));
         field.offset = offset;
+
+        if (alignment > struct_alignment)
+            struct_alignment = alignment;
 
         ARENA_DA_APPEND(&compiler->global->arena, &sym->as.structure.fields, field);
         offset += type_size(field.type);
     }
+
     sym->as.structure.size = offset + 7 - (offset - 1) % 8;
+    sym->as.structure.alignment = struct_alignment;
 
     if (compiler->lexer->cur.type == TOK_EOF) {
         compiler->global->had_error = 1;
