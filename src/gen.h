@@ -9,6 +9,7 @@ typedef struct {
     String_Array strs;
     Function func;
     Ops *ops;
+    int pos;
     int allocated;
     int had_error;
 } Generator;

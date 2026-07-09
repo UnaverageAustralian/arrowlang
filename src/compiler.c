@@ -159,10 +159,6 @@ void print_ops(Ops *ops) {
     }
 }
 
-static inline int align(int a, int b) {
-    return a + (b - 1) - ((a - 1) & (b - 1));
-}
-
 static inline Type basic_type(Basic_Type type) {
     return (Type) {
         .kind = KIND_BASIC,
@@ -377,14 +373,6 @@ Type get_type(Compilation_Unit *compiler) {
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Expected type, got %s\n", tok_spelling(compiler->lexer->cur.type));
         return basic_type(TYPE_VOID);
-    }
-}
-
-static int type_alignment(Type type) {
-    switch (type.kind) {
-    case KIND_BASIC:  return type_size(type);
-    case KIND_STRUCT: return type.as.structure.alignment;
-    default:          return 0;
     }
 }
 
@@ -675,8 +663,8 @@ void compile_struct(Compilation_Unit *compiler) {
         lexer_next(compiler->lexer);
         field.type = get_type(compiler);
 
-        size_t alignment = type_alignment(field.type);
-        offset = align(offset, alignment);
+        size_t alignment = type_size(field.type);
+        offset = ALIGN(offset, alignment);
         field.offset = offset;
 
         if (alignment > struct_alignment)
@@ -686,8 +674,7 @@ void compile_struct(Compilation_Unit *compiler) {
         offset += type_size(field.type);
     }
 
-    sym->as.structure.size = align(offset, 8);
-    sym->as.structure.alignment = struct_alignment;
+    sym->as.structure.size = ALIGN(offset, 8);
 
     if (compiler->lexer->cur.type == TOK_EOF) {
         compiler->global->had_error = 1;

@@ -7,7 +7,7 @@
 #include "compiler.h"
 #include "utils.h"
 
-#define GEN_EPRINTF(op, level, ...) eprintf(op->file_path, op->line, op->pos, level, __VA_ARGS__)
+#define GEN_EPRINTF(op, level, ...) eprintf((op)->file_path, (op)->line, (op)->pos, level, __VA_ARGS__)
 
 static char size_sufs[]  = ".bw.l...q";
 static char fsize_sufs[] = "....s...d";
@@ -191,6 +191,47 @@ void duplicate_struct(Generator *gen, Struct a) {
     }
     sb_appendf(&gen->sb, "    pushq %%rdi\n");
     gen->allocated += a.size;
+}
+
+void pass_struct_arg(Generator *gen, Struct structure, int *iparams, int *fparams) {
+    sb_appendf(&gen->sb, "    popq %%rsi\n");
+ 
+    if (structure.fields.count == 0) return;
+
+    int needed_fparams = (structure.fields.items[0].type.as.basic & TYPE_F64) != 0 &&
+        (structure.fields.items[structure.fields.count-1].type.as.basic & TYPE_F64) != 0;
+
+    for (size_t i = 0; i < structure.fields.count; i++) {
+        if (structure.fields.items[i].type.kind == KIND_STRUCT) {
+            GEN_EPRINTF(&gen->ops->items[gen->pos], LEVEL_ERR,
+                        "Passing a struct with another struct as one of its fields into an external C function is not implemented\n");
+            return;
+        }
+    }
+ 
+    if (structure.size <= 16 && *fparams >= needed_fparams && *iparams >= structure.size/8 - needed_fparams) {
+        if (structure.fields.items[0].type.as.basic & TYPE_F64) {
+            sb_appendf(&gen->sb, "    movq (%%rsi), %%xmm%d\n", *fparams-1);
+            (*fparams)--;
+        }
+        else {
+            sb_appendf(&gen->sb, "    movq (%%rsi), %s\n", arg_regs[*iparams-1]);
+            (*iparams)--;
+        }
+
+        if (structure.fields.items[structure.fields.count-1].type.as.basic & TYPE_F64 && structure.size > 1) {
+            sb_appendf(&gen->sb, "    movq 8(%%rsi), %%xmm%d\n", *fparams-1);
+            (*fparams)--;
+        }
+        else if (structure.size > 8) {
+            sb_appendf(&gen->sb, "    movq 8(%%rsi), %s\n", arg_regs[*iparams-1]);
+            (*iparams)--;
+        }
+    }
+    else {
+        for (int i = 0; i < structure.size; i += 8)
+            sb_appendf(&gen->sb, "    pushq %d(%%rsi)\n", i);
+    }
 }
 
 void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
@@ -508,7 +549,7 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             }
             sb_appendf(&gen.sb, "    pushq %%rbp\n");
             sb_appendf(&gen.sb, "    movq %%rsp, %%rbp\n");
-            sb_appendf(&gen.sb, "    subq $%d, %%rsp\n", gen.func.max_allocated);
+            sb_appendf(&gen.sb, "    subq $%d, %%rsp\n", ALIGN(gen.func.max_allocated, 16));
 
             for (size_t offs = (gen.func.param_types.count-1)*8 + 16; offs >= 16; offs -= 8)
                 sb_appendf(&gen.sb, "    pushq %zu(%%rbp)\n", offs);
@@ -552,7 +593,11 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             }
 
             for (int i = func.param_types.count-1; i >= 0; i--) {
-                if ((func.param_types.items[i].as.basic & TYPE_REAL) && fparams >= 0) {
+                Type param = func.param_types.items[i];
+                if (param.kind == KIND_STRUCT) {
+                    pass_struct_arg(&gen, param.as.structure, &iparams, &fparams);
+                }
+                else if ((param.as.basic & TYPE_REAL) && fparams >= 0) {
                     sb_appendf(&gen.sb, "    movsd (%%rsp), %%xmm%d\n", fparams-1);
                     sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
                     fparams--;

@@ -35,6 +35,8 @@
         (a)->items[(a)->count++] = (i);                                               \
     } while (0)
 
+#define ALIGN(a, b) (a) + ((b) - 1) - (((a) - 1) & ((b) - 1))
+
 typedef enum {
     LEVEL_NOTE,
     LEVEL_WARN,
