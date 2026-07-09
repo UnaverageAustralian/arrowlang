@@ -147,6 +147,7 @@ void check_expected_types(Analyser *analyser) {
 void type_check_op(Analyser *analyser);
 
 void type_check_block(Analyser *analyser) {
+    int in_block = analyser->in_block;
     analyser->in_block = 1;
 
     int block_start = analyser->block_start;
@@ -175,10 +176,11 @@ void type_check_block(Analyser *analyser) {
     analyser->expected_types.count = analyser->expected_types_start;
     analyser->expected_types_start = expected_types_start;
 
-    analyser->in_block = 0;
+    analyser->in_block = in_block;
 }
 
 void type_check_if(Analyser *analyser) {
+    int in_block = analyser->in_block;
     analyser->in_block = 1;
 
     int block_start = analyser->block_start;
@@ -229,7 +231,7 @@ void type_check_if(Analyser *analyser) {
     analyser->expected_types_start = expected_types_start;
 
     free(copy.items);
-    analyser->in_block = 0;
+    analyser->in_block = in_block;
 }
 
 void expected_types_error(Analyser *analyser, char *msg, Types expected) {
