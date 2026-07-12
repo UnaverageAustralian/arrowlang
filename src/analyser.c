@@ -6,6 +6,7 @@
 
 #include "analyser.h"
 #include "compiler.h"
+#include "types.h"
 #include "utils.h"
 
 #define EPRINTF_AT_OP(op, level, ...) eprintf((op)->file_path, (op)->line, (op)->pos, level, __VA_ARGS__);
@@ -601,10 +602,12 @@ void type_check_op(Analyser *analyser) {
             }
 
             if (!types_equal(arg, param)) {
-                if (arg.kind == KIND_BASIC)
-                    arg.as.basic = arg.as.basic == TYPE_INTEGER ? TYPE_I64 : arg.as.basic == TYPE_REAL ? TYPE_F64 : arg.as.basic;
+                arg.as.basic = arg.as.basic == TYPE_INTEGER ? TYPE_I64 : arg.as.basic == TYPE_REAL ? TYPE_F64 : arg.as.basic;
                 make_conversion_op(analyser, func.param_types.items[i], arg, (func.param_types.count-i-1)*8);
             }
+
+            if (arg.kind == KIND_STRUCT)
+                analyser->allocated -= arg.as.structure.size;
         }
 
         if (had_error) {
@@ -613,8 +616,11 @@ void type_check_op(Analyser *analyser) {
         }
 
         analyser->stack.count -= func.param_types.count;
-        for (size_t i = 0; i < func.return_types.count; i++)
+        for (size_t i = 0; i < func.return_types.count; i++) {
             DA_APPEND(&analyser->stack, func.return_types.items[i]);
+            if (func.return_types.items[i].kind == KIND_STRUCT)
+                allocate(analyser, func.return_types.items[i]);
+        }
         break;
     }
     case OP_STR:
@@ -695,8 +701,7 @@ void type_check_op(Analyser *analyser) {
         analyser->stack.count -= fields.count;
         DA_APPEND(&analyser->stack, op->types[0]);
 
-        if (op->types[0].kind == KIND_STRUCT)
-            allocate(analyser, op->types[0]);
+        allocate(analyser, op->types[0]);
         break;
     }
     case OP_ACCESS: {

@@ -7,9 +7,10 @@
 #include <unistd.h>
 
 #include "analyser.h"
-#include "gen.h"
 #include "compiler.h"
+#include "gen.h"
 #include "lexer.h"
+#include "types.h"
 #include "utils.h"
 
 #define COMPILER_EPRINTF(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->prev.line, compiler->lexer->prev.pos, level, __VA_ARGS__); 
@@ -94,6 +95,7 @@ char *opcode_spelling(Opcode opcode) {
     case OP_END:     return "END";
     case OP_IF:      return "IF";
     case OP_ELSE:    return "ELSE";
+    case OP_INIT:    return "INIT";
     case OP_ACCESS:  return "ACCESS";
     case OP_STORE:   return "STORE";
     default:         return "UNKNOWN";
@@ -157,13 +159,6 @@ void print_ops(Ops *ops) {
         printf("%s:%d:%d: ", op->file_path, op->line, op->pos);
         print_op(op);
     }
-}
-
-static inline Type basic_type(Basic_Type type) {
-    return (Type) {
-        .kind = KIND_BASIC,
-        .as = { .basic = type },
-    };
 }
 
 inline Hash_Entry *add_symbol(Compilation_Unit *compiler, Symbol *sym) {
@@ -340,31 +335,31 @@ void compile_loop_stmt(Compilation_Unit *compiler) {
 
 Type get_type(Compilation_Unit *compiler) {
     switch (compiler->lexer->prev.type) {
-    case TOK_I8:   return basic_type(TYPE_I8);
-    case TOK_CHAR: return basic_type(TYPE_CHAR);
-    case TOK_U8:   return basic_type(TYPE_U8);
-    case TOK_I16:  return basic_type(TYPE_I16);
-    case TOK_U16:  return basic_type(TYPE_U16);
-    case TOK_I32:  return basic_type(TYPE_I32);
-    case TOK_U32:  return basic_type(TYPE_U32);
-    case TOK_I64:  return basic_type(TYPE_I64);
-    case TOK_U64:  return basic_type(TYPE_U64);
-    case TOK_F32:  return basic_type(TYPE_F32);
-    case TOK_F64:  return basic_type(TYPE_F64);
-    case TOK_STR:  return basic_type(TYPE_STR);
+    case TOK_I8:   return BASIC_TYPE(TYPE_I8);
+    case TOK_CHAR: return BASIC_TYPE(TYPE_CHAR);
+    case TOK_U8:   return BASIC_TYPE(TYPE_U8);
+    case TOK_I16:  return BASIC_TYPE(TYPE_I16);
+    case TOK_U16:  return BASIC_TYPE(TYPE_U16);
+    case TOK_I32:  return BASIC_TYPE(TYPE_I32);
+    case TOK_U32:  return BASIC_TYPE(TYPE_U32);
+    case TOK_I64:  return BASIC_TYPE(TYPE_I64);
+    case TOK_U64:  return BASIC_TYPE(TYPE_U64);
+    case TOK_F32:  return BASIC_TYPE(TYPE_F32);
+    case TOK_F64:  return BASIC_TYPE(TYPE_F64);
+    case TOK_STR:  return BASIC_TYPE(TYPE_STR);
     case TOK_WORD: {
         Hash_Entry *entry = hashmap_get(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len);
         if (!entry || !entry->key) {
             compiler->global->had_error = 1;
             COMPILER_EPRINTF(LEVEL_ERR, "Unresolved structure %.*s\n", compiler->lexer->prev.len, compiler->lexer->prev.start);
-            return basic_type(TYPE_VOID);
+            return BASIC_TYPE(TYPE_VOID);
         }
 
         Symbol *sym = (Symbol *)entry->val;
         if (sym->type != STYPE_STRUCT) {
             compiler->global->had_error = 1;
             COMPILER_EPRINTF(LEVEL_ERR, "%.*s is not a structure\n");
-            return basic_type(TYPE_VOID);
+            return BASIC_TYPE(TYPE_VOID);
         }
 
         return (Type){ .kind = KIND_STRUCT, .as = { .structure = sym->as.structure } };
@@ -372,7 +367,7 @@ Type get_type(Compilation_Unit *compiler) {
     default:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Expected type, got %s\n", tok_spelling(compiler->lexer->cur.type));
-        return basic_type(TYPE_VOID);
+        return BASIC_TYPE(TYPE_VOID);
     }
 }
 
@@ -436,15 +431,15 @@ void compile_stmt(Compilation_Unit *compiler) {
     switch (tok->type) {
     case TOK_INT_LIT:
         make_op(compiler, OP_PUSH, tok->as.integer);
-        compiler->ops.items[compiler->ops.count-1].types[0] = basic_type(TYPE_INTEGER);
+        compiler->ops.items[compiler->ops.count-1].types[0] = BASIC_TYPE(TYPE_INTEGER);
         break;
     case TOK_FLOAT_LIT:
         make_op(compiler, OP_PUSH, tok->as.integer);
-        compiler->ops.items[compiler->ops.count-1].types[0] = basic_type(TYPE_REAL);
+        compiler->ops.items[compiler->ops.count-1].types[0] = BASIC_TYPE(TYPE_REAL);
         break;
     case TOK_CHAR_LIT:
         make_op(compiler, OP_PUSH, tok->as.integer);
-        compiler->ops.items[compiler->ops.count-1].types[0] = basic_type(TYPE_CHAR);
+        compiler->ops.items[compiler->ops.count-1].types[0] = BASIC_TYPE(TYPE_CHAR);
         break;
     case TOK_ADD:   make_op(compiler, OP_ADD, 0);   break;
     case TOK_SUB:   make_op(compiler, OP_SUB, 0);   break;
@@ -663,7 +658,7 @@ void compile_struct(Compilation_Unit *compiler) {
         lexer_next(compiler->lexer);
         field.type = get_type(compiler);
 
-        size_t alignment = type_size(field.type);
+        size_t alignment = type_alignment(field.type);
         offset = ALIGN(offset, alignment);
         field.offset = offset;
 
@@ -675,6 +670,7 @@ void compile_struct(Compilation_Unit *compiler) {
     }
 
     sym->as.structure.size = ALIGN(offset, 8);
+    sym->as.structure.alignment = struct_alignment;
 
     if (compiler->lexer->cur.type == TOK_EOF) {
         compiler->global->had_error = 1;
@@ -686,7 +682,7 @@ void compile_struct(Compilation_Unit *compiler) {
 void compile_implicit_main(Compilation_Unit *compiler) {
     Symbol *main = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     main->type = STYPE_FUNC;
-    DA_APPEND(&main->as.func.return_types, basic_type(TYPE_U8));
+    DA_APPEND(&main->as.func.return_types, BASIC_TYPE(TYPE_U8));
     main->as.func.module_name = (String_View){0};
 
     Hash_Entry *entry = hashmap_add(&compiler->symbols, "main", 4, main);
