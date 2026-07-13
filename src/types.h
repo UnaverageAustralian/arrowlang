@@ -63,6 +63,9 @@ int type_size(Type type);
 int type_alignment(Type type);
 int typeid(Type type);
 
+int types_compatible(Type a, Type b);
+int types_equal(Type a, Type b);
+
 int struct_size(Struct structure);
 Field *get_first_leaf_field(Struct structure);
 Field *get_last_leaf_field(Struct structure);

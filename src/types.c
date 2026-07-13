@@ -83,3 +83,32 @@ Field *get_last_leaf_field(Struct structure) {
     return result;
 }
 
+int struct_fields_equal(Struct a, Struct b) {
+    if (a.fields.count != b.fields.count) return 0;
+
+    for (size_t i = 0; i < a.fields.count; i++)
+        if (!types_equal(a.fields.items[i].type, b.fields.items[i].type))
+            return 0;
+    return 1;
+}
+
+int types_compatible(Type a, Type b) {
+    if (a.kind != b.kind) return 0;
+
+    switch (a.kind) {
+    case KIND_BASIC:  return (a.as.basic & b.as.basic) != 0;
+    case KIND_STRUCT: return struct_fields_equal(a.as.structure, a.as.structure);
+    default:          return 0;
+    }
+}
+
+int types_equal(Type a, Type b) {
+    if (a.kind != b.kind) return 0;
+
+    switch (a.kind) {
+    case KIND_BASIC:  return a.as.basic == b.as.basic;
+    case KIND_STRUCT: return struct_fields_equal(a.as.structure, a.as.structure);
+    default:          return 0;
+    }
+}
+
