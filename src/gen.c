@@ -176,11 +176,6 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
                 fparams = 8;
             if (iparams > 6)
                 iparams = 6;
-
-            gen->allocated -= param->as.structure.size;
-        }
-        else if (param->kind == KIND_STRUCT) {
-            gen->allocated -= param->as.structure.size;
         }
         else if ((func.param_types.items[i].as.basic & TYPE_REAL) && fparams < 8) {
             fparams++;
@@ -478,8 +473,6 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_DROP:
             sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
-            if (op->types[0].kind == KIND_STRUCT)
-                gen.allocated -= op->types[0].as.structure.size;
             gen.depth--;
             break;
         case OP_SWAP:
@@ -685,11 +678,6 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             Hash_Entry *entry = (Hash_Entry *)op->operand;
             Function func = ((Symbol *)entry->val)->as.func;
 
-            for (size_t i = 0; i < func.param_types.count; i++) {
-                if (func.param_types.items[i].kind == KIND_STRUCT)
-                    gen.allocated -= func.param_types.items[i].as.structure.size;
-            }
-
             if (func.module_name.str == NULL)
                 sb_appendf(&gen.sb, "    call \"%.*s\"\n", entry->key_len, entry->key);
             else
@@ -790,10 +778,6 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             else {
                 sb_appendf(&gen.sb, "    mov%c %s, %d(%%rdi)\n", size_sufs[type_size(field->type)], rax[type_size(field->type)], field->offset);
             }
-
-            if (field->type.kind == KIND_STRUCT)
-                gen.allocated -= field->type.as.structure.size;
-
             gen.depth--;
             break;
         }

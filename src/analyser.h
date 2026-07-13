@@ -19,6 +19,5 @@ typedef struct {
 } Analyser;
 
 int type_check(Ops *ops);
-char *type_spelling(Type type);
 
 #endif // ARROW_TYPE_CHECKING_H

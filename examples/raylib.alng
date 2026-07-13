@@ -14,11 +14,13 @@ C$EndDrawing ( -> )
 
 C$ClearBackground( Colour -> )
 
-800 600 "Hello from Arrowlang" InitWindow
-while WindowShouldClose! loop
-    BeginDrawing
-    255 0 0 255 Colour ClearBackground
-    EndDrawing
-end
-CloseWindow
-0
+$main ( -> u8 )
+    800 600 "Hello from Arrowlang" InitWindow
+    while WindowShouldClose! loop
+        BeginDrawing
+        255 0 0 255 Colour ClearBackground
+        EndDrawing
+    end
+    CloseWindow
+    0
+$

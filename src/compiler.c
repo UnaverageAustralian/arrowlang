@@ -333,6 +333,17 @@ void compile_loop_stmt(Compilation_Unit *compiler) {
     compiler->is_in_loop = 0;
 }
 
+void compile_struct_fields(Compilation_Unit *compiler, Struct *structure);
+
+Struct compile_anonymous_struct(Compilation_Unit *compiler) {
+    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
+    sym->type = STYPE_STRUCT;
+    sym->as.structure.name = (String_View){0};
+
+    compile_struct_fields(compiler, &sym->as.structure);
+    return sym->as.structure;
+}
+
 Type get_type(Compilation_Unit *compiler) {
     switch (compiler->lexer->prev.type) {
     case TOK_I8:   return BASIC_TYPE(TYPE_I8);
@@ -362,17 +373,15 @@ Type get_type(Compilation_Unit *compiler) {
             return BASIC_TYPE(TYPE_VOID);
         }
 
-        return (Type){ .kind = KIND_STRUCT, .as = { .structure = sym->as.structure } };
+        return STRUCT_TYPE(sym->as.structure);
     }
+    case TOK_STRUCT:
+        return STRUCT_TYPE(compile_anonymous_struct(compiler));
     default:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Expected type, got %s\n", tok_spelling(compiler->lexer->cur.type));
         return BASIC_TYPE(TYPE_VOID);
     }
-}
-
-inline int is_decl_type(Token_Type type) {
-    return type == TOK_FUNC || type == TOK_STRUCT;
 }
 
 void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
@@ -398,10 +407,7 @@ void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
         break;
     case STYPE_STRUCT: {
         make_op(compiler, OP_INIT, 0);
-        compiler->ops.items[compiler->ops.count-1].types[0] = (Type){
-            .kind = KIND_STRUCT,
-            .as = { .structure = sym->as.structure }
-        };
+        compiler->ops.items[compiler->ops.count-1].types[0] = STRUCT_TYPE(sym->as.structure);
         break;
     }
     case STYPE_MODULE: {
@@ -514,6 +520,10 @@ void compile_stmt(Compilation_Unit *compiler) {
         compile_entry(compiler, entry);
         break;
     }
+    case TOK_STRUCT:
+        make_op(compiler, OP_INIT, 0);
+        compiler->ops.items[compiler->ops.count-1].types[0] = STRUCT_TYPE(compile_anonymous_struct(compiler));
+        break;
     case TOK_I8:
     case TOK_U8:
     case TOK_CHAR:
@@ -636,16 +646,7 @@ void compile_external_function(Compilation_Unit *compiler, uint8_t is_c_func) {
     }
 }
 
-void compile_struct(Compilation_Unit *compiler) {
-    lexer_next(compiler->lexer);
-    expect(compiler, TOK_WORD);
-
-    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
-    sym->type = STYPE_STRUCT;
-
-    add_symbol(compiler, sym);
-    sym->as.structure.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
-
+void compile_struct_fields(Compilation_Unit *compiler, Struct *structure) {
     size_t offset = 0;
     size_t struct_alignment = 0;
 
@@ -665,12 +666,12 @@ void compile_struct(Compilation_Unit *compiler) {
         if (alignment > struct_alignment)
             struct_alignment = alignment;
 
-        ARENA_DA_APPEND(&compiler->global->arena, &sym->as.structure.fields, field);
+        ARENA_DA_APPEND(&compiler->global->arena, &structure->fields, field);
         offset += type_size(field.type);
     }
 
-    sym->as.structure.size = ALIGN(offset, 8);
-    sym->as.structure.alignment = struct_alignment;
+    structure->size = ALIGN(offset, 8);
+    structure->alignment = struct_alignment;
 
     if (compiler->lexer->cur.type == TOK_EOF) {
         compiler->global->had_error = 1;
@@ -679,27 +680,17 @@ void compile_struct(Compilation_Unit *compiler) {
     lexer_next(compiler->lexer);
 }
 
-void compile_implicit_main(Compilation_Unit *compiler) {
-    Symbol *main = arena_calloc(&compiler->global->arena, sizeof(Symbol));
-    main->type = STYPE_FUNC;
-    DA_APPEND(&main->as.func.return_types, BASIC_TYPE(TYPE_U8));
-    main->as.func.module_name = (String_View){0};
+void compile_struct(Compilation_Unit *compiler) {
+    lexer_next(compiler->lexer);
+    expect(compiler, TOK_WORD);
 
-    Hash_Entry *entry = hashmap_add(&compiler->symbols, "main", 4, main);
-    hashmap_add(&compiler->module.symbols, "main", 4, main);
+    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
+    sym->type = STYPE_STRUCT;
 
-    make_op_at_cur(compiler, OP_FUNC, (int64_t)entry);
-    while (!is_decl_type(compiler->lexer->cur.type) && compiler->lexer->cur.type != TOK_EOF)
-        compile_stmt(compiler);
+    add_symbol(compiler, sym);
+    sym->as.structure.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
 
-    for (int i = compiler->rets.count-1; i >= 0; i--) {
-        compiler->ops.items[compiler->rets.positions[i]].operand = compiler->label_count;
-        compiler->rets.count--;
-    }
-
-    if (compiler->rets.count > 0)
-        make_op_at_cur(compiler, OP_LABEL, compiler->label_count++);
-    make_op_at_cur(compiler, OP_RET, 0);
+    compile_struct_fields(compiler, &sym->as.structure);
 }
 
 void compile_decls(Compilation_Unit *compiler) {
@@ -722,35 +713,9 @@ void compile_decls(Compilation_Unit *compiler) {
         break;
     }
 
-    if (compiler->symbols.entries != NULL && hashmap_get(&compiler->symbols, "main", 4)->key) {
-        if (compiler->lexer->cur.type != TOK_EOF) {
-            compiler->global->had_error = 1;
-            COMPILER_EPRINTF(LEVEL_ERR, "Extra tokens at end of file\n");
-        }
-        return;
-    }
-    if (compiler->lexer->cur.type == TOK_EOF) return;
-
-    compile_implicit_main(compiler);
-
-    for (; ;) {
-        switch (compiler->lexer->cur.type) {
-        case TOK_FUNC:
-            compile_function(compiler);
-            continue;
-        case TOK_EXT_FUNC:
-            compile_external_function(compiler, 0);
-            continue;
-        case TOK_C_FUNC:
-            compile_external_function(compiler, 1);
-            continue;
-        case TOK_STRUCT:
-            compile_struct(compiler);
-            continue;
-        default: break;
-        }
-        break;
-    }
+    Hash_Entry *main = hashmap_get(&compiler->symbols, "main", 4);
+    if (main && main->val)
+        ((Symbol *)main->val)->as.func.module_name = (String_View){0};
 
     if (compiler->lexer->cur.type != TOK_EOF) {
         compiler->global->had_error = 1;
@@ -778,10 +743,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
             break;
         case STYPE_STRUCT:
             op->opcode = OP_INIT;
-            op->types[0] = (Type){
-                .kind = KIND_STRUCT,
-                .as = { .structure = sym->as.structure },
-            };
+            op->types[0] = STRUCT_TYPE(sym->as.structure);
             break;
         case STYPE_MODULE:
             compiler->global->had_error = 1;

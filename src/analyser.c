@@ -11,46 +11,6 @@
 
 #define EPRINTF_AT_OP(op, level, ...) eprintf((op)->file_path, (op)->line, (op)->pos, level, __VA_ARGS__);
 
-static inline Type basic_type(Basic_Type type) {
-    return (Type) {
-        .kind = KIND_BASIC,
-        .as = { .basic = type },
-    };
-}
-
-char *basic_type_spelling(Basic_Type type) {
-    switch (type) {
-    case TYPE_VOID:    return "void";
-    case TYPE_I8:      return "i8";
-    case TYPE_CHAR:    return "char";
-    case TYPE_U8:      return "u8";
-    case TYPE_I16:     return "i16";
-    case TYPE_U16:     return "u16";
-    case TYPE_I32:     return "i32";
-    case TYPE_U32:     return "u32";
-    case TYPE_I64:     return "i64";
-    case TYPE_U64:     return "u64";
-    case TYPE_F32:     return "f32";
-    case TYPE_F64:     return "f64";
-    case TYPE_STR:     return "str";
-    case TYPE_INTEGER: return "int_lit";
-    case TYPE_REAL:    return "real_lit";
-    default:           return "unknown";
-    }
-}
-
-char *type_spelling(Type type) {
-    switch (type.kind) {
-    case KIND_BASIC: return basic_type_spelling(type.as.basic);
-    case KIND_STRUCT: {
-        String_Builder sb = {0};
-        sb_appendf(&sb, "%.*s", type.as.structure.name.len, type.as.structure.name.str);
-        return sb.items;
-    }
-    }
-    return "unknown";
-}
-
 inline void init_analyser(Analyser *analyser, Ops *ops) {
     *analyser = (Analyser){0};
     analyser->ops = ops;
@@ -399,10 +359,6 @@ void type_check_op(Analyser *analyser) {
     case OP_DROP: {
         if (!check_operand_count(analyser, 1)) break;
         Type a = pop(analyser);
-
-        if (a.kind == KIND_STRUCT)
-            analyser->allocated -= a.as.structure.size;
-
         op->types[0] = a;
         break;
     }
@@ -501,7 +457,7 @@ void type_check_op(Analyser *analyser) {
             }
 
             op->types[0] = greater;
-            DA_APPEND(&analyser->stack, basic_type(TYPE_U8));
+            DA_APPEND(&analyser->stack, BASIC_TYPE(TYPE_U8));
 
             if (greater.as.basic != lesser.as.basic)
                 make_conversion_op(analyser, greater, lesser, depth);
@@ -562,7 +518,7 @@ void type_check_op(Analyser *analyser) {
 
         if (a.kind == KIND_BASIC && a.as.basic & TYPE_NUMBER) {
             op->types[0].as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
-            DA_APPEND(&analyser->stack, basic_type(TYPE_U8));
+            DA_APPEND(&analyser->stack, BASIC_TYPE(TYPE_U8));
         }
         else {
             analyser->had_error = 1;
@@ -589,9 +545,6 @@ void type_check_op(Analyser *analyser) {
                 arg.as.basic = arg.as.basic == TYPE_INTEGER ? TYPE_I64 : arg.as.basic == TYPE_REAL ? TYPE_F64 : arg.as.basic;
                 make_conversion_op(analyser, func.param_types.items[i], arg, (func.param_types.count-i-1)*8);
             }
-
-            if (arg.kind == KIND_STRUCT)
-                analyser->allocated -= arg.as.structure.size;
         }
 
         if (had_error) {
@@ -608,7 +561,7 @@ void type_check_op(Analyser *analyser) {
         break;
     }
     case OP_STR:
-        DA_APPEND(&analyser->stack, basic_type(TYPE_STR));
+        DA_APPEND(&analyser->stack, BASIC_TYPE(TYPE_STR));
         break;
     case OP_ROT: {
         if (!check_operand_count(analyser, 3)) break;
@@ -745,9 +698,6 @@ void type_check_op(Analyser *analyser) {
         }
 
         op->operand = (uint64_t)field;
-
-        if (field->type.kind == KIND_STRUCT)
-            analyser->allocated -= field->type.as.structure.size;
         break;
     }
     case OP_LABEL: break;

@@ -4,6 +4,7 @@
 #include "utils.h"
 
 #define BASIC_TYPE(type) (Type){ .kind = KIND_BASIC, .as.basic = type }
+#define STRUCT_TYPE(type) (Type){ .kind = KIND_STRUCT, .as.structure = type }
 
 typedef enum {
     TYPE_VOID = 0x0,
@@ -69,5 +70,8 @@ int types_equal(Type a, Type b);
 int struct_size(Struct structure);
 Field *get_first_leaf_field(Struct structure);
 Field *get_last_leaf_field(Struct structure);
+
+char *basic_type_spelling(Basic_Type type);
+char *type_spelling(Type type);
 
 #endif // ARROW_TYPES_H

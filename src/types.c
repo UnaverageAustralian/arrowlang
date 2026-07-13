@@ -1,5 +1,40 @@
 #include "types.h"
 
+char *basic_type_spelling(Basic_Type type) {
+    switch (type) {
+    case TYPE_VOID:    return "void";
+    case TYPE_I8:      return "i8";
+    case TYPE_CHAR:    return "char";
+    case TYPE_U8:      return "u8";
+    case TYPE_I16:     return "i16";
+    case TYPE_U16:     return "u16";
+    case TYPE_I32:     return "i32";
+    case TYPE_U32:     return "u32";
+    case TYPE_I64:     return "i64";
+    case TYPE_U64:     return "u64";
+    case TYPE_F32:     return "f32";
+    case TYPE_F64:     return "f64";
+    case TYPE_STR:     return "str";
+    case TYPE_INTEGER: return "int_lit";
+    case TYPE_REAL:    return "real_lit";
+    default:           return "unknown";
+    }
+}
+
+char *type_spelling(Type type) {
+    switch (type.kind) {
+    case KIND_BASIC: return basic_type_spelling(type.as.basic);
+    case KIND_STRUCT: {
+        if (type.as.structure.name.len == 0)
+            return "anon_struct";
+        String_Builder sb = {0};
+        sb_appendf(&sb, "%.*s", type.as.structure.name.len, type.as.structure.name.str);
+        return sb.items;
+    }
+    }
+    return "unknown";
+}
+
 int struct_size(Struct structure) {
     int result = 0;
     for (size_t i = 0; i < structure.fields.count; i++) {

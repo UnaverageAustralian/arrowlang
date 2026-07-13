@@ -4,4 +4,6 @@ $foo ( -> i64 )
     2 return 3
 $
 
-foo 2 = "foo = 2" errors::assert
+$main ( -> u8 )
+    foo 2 = "foo = 2" errors::assert
+$

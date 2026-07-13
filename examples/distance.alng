@@ -8,6 +8,8 @@ $distance ( f64 f64 f64 f64 -> f64 )
     sqrt
 $
 
-2.96 -4.15 8.43 -0.43 distance 100.0 * i64 io::println
-io::flush
-0
+$main ( -> u8 )
+    2.96 -4.15 8.43 -0.43 distance 100.0 * i64 io::println
+    io::flush
+    0
+$

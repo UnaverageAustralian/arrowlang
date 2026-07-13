@@ -1,8 +1,10 @@
 import errors
 
-2 3 + 5  = "2 3 + = 5"  errors::assert
-2 3 - -1 = "2 3 - = -1" errors::assert |
-2 3 * 6  = "2 3 * = 6"  errors::assert |
-5 3 / 1  = "5 3 / = 1"  errors::assert |
-5 3 % 2  = "5 3 % = 2"  errors::assert |
-5 neg -5 = "5 neg = -5" errors::assert |
+$main ( -> u8 )
+    2 3 + 5  = "2 3 + = 5"  errors::assert
+    2 3 - -1 = "2 3 - = -1" errors::assert |
+    2 3 * 6  = "2 3 * = 6"  errors::assert |
+    5 3 / 1  = "5 3 / = 1"  errors::assert |
+    5 3 % 2  = "5 3 % = 2"  errors::assert |
+    5 neg -5 = "5 neg = -5" errors::assert |
+$

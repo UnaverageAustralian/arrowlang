@@ -1,4 +1,6 @@
 import errors
 
-'!' 33 = "'!' = 33" errors::assert
-'?' 63 = "'?' = 63" errors::assert
+$main ( -> u8 )
+    '!' 33 = "'!' = 33" errors::assert
+    '?' 63 = "'?' = 63" errors::assert
+$
