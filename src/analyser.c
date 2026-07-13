@@ -648,18 +648,6 @@ void type_check_op(Analyser *analyser) {
         break;
     }
     case OP_INIT: {
-        if (analyser->stack.count > 0 && peek(analyser, 1).kind == KIND_STRUCT) {
-            if (!types_equal(peek(analyser, 1), op->types[0])) {
-                analyser->had_error = 1;
-                EPRINTF_AT_OP(op, LEVEL_ERR, "Incompatible struct types\n");
-                break;
-            }
-
-            analyser->stack.items[analyser->stack.count-1] = op->types[0];
-            analyser->pos++;
-            return;
-        }
-
         Fields fields = op->types[0].as.structure.fields;
         if (!check_operand_count(analyser, fields.count)) break;
 
