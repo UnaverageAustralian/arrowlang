@@ -4,7 +4,7 @@
 #include "utils.h"
 
 #define BASIC_TYPE(type) (Type){ .kind = KIND_BASIC, .as.basic = type }
-#define STRUCT_TYPE(type) (Type){ .kind = KIND_STRUCT, .as.structure = type }
+#define ADVANCED_TYPE(type) (Type){ .kind = KIND_ADVANCED, .as.advanced = type }
 
 typedef enum {
     TYPE_VOID = 0x0,
@@ -22,8 +22,17 @@ typedef enum {
 } Basic_Type;
 
 typedef enum {
-    KIND_BASIC, KIND_STRUCT,
+    KIND_BASIC, KIND_ADVANCED,
 } Type_Kind;
+
+typedef enum {
+    KIND_STRUCT,
+} Advanced_Type_Kind;
+
+typedef enum {
+    STATUS_UNRESOLVED, STATUS_RESOLVING,
+    STATUS_RESOLVED,
+} Resolve_Status;
 
 typedef struct Field Field;
 
@@ -41,10 +50,19 @@ typedef struct {
 } Struct;
 
 typedef struct {
+    Advanced_Type_Kind kind;
+    union {
+        Struct structure;
+    } as;
+    Resolve_Status resolve_status;
+    int pos, line;
+} Advanced_Type;
+
+typedef struct {
     Type_Kind kind;
     union {
         Basic_Type basic;
-        Struct structure;
+        Advanced_Type *advanced;
     } as;
 } Type;
 
@@ -53,6 +71,12 @@ typedef struct {
     size_t capacity;
     Type *items;
 } Types;
+
+typedef struct {
+    size_t count;
+    size_t capacity;
+    Advanced_Type *items;
+} Advanced_Types;
 
 struct Field {
     String_View name;

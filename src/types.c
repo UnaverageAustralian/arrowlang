@@ -22,34 +22,32 @@ char *basic_type_spelling(Basic_Type type) {
 }
 
 char *type_spelling(Type type) {
-    switch (type.kind) {
-    case KIND_BASIC: return basic_type_spelling(type.as.basic);
-    case KIND_STRUCT: {
-        if (type.as.structure.name.len == 0)
+    if (type.kind == KIND_BASIC)
+        return basic_type_spelling(type.as.basic);
+
+    switch (type.as.advanced->kind) {
+    case KIND_STRUCT:
+        if (type.as.advanced->as.structure.name.len == 0)
             return "anon_struct";
         String_Builder sb = {0};
-        sb_appendf(&sb, "%.*s", type.as.structure.name.len, type.as.structure.name.str);
+        sb_appendf(&sb, "%.*s", type.as.advanced->as.structure.name.len, type.as.advanced->as.structure.name.str);
         return sb.items;
+    default:
+        return "unknown";
     }
-    }
-    return "unknown";
 }
 
 int struct_size(Struct structure) {
     int result = 0;
     for (size_t i = 0; i < structure.fields.count; i++) {
         result = ALIGN(result, type_alignment(structure.fields.items[i].type));
-        if (structure.fields.items[i].type.kind == KIND_STRUCT)
-            result += struct_size(structure.fields.items[i].type.as.structure);
-        else
-            result += type_size(structure.fields.items[i].type);
+        result += type_size(structure.fields.items[i].type);
     }
     return result;
 }
 
 int type_size(Type type) {
-    switch (type.kind) {
-    case KIND_BASIC:
+    if (type.kind == KIND_BASIC) {
         switch (type.as.basic) {
         case TYPE_I8:
         case TYPE_CHAR:
@@ -70,10 +68,10 @@ int type_size(Type type) {
         default:
             return 0;
         }
-    case KIND_STRUCT:
-        return struct_size(type.as.structure);
+        return 0;
     }
-    return 0;
+
+    return struct_size(type.as.advanced->as.structure);
 }
 
 int typeid(Type type) {
@@ -97,24 +95,22 @@ int typeid(Type type) {
 }
 
 int type_alignment(Type type) {
-    switch (type.kind) {
-    case KIND_BASIC:  return type_size(type);
-    case KIND_STRUCT: return type.as.structure.alignment;
-    default:          return 0;
-    }
+    if (type.kind == KIND_BASIC)
+        return type_size(type);
+    return type.as.advanced->as.structure.alignment;
 }
 
 Field *get_first_leaf_field(Struct structure) {
     Field *result = &structure.fields.items[0];
-    while (result->type.kind == KIND_STRUCT)
-        result = &result->type.as.structure.fields.items[0];
+    while (result->type.kind != KIND_BASIC)
+        result = &result->type.as.advanced->as.structure.fields.items[0];
     return result;
 }
 
 Field *get_last_leaf_field(Struct structure) {
     Field *result = &structure.fields.items[0];
-    while (result->type.kind == KIND_STRUCT)
-        result = &result->type.as.structure.fields.items[result->type.as.structure.fields.count-1];
+    while (result->type.kind != KIND_BASIC)
+        result = &result->type.as.advanced->as.structure.fields.items[result->type.as.advanced->as.structure.fields.count-1];
     return result;
 }
 
@@ -130,20 +126,16 @@ int struct_fields_equal(Struct a, Struct b) {
 int types_compatible(Type a, Type b) {
     if (a.kind != b.kind) return 0;
 
-    switch (a.kind) {
-    case KIND_BASIC:  return (a.as.basic & b.as.basic) != 0;
-    case KIND_STRUCT: return struct_fields_equal(a.as.structure, a.as.structure);
-    default:          return 0;
-    }
+    if (a.kind == KIND_BASIC)
+        return (a.as.basic & b.as.basic) != 0;
+    return struct_fields_equal(a.as.advanced->as.structure, a.as.advanced->as.structure);
 }
 
 int types_equal(Type a, Type b) {
     if (a.kind != b.kind) return 0;
 
-    switch (a.kind) {
-    case KIND_BASIC:  return a.as.basic == b.as.basic;
-    case KIND_STRUCT: return struct_fields_equal(a.as.structure, a.as.structure);
-    default:          return 0;
-    }
+    if (a.kind == KIND_BASIC)
+        return a.as.basic == b.as.basic;
+    return struct_fields_equal(a.as.advanced->as.structure, a.as.advanced->as.structure);
 }
 

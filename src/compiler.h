@@ -40,8 +40,12 @@ typedef enum {
 
 typedef enum {
     STYPE_FUNC,  STYPE_MODULE,
-    STYPE_STRUCT,
+    STYPE_TYPE,
 } Symbol_Type;
+
+typedef enum {
+    UTYPE_OP, UTYPE_TYPE,
+} Unresolved_Type;
 
 typedef struct {
     char **input_files;
@@ -70,7 +74,12 @@ typedef struct {
 
 typedef struct {
     String_View name;
-    int pos;
+    int pos, line;
+    Unresolved_Type type;
+    union {
+        Op *op;
+        Type *type;
+    } as;
 } Unresolved_Symbol;
 
 typedef struct {
@@ -99,7 +108,7 @@ typedef struct {
     union {
         Function func;
         Module module;
-        Struct structure;
+        Advanced_Type *type;
     } as;
 } Symbol;
 
@@ -112,6 +121,7 @@ typedef struct {
 
 typedef struct {
     Ops ops;
+    Advanced_Types types;
     Hashmap symbols;
     Unresolved_Symbols unresolved;
     Module module;

@@ -1,11 +1,5 @@
 import errors
 
-struct Foo
-    x : f32
-    y : f32
-    z : f32
-end
-
 struct Bar
     a   : i32
     foo : Foo
@@ -26,3 +20,9 @@ $main ( -> u8 )
     swap #foo#y swap drop 2.0 = "#foo#y = 2.0" errors::assert rot |
     swap #foo#z swap drop 3.0 = "#foo#z = 3.0" errors::assert rot |
 $
+
+struct Foo
+    x : f32
+    y : f32
+    z : f32
+end
