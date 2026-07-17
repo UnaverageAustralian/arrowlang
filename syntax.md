@@ -192,3 +192,13 @@ There is also a variant of the `#` operation which does drop the struct, the `.`
      drop #foo.y // 3
  $
 ```
+
+You can also declare anonymous structs:
+```
+ 2 3 struct
+     x : i32
+     y : i32
+ end
+ 4 >#x
+ #x // 4
+```
