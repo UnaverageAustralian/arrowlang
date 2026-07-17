@@ -31,7 +31,7 @@ typedef enum {
     OP_CCALL,  OP_ROTN,
     OP_NEQ,    OP_UNKNOWN,
     OP_ACCESS, OP_STORE,
-    OP_INIT,
+    OP_INIT,   OP_ACCESS_DROP,
 
     // For the analyser
     OP_START, OP_END,

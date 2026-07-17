@@ -766,6 +766,25 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.depth++;
             break;
         }
+        case OP_ACCESS_DROP: {
+            Field *field = (Field *)op->operand;
+
+            sb_appendf(&gen.sb, "    popq %%rsi\n");
+            sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
+
+            if (field->type.kind == KIND_ADVANCED && field->type.as.advanced->kind == KIND_STRUCT)
+                sb_appendf(&gen.sb, "    leaq %d(%%rsi), %%rax\n", field->offset);
+            else
+                sb_appendf(&gen.sb, "    mov%c %d(%%rsi), %s\n", size_sufs[type_size(field->type)], field->offset, rax[type_size(field->type)]);
+
+            sb_appendf(&gen.sb, "    pushq %%rax\n");
+
+            if (field->type.kind == KIND_ADVANCED && field->type.as.advanced->kind == KIND_STRUCT)
+                duplicate_struct(&gen, field->type.as.advanced->as.structure);
+
+            gen.depth++;
+            break;
+        }
         case OP_STORE: {
             Field *field = (Field *)op->operand;
 

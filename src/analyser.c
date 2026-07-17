@@ -668,6 +668,33 @@ void type_check_op(Analyser *analyser) {
             allocate(analyser, field->type);
         break;
     }
+    case OP_ACCESS_DROP: {
+        if (!check_operand_count(analyser, 1)) break;
+
+        Type a = pop(analyser);
+        if (a.kind != KIND_ADVANCED || a.as.advanced->kind != KIND_STRUCT) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Source is not a struct\n");
+            break;
+        }
+
+        Struct structure = a.as.advanced->as.structure;
+        String_View *sv = (String_View *)op->operand;
+
+        Field *field = find_field(&structure, sv);
+        if (!field) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", structure.name.len, structure.name.str, sv->len, sv->str);
+            break;
+        }
+
+        op->operand = (uint64_t)field;
+        DA_APPEND(&analyser->stack, field->type);
+
+        if (field->type.kind == KIND_ADVANCED && field->type.as.advanced->kind == KIND_STRUCT)
+            allocate(analyser, field->type);
+        break;
+    }
     case OP_STORE: {
         if (!check_operand_count(analyser, 2)) break;
 

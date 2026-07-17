@@ -50,55 +50,56 @@ void init_compilation_unit(Compilation_Unit *unit, Lexer *lexer, Compiler *globa
 
 char *opcode_spelling(Opcode opcode) {
     switch (opcode) {
-    case OP_NOP:     return "NOP";
-    case OP_PUSH:    return "PUSH";
-    case OP_JMPF:    return "JMPF";
-    case OP_JMP:     return "JMP";
-    case OP_LABEL:   return "LABEL";
-    case OP_FUNC:    return "FUNC";
-    case OP_CALL:    return "CALL";
-    case OP_STR:     return "STR";
-    case OP_ADD:     return "ADD";
-    case OP_SUB:     return "SUB";
-    case OP_MUL:     return "MUL";
-    case OP_DIV:     return "DIV";
-    case OP_MOD:     return "MOD";
-    case OP_AND:     return "AND";
-    case OP_OR:      return "OR";
-    case OP_XOR:     return "XOR";
-    case OP_SHL:     return "SHL";
-    case OP_SHR:     return "SHR";
-    case OP_ROL:     return "ROL";
-    case OP_ROR:     return "ROR";
-    case OP_NOT:     return "NOT";
-    case OP_DUP:     return "DUP";
-    case OP_OVER:    return "OVER";
-    case OP_DUP2:    return "DUP2";
-    case OP_DROP:    return "DROP";
-    case OP_SWAP:    return "SWAP";
-    case OP_OVER2:   return "OVER";
-    case OP_SWAP2:   return "SWAP";
-    case OP_NEG:     return "NEG";
-    case OP_EQ:      return "EQ";
-    case OP_LT:      return "LT";
-    case OP_LTEQ:    return "LTEQ";
-    case OP_GT:      return "GT";
-    case OP_GTEQ:    return "GTEQ";
-    case OP_NEQ:     return "NEQ";
-    case OP_LNOT:    return "LNOT";
-    case OP_ROT:     return "ROT";
-    case OP_ROTN:    return "ROTN";
-    case OP_RET:     return "RET";
-    case OP_CONVERT: return "CONVERT";
-    case OP_CCALL:   return "CCALL";
-    case OP_START:   return "START";
-    case OP_END:     return "END";
-    case OP_IF:      return "IF";
-    case OP_ELSE:    return "ELSE";
-    case OP_INIT:    return "INIT";
-    case OP_ACCESS:  return "ACCESS";
-    case OP_STORE:   return "STORE";
-    default:         return "UNKNOWN";
+    case OP_NOP:         return "NOP";
+    case OP_PUSH:        return "PUSH";
+    case OP_JMPF:        return "JMPF";
+    case OP_JMP:         return "JMP";
+    case OP_LABEL:       return "LABEL";
+    case OP_FUNC:        return "FUNC";
+    case OP_CALL:        return "CALL";
+    case OP_STR:         return "STR";
+    case OP_ADD:         return "ADD";
+    case OP_SUB:         return "SUB";
+    case OP_MUL:         return "MUL";
+    case OP_DIV:         return "DIV";
+    case OP_MOD:         return "MOD";
+    case OP_AND:         return "AND";
+    case OP_OR:          return "OR";
+    case OP_XOR:         return "XOR";
+    case OP_SHL:         return "SHL";
+    case OP_SHR:         return "SHR";
+    case OP_ROL:         return "ROL";
+    case OP_ROR:         return "ROR";
+    case OP_NOT:         return "NOT";
+    case OP_DUP:         return "DUP";
+    case OP_OVER:        return "OVER";
+    case OP_DUP2:        return "DUP2";
+    case OP_DROP:        return "DROP";
+    case OP_SWAP:        return "SWAP";
+    case OP_OVER2:       return "OVER";
+    case OP_SWAP2:       return "SWAP";
+    case OP_NEG:         return "NEG";
+    case OP_EQ:          return "EQ";
+    case OP_LT:          return "LT";
+    case OP_LTEQ:        return "LTEQ";
+    case OP_GT:          return "GT";
+    case OP_GTEQ:        return "GTEQ";
+    case OP_NEQ:         return "NEQ";
+    case OP_LNOT:        return "LNOT";
+    case OP_ROT:         return "ROT";
+    case OP_ROTN:        return "ROTN";
+    case OP_RET:         return "RET";
+    case OP_CONVERT:     return "CONVERT";
+    case OP_CCALL:       return "CCALL";
+    case OP_START:       return "START";
+    case OP_END:         return "END";
+    case OP_IF:          return "IF";
+    case OP_ELSE:        return "ELSE";
+    case OP_INIT:        return "INIT";
+    case OP_ACCESS:      return "ACCESS";
+    case OP_STORE:       return "STORE";
+    case OP_ACCESS_DROP: return "ACCESS_DROP";
+    default:             return "UNKNOWN";
     }
 }
 
@@ -574,6 +575,13 @@ void compile_stmt(Compilation_Unit *compiler) {
         String_View *sv = arena_calloc(&compiler->global->arena, sizeof(String_View));
         *sv = (String_View){ .len = tok->len, .str = tok->start };
         make_op(compiler, OP_STORE, (uint64_t)sv);
+        break;
+    }
+    case TOK_DOT: {
+        expect(compiler, TOK_WORD);
+        String_View *sv = arena_calloc(&compiler->global->arena, sizeof(String_View));
+        *sv = (String_View){ .len = tok->len, .str = tok->start };
+        make_op(compiler, OP_ACCESS_DROP, (uint64_t)sv);
         break;
     }
     case TOK_ERROR:

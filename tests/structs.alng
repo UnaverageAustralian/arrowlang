@@ -10,15 +10,15 @@ $main ( -> u8 )
     swap            #y 2.0 = "#y = 2.0" errors::assert rot |
     swap            #z 1.0 = "#z = 1.0" errors::assert rot |
 
-    2 rot Bar #foo#x swap drop 3.0 = "#foo#x = 3.0" errors::assert rot |
-    swap      #foo#y swap drop 2.0 = "#foo#y = 2.0" errors::assert rot |
-    swap      #foo#z swap drop 1.0 = "#foo#z = 1.0" errors::assert rot |
-    swap                      #a 2 = "#a = 2"       errors::assert rot |
+    2 rot Bar #foo.x 3.0 = "#foo.x = 3.0" errors::assert rot |
+    swap      #foo.y 2.0 = "#foo.y = 2.0" errors::assert rot |
+    swap      #foo.z 1.0 = "#foo.z = 1.0" errors::assert rot |
+    swap            #a 2 = "#a = 2"       errors::assert rot |
 
     swap 1.0 2.0 3.0 Foo >#foo
-         #foo#x swap drop 1.0 = "#foo#x = 1.0" errors::assert rot |
-    swap #foo#y swap drop 2.0 = "#foo#y = 2.0" errors::assert rot |
-    swap #foo#z swap drop 3.0 = "#foo#z = 3.0" errors::assert rot |
+         #foo.x 1.0 = "#foo.x = 1.0" errors::assert rot |
+    swap #foo.y 2.0 = "#foo.y = 2.0" errors::assert rot |
+    swap #foo.z 3.0 = "#foo.z = 3.0" errors::assert rot |
 $
 
 struct Foo

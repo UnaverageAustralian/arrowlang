@@ -497,7 +497,7 @@ void lexer_next(Lexer *lexer) {
         break;
     case '.':
         skip(lexer, 1);
-        make_token(lexer, TOK_DROP);
+        make_token(lexer, TOK_DOT);
         break;
     case '\\':
         skip(lexer, 1);
@@ -691,6 +691,7 @@ char *tok_spelling(Token_Type type) {
     case TOK_SCOPE:      return "SCOPE";
     case TOK_HASH:       return "HASH";
     case TOK_ARROW_HASH: return "ARROW_HASH";
+    case TOK_DOT:        return "DOT";
     case TOK_INT_LIT:    return "INT_LIT";
     case TOK_FLOAT_LIT:  return "FLOAT_LIT";
     case TOK_STR_LIT:    return "STR_LIT";

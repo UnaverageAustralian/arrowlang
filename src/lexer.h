@@ -23,6 +23,7 @@ typedef enum {
     TOK_RPAREN,    TOK_SCOPE,
     TOK_EXT_FUNC,  TOK_C_FUNC,
     TOK_HASH,      TOK_ARROW_HASH,
+    TOK_DOT,
 
     // Symbols/Words
     TOK_MOD,       TOK_AND,
