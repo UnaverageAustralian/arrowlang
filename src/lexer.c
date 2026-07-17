@@ -497,7 +497,7 @@ void lexer_next(Lexer *lexer) {
         break;
     case '.':
         skip(lexer, 1);
-        make_token(lexer, TOK_DROP);
+        make_token(lexer, TOK_DOT);
         break;
     case '\\':
         skip(lexer, 1);
@@ -514,6 +514,10 @@ void lexer_next(Lexer *lexer) {
     case ')':
         skip(lexer, 1);
         make_token(lexer, TOK_RPAREN);
+        break;
+    case '#':
+        skip(lexer, 1);
+        make_token(lexer, TOK_HASH);
         break;
     case '!':
         skip(lexer, 1);
@@ -552,7 +556,7 @@ void lexer_next(Lexer *lexer) {
             make_token(lexer, TOK_SCOPE);
         }
         else {
-            make_token(lexer, TOK_ELSE);
+            make_token(lexer, TOK_COLON);
         }
         break;
     case '-':
@@ -602,6 +606,10 @@ void lexer_next(Lexer *lexer) {
             skip(lexer, 1);
             make_token(lexer, TOK_GTEQ);
         }
+        else if (peek(lexer, 0) == '#') {
+            skip(lexer, 1);
+            make_token(lexer, TOK_ARROW_HASH);
+        }
         else {
             make_token(lexer, TOK_GT);
         }
@@ -632,74 +640,77 @@ void lexer_next(Lexer *lexer) {
 
 char *tok_spelling(Token_Type type) {
     switch (type) {
-    case TOK_ADD:       return "ADD";
-    case TOK_SUB:       return "SUB";
-    case TOK_MUL:       return "MUL";
-    case TOK_DIV:       return "DIV";
-    case TOK_MOD:       return "MOD";
-    case TOK_AND:       return "AND";
-    case TOK_OR:        return "OR";
-    case TOK_XOR:       return "XOR";
-    case TOK_SHL:       return "SHL";
-    case TOK_SHR:       return "SHR";
-    case TOK_ROL:       return "ROL";
-    case TOK_ROR:       return "ROR";
-    case TOK_NOT:       return "NOT";
-    case TOK_EQ:        return "EQ";
-    case TOK_LT:        return "LT";
-    case TOK_LTEQ:      return "LTEQ";
-    case TOK_GT:        return "GT";
-    case TOK_GTEQ:      return "GTEQ";
-    case TOK_NEQ:       return "NEQ";
-    case TOK_LNOT:      return "LNOT";
-    case TOK_DUP:       return "DUP";
-    case TOK_OVER:      return "OVER";
-    case TOK_DUP2:      return "DUP2";
-    case TOK_DROP:      return "DROP";
-    case TOK_SWAP:      return "SWAP";
-    case TOK_OVER2:     return "OVER2";
-    case TOK_SWAP2:     return "SWAP2";
-    case TOK_NEG:       return "NEG";
-    case TOK_ROT:       return "ROT";
-    case TOK_ROTN:      return "ROTN";
-    case TOK_IF:        return "IF";
-    case TOK_ELSE:      return "ELSE";
-    case TOK_WHILE:     return "WHILE";
-    case TOK_LBRACE:    return "LBRACE";
-    case TOK_RBRACE:    return "RBRACE";
-    case TOK_LOOP:      return "LOOP";
-    case TOK_END:       return "END";
-    case TOK_BRK:       return "BRK";
-    case TOK_CONTINUE:  return "CONTINUE";
-    case TOK_SEMICOLON: return "SEMICOLON";
-    case TOK_FUNC:      return "FUNC";
-    case TOK_LPAREN:    return "LPAREN";
-    case TOK_RPAREN:    return "RPAREN";
-    case TOK_ARROW:     return "ARROW";
-    case TOK_RET:       return "RET";
-    case TOK_EXT_FUNC:  return "EXT_FUNC";
-    case TOK_C_FUNC:    return "C_FUNC";
-    case TOK_IMPORT:    return "IMPORT";
-    case TOK_SCOPE:     return "SCOPE";
-    case TOK_INT_LIT:   return "INT_LIT";
-    case TOK_FLOAT_LIT: return "FLOAT_LIT";
-    case TOK_STR_LIT:   return "STR_LIT";
-    case TOK_CHAR_LIT:  return "CHAR_LIT";
-    case TOK_I8:        return "I8";
-    case TOK_CHAR:      return "CHAR";
-    case TOK_U8:        return "U8";
-    case TOK_I16:       return "I16";
-    case TOK_U16:       return "U16";
-    case TOK_I32:       return "I32";
-    case TOK_U32:       return "U32";
-    case TOK_I64:       return "I64";
-    case TOK_U64:       return "U64";
-    case TOK_F32:       return "F32";
-    case TOK_F64:       return "F64";
-    case TOK_STR:       return "STR";
-    case TOK_WORD:      return "WORD";
-    case TOK_EOF:       return "EOF";
-    default:            return "UNKNOWN";
+    case TOK_ADD:        return "ADD";
+    case TOK_SUB:        return "SUB";
+    case TOK_MUL:        return "MUL";
+    case TOK_DIV:        return "DIV";
+    case TOK_MOD:        return "MOD";
+    case TOK_AND:        return "AND";
+    case TOK_OR:         return "OR";
+    case TOK_XOR:        return "XOR";
+    case TOK_SHL:        return "SHL";
+    case TOK_SHR:        return "SHR";
+    case TOK_ROL:        return "ROL";
+    case TOK_ROR:        return "ROR";
+    case TOK_NOT:        return "NOT";
+    case TOK_EQ:         return "EQ";
+    case TOK_LT:         return "LT";
+    case TOK_LTEQ:       return "LTEQ";
+    case TOK_GT:         return "GT";
+    case TOK_GTEQ:       return "GTEQ";
+    case TOK_NEQ:        return "NEQ";
+    case TOK_LNOT:       return "LNOT";
+    case TOK_DUP:        return "DUP";
+    case TOK_OVER:       return "OVER";
+    case TOK_DUP2:       return "DUP2";
+    case TOK_DROP:       return "DROP";
+    case TOK_SWAP:       return "SWAP";
+    case TOK_OVER2:      return "OVER2";
+    case TOK_SWAP2:      return "SWAP2";
+    case TOK_NEG:        return "NEG";
+    case TOK_ROT:        return "ROT";
+    case TOK_ROTN:       return "ROTN";
+    case TOK_IF:         return "IF";
+    case TOK_COLON:      return "COLON";
+    case TOK_WHILE:      return "WHILE";
+    case TOK_LBRACE:     return "LBRACE";
+    case TOK_RBRACE:     return "RBRACE";
+    case TOK_LOOP:       return "LOOP";
+    case TOK_END:        return "END";
+    case TOK_BRK:        return "BRK";
+    case TOK_CONTINUE:   return "CONTINUE";
+    case TOK_SEMICOLON:  return "SEMICOLON";
+    case TOK_FUNC:       return "FUNC";
+    case TOK_LPAREN:     return "LPAREN";
+    case TOK_RPAREN:     return "RPAREN";
+    case TOK_ARROW:      return "ARROW";
+    case TOK_RET:        return "RET";
+    case TOK_EXT_FUNC:   return "EXT_FUNC";
+    case TOK_C_FUNC:     return "C_FUNC";
+    case TOK_IMPORT:     return "IMPORT";
+    case TOK_SCOPE:      return "SCOPE";
+    case TOK_HASH:       return "HASH";
+    case TOK_ARROW_HASH: return "ARROW_HASH";
+    case TOK_DOT:        return "DOT";
+    case TOK_INT_LIT:    return "INT_LIT";
+    case TOK_FLOAT_LIT:  return "FLOAT_LIT";
+    case TOK_STR_LIT:    return "STR_LIT";
+    case TOK_CHAR_LIT:   return "CHAR_LIT";
+    case TOK_I8:         return "I8";
+    case TOK_CHAR:       return "CHAR";
+    case TOK_U8:         return "U8";
+    case TOK_I16:        return "I16";
+    case TOK_U16:        return "U16";
+    case TOK_I32:        return "I32";
+    case TOK_U32:        return "U32";
+    case TOK_I64:        return "I64";
+    case TOK_U64:        return "U64";
+    case TOK_F32:        return "F32";
+    case TOK_F64:        return "F64";
+    case TOK_STR:        return "STR";
+    case TOK_WORD:       return "WORD";
+    case TOK_EOF:        return "EOF";
+    default:             return "UNKNOWN";
     }
 }
 

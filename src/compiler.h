@@ -2,33 +2,36 @@
 #define ARROW_COMPILER_H
 
 #include "lexer.h"
+#include "types.h"
 #include "utils.h"
 
 #define MAX_BACKPATCHEES 256
 
 typedef enum {
     OP_NOP,
-    OP_PUSH,  OP_ADD,
-    OP_SUB,   OP_MUL,
-    OP_DIV,   OP_MOD,
-    OP_AND,   OP_OR,
-    OP_XOR,   OP_SHL,
-    OP_SHR,   OP_ROL,
-    OP_ROR,   OP_NOT,
-    OP_DUP,   OP_OVER,
-    OP_DUP2,  OP_DROP,
-    OP_SWAP,  OP_OVER2,
-    OP_SWAP2, OP_NEG,
-    OP_ABS,   OP_EQ,
-    OP_LT,    OP_LTEQ,
-    OP_GT,    OP_GTEQ,
-    OP_JMPF,  OP_JMP,
-    OP_LABEL, OP_LNOT,
-    OP_FUNC,  OP_RET,
-    OP_CALL,  OP_STR,
-    OP_ROT,   OP_CONVERT,
-    OP_CCALL, OP_ROTN,
-    OP_NEQ,
+    OP_PUSH,   OP_ADD,
+    OP_SUB,    OP_MUL,
+    OP_DIV,    OP_MOD,
+    OP_AND,    OP_OR,
+    OP_XOR,    OP_SHL,
+    OP_SHR,    OP_ROL,
+    OP_ROR,    OP_NOT,
+    OP_DUP,    OP_OVER,
+    OP_DUP2,   OP_DROP,
+    OP_SWAP,   OP_OVER2,
+    OP_SWAP2,  OP_NEG,
+    OP_ABS,    OP_EQ,
+    OP_LT,     OP_LTEQ,
+    OP_GT,     OP_GTEQ,
+    OP_JMPF,   OP_JMP,
+    OP_LABEL,  OP_LNOT,
+    OP_FUNC,   OP_RET,
+    OP_CALL,   OP_STR,
+    OP_ROT,    OP_CONVERT,
+    OP_CCALL,  OP_ROTN,
+    OP_NEQ,    OP_UNKNOWN,
+    OP_ACCESS, OP_STORE,
+    OP_INIT,   OP_ACCESS_DROP,
 
     // For the analyser
     OP_START, OP_END,
@@ -36,29 +39,13 @@ typedef enum {
 } Opcode;
 
 typedef enum {
-    STYPE_FUNC, STYPE_MODULE,
+    STYPE_FUNC,  STYPE_MODULE,
+    STYPE_TYPE,
 } Symbol_Type;
 
 typedef enum {
-    TYPE_VOID = 0x0,
-    TYPE_I8   = 0x1,   TYPE_CHAR = 0x2,
-    TYPE_U8   = 0x4,   TYPE_I16  = 0x8,
-    TYPE_U16  = 0x10,  TYPE_I32  = 0x20,
-    TYPE_U32  = 0x40,  TYPE_I64  = 0x80,
-    TYPE_U64  = 0x100, TYPE_F32  = 0x200,
-    TYPE_F64  = 0x400, TYPE_STR  = 0x800,
-
-    TYPE_INTEGER = TYPE_I8  | TYPE_CHAR | TYPE_U8  | TYPE_I16 |
-                   TYPE_U16 | TYPE_I32  | TYPE_U32 | TYPE_I64 | TYPE_U64,
-    TYPE_REAL    = TYPE_F32 | TYPE_F64,
-    TYPE_NUMBER  = TYPE_INTEGER | TYPE_REAL,
-} Type;
-
-typedef struct {
-    size_t count;
-    size_t capacity;
-    Type *items;
-} Types;
+    UTYPE_OP, UTYPE_TYPE,
+} Unresolved_Type;
 
 typedef struct {
     char **input_files;
@@ -87,7 +74,12 @@ typedef struct {
 
 typedef struct {
     String_View name;
-    int pos;
+    int pos, line;
+    Unresolved_Type type;
+    union {
+        Op *op;
+        Type *type;
+    } as;
 } Unresolved_Symbol;
 
 typedef struct {
@@ -107,6 +99,7 @@ typedef struct {
     String_View module_name;
     Types param_types;
     Types return_types;
+    int max_allocated;
     uint8_t is_c_func;
 } Function;
 
@@ -115,6 +108,7 @@ typedef struct {
     union {
         Function func;
         Module module;
+        Advanced_Type *type;
     } as;
 } Symbol;
 
@@ -127,6 +121,7 @@ typedef struct {
 
 typedef struct {
     Ops ops;
+    Advanced_Types types;
     Hashmap symbols;
     Unresolved_Symbols unresolved;
     Module module;

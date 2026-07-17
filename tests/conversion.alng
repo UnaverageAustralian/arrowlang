@@ -2,12 +2,14 @@ import errors
 
 $fsub ( f32 f32 -> f32 ) - $
 
-128u8  255        + i64 127  = "128u8 255 + = 127"         errors::assert
-128u16 65535      + i64 127  = "128u16 65535 + = 127"      errors::assert |
-128u32 4294967295 + i64 127  = "128u32 4294967295 + = 127" errors::assert |
-255i8               i64 -1   = "255i8 i64 = -1"            errors::assert |
-2.0f32 1.25       -     0.75 = "2.0f32 1.25 - = 0.75"      errors::assert |
-2.0f32 1.25f64    -     0.75 = "2.0f32 1.25f64 - = 0.75"   errors::assert |
-2.0 1.25          fsub  0.75 = "2.0 1.25 fsub = 0.75"      errors::assert |
-256.0 i8            i64 0    = "256.0 i8 = 0"              errors::assert |
-65536.0 i16         i64 0    = "65536.0 i16 = 0"           errors::assert |
+$main ( -> u8 )
+    128u8  255        + i64 127  = "128u8 255 + = 127"         errors::assert
+    128u16 65535      + i64 127  = "128u16 65535 + = 127"      errors::assert |
+    128u32 4294967295 + i64 127  = "128u32 4294967295 + = 127" errors::assert |
+    255i8               i64 -1   = "255i8 i64 = -1"            errors::assert |
+    2.0f32 1.25       -     0.75 = "2.0f32 1.25 - = 0.75"      errors::assert |
+    2.0f32 1.25f64    -     0.75 = "2.0f32 1.25f64 - = 0.75"   errors::assert |
+    2.0 1.25          fsub  0.75 = "2.0 1.25 fsub = 0.75"      errors::assert |
+    256.0 i8            i64 0    = "256.0 i8 = 0"              errors::assert |
+    65536.0 i16         i64 0    = "65536.0 i16 = 0"           errors::assert |
+$

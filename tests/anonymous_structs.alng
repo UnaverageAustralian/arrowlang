@@ -1,0 +1,29 @@
+import errors
+
+struct Foo
+    x : struct
+        x : i32
+    end
+    y : i32
+end
+
+$bar ( Foo -> i32 )
+    #x#x swap drop swap #y swap drop +
+$
+
+$main ( -> u8 )
+    2 struct e : i32 end 3 struct
+        a : struct
+            h : i32
+        end
+        b : i32
+    end bar struct j : i32 end
+    4 struct
+        c : struct
+            i : i32
+        end
+        d : i32
+    end
+         #c#i swap drop 5 = "#c#i = 5" errors::assert
+    swap #d             4 = "#d = 4"   errors::assert rot |
+$
