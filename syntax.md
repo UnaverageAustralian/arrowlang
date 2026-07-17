@@ -134,8 +134,11 @@ The standard library modules are:
 Here is an example using the `io` module:
 ```
  import io
- 71 io::printc // Prints the character G to the io buffer
- io::flush     // Flushes the io buffer
+
+ $main ( -> u8 )
+    71 io::printc // Prints the character G to the io buffer
+    io::flush     // Flushes the io buffer
+ $
 ```
 
 ## Types
@@ -148,4 +151,44 @@ You can convert between types just by putting in the type's name:
 ```
  30 f32                  // Converts the 30 from int_lit to f32
  255u8 1 + i64 io::print // Prints 0
+```
+
+## Structs
+
+Structs are declared with `struct` followed by a name, and end with `end`. Structs contain fields which can be accessed with `#` followed by the field's name (this operation does not drop the struct), and can be initialised with values by putting in their name:
+```
+ struct Foo
+     x : i32
+     y : i32
+ end
+
+ $main ( -> u8 )
+     2 3 Foo
+     #x // 2
+ $
+```
+
+You can also store values into fields with `>#` followed by the field's name (this operation also does not drop the struct):
+```
+ 2 3 Foo
+ 4 >#x
+ #x // 4
+```
+
+There is also a variant of the `#` operation which does drop the struct, the `.` operation:
+```
+ struct Foo
+     x : i32
+     y : i32
+ end
+
+ struct Bar
+     foo : Foo
+ end
+
+ $main ( -> u8 )
+     2 3 Foo Bar
+     #foo.x      // 2
+     drop #foo.y // 3
+ $
 ```
