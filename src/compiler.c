@@ -223,11 +223,11 @@ void compile_if_stmt(Compilation_Unit *compiler) {
     make_op(compiler, OP_IF, 0);
 
     Token *cur = &compiler->lexer->cur;
-    while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_COLON && cur->type != TOK_EOF)
+    while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_COLON && cur->type != TOK_ELSE && cur->type != TOK_EOF)
         compile_stmt(compiler);
     compiler->ops.items[if_start].operand = compiler->label_count;
 
-    if (cur->type == TOK_COLON) {
+    if (cur->type == TOK_COLON || cur->type == TOK_ELSE) {
         lexer_next(compiler->lexer);
 
         int else_start = compiler->ops.count;

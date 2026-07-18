@@ -17,17 +17,16 @@ static const char *keywords[] = {
     "lteq",    "gt",
     "gteq",    "eq",
     "neq",     "if",
-    "else",
 
     "dup",     "over",
     "dup2",    "over2",
     "swap2",   "while",
     "loop",    "end",
-    "break",     "continue",
+    "break",   "continue",
     "macro",   "struct",
     "import",  "neg",
     "return",  "rot",
-    "rotn",
+    "rotn",    "else",
 
     "i8",      "u8",
     "i16",     "u16",
@@ -671,6 +670,7 @@ char *tok_spelling(Token_Type type) {
     case TOK_ROT:        return "ROT";
     case TOK_ROTN:       return "ROTN";
     case TOK_IF:         return "IF";
+    case TOK_ELSE:       return "ELSE";
     case TOK_COLON:      return "COLON";
     case TOK_WHILE:      return "WHILE";
     case TOK_LBRACE:     return "LBRACE";
