@@ -255,7 +255,7 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
         sb_appendf(&gen->sb, "    subq $8, %%rsp\n");
         extra_depth++;
     }
-    sb_appendf(&gen->sb, "    call \"%.*s\"\n", entry->key_len, entry->key);
+    sb_appendf(&gen->sb, "    call \"%.*s\"\n", func.extern_name.len, func.extern_name.str);
     if (extra_depth > 0)
         sb_appendf(&gen->sb, "    addq $%d, %%rsp\n", extra_depth*8);
 
@@ -646,12 +646,14 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.func = ((Symbol *)func_entry->val)->as.func;
 
             if (gen.func.module_name.str == NULL) {
-                sb_appendf(&gen.sb, ".globl \"%.*s\"\n", func_entry->key_len, func_entry->key);
-                sb_appendf(&gen.sb, "\"%.*s\":\n", func_entry->key_len, func_entry->key);
+                sb_appendf(&gen.sb, ".globl \"%.*s\"\n", gen.func.extern_name.len, gen.func.extern_name.str);
+                sb_appendf(&gen.sb, "\"%.*s\":\n", gen.func.extern_name.len, gen.func.extern_name.str);
             }
             else {
-                sb_appendf(&gen.sb, ".globl \"%.*s::%.*s\"\n", gen.func.module_name.len, gen.func.module_name.str, func_entry->key_len, func_entry->key);
-                sb_appendf(&gen.sb, "\"%.*s::%.*s\":\n", gen.func.module_name.len, gen.func.module_name.str, func_entry->key_len, func_entry->key);
+                sb_appendf(&gen.sb, ".globl \"%.*s::%.*s\"\n", gen.func.module_name.len, gen.func.module_name.str,
+                           gen.func.extern_name.len, gen.func.extern_name.str);
+                sb_appendf(&gen.sb, "\"%.*s::%.*s\":\n", gen.func.module_name.len, gen.func.module_name.str,
+                           gen.func.extern_name.len, gen.func.extern_name.str);
             }
             sb_appendf(&gen.sb, "    pushq %%rbp\n");
             sb_appendf(&gen.sb, "    movq %%rsp, %%rbp\n");
@@ -680,9 +682,9 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             Function func = ((Symbol *)entry->val)->as.func;
 
             if (func.module_name.str == NULL)
-                sb_appendf(&gen.sb, "    call \"%.*s\"\n", entry->key_len, entry->key);
+                sb_appendf(&gen.sb, "    call \"%.*s\"\n", func.extern_name.len, func.extern_name.str);
             else
-                sb_appendf(&gen.sb, "    call \"%.*s::%.*s\"\n", func.module_name.len, func.module_name.str, entry->key_len, entry->key);
+                sb_appendf(&gen.sb, "    call \"%.*s::%.*s\"\n", func.module_name.len, func.module_name.str, func.extern_name.len, func.extern_name.str);
 
             for (int64_t i = func.return_types.count-1; i >= 0; i--) {
                 if (func.return_types.items[i].kind == KIND_ADVANCED && func.return_types.items[i].as.advanced->kind == KIND_STRUCT) {

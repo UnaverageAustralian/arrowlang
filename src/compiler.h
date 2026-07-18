@@ -96,6 +96,7 @@ typedef struct {
 } Module;
 
 typedef struct {
+    String_View extern_name;
     String_View module_name;
     Types param_types;
     Types return_types;

@@ -648,6 +648,9 @@ void compile_function(Compilation_Unit *compiler) {
     Hash_Entry *entry = compile_function_signature(compiler);
     make_op(compiler, OP_FUNC, (int64_t)entry);
 
+    Function *func = &((Symbol *)entry->val)->as.func;
+    func->extern_name = (String_View){ .len = entry->key_len, .str = entry->key };
+
     while (compiler->lexer->cur.type != TOK_FUNC && compiler->lexer->cur.type != TOK_EOF)
         compile_stmt(compiler);
 
@@ -668,12 +671,23 @@ void compile_function(Compilation_Unit *compiler) {
 
 void compile_external_function(Compilation_Unit *compiler, uint8_t is_c_func) {
     Hash_Entry *entry = compile_function_signature(compiler);
-    ((Symbol *)entry->val)->as.func.is_c_func = is_c_func;
+    Function *func = &((Symbol *)entry->val)->as.func;
+    func->is_c_func = is_c_func;
+
+    if (compiler->lexer->cur.type == TOK_EQ) {
+        lexer_next(compiler->lexer);
+        expect(compiler, TOK_STR_LIT);
+        func->extern_name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start, };
+    }
+    else {
+        func->extern_name = (String_View){ .len = entry->key_len, .str = entry->key };
+    }
 
     if (!compiler->module.has_ext_funcs) {
         compiler->module.has_ext_funcs = 1;
         char *extern_path = arena_calloc(&compiler->global->arena, compiler->module.path.len + compiler->module.name.len + 7);
-        snprintf(extern_path, compiler->module.path.len + compiler->module.name.len + 7, "%.*s%.*s_ext.o", compiler->module.path.len, compiler->module.path.str, compiler->module.name.len, compiler->module.name.str);
+        snprintf(extern_path, compiler->module.path.len + compiler->module.name.len + 7, "%.*s%.*s_ext.o",
+                 compiler->module.path.len, compiler->module.path.str, compiler->module.name.len, compiler->module.name.str);
         if (access(extern_path, F_OK) == 0)
             DA_APPEND(&compiler->global->options.link_cmd, extern_path);
     }
