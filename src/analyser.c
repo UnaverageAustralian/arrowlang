@@ -64,28 +64,30 @@ void check_expected_types(Analyser *analyser) {
         return;
     }
 
-    if (actual_count != expected_count && analyser->in_block) {
-        analyser->had_error = 1;
-        EPRINTF_AT_OP(op, LEVEL_ERR, "Blocks cannot change the state of the stack, expected %d elements, got %d elements\n",
-                      expected_count, actual_count);
-        return;
-    }
+    int had_error = 0;
+    if (actual_count != expected_count && analyser->in_block)
+        had_error = 1;
 
     for (size_t i = analyser->expected_types_start; i < analyser->expected_types.count; i++) {
-        if (!types_compatible(analyser->expected_types.items[i], analyser->stack.items[analyser->block_start + i - analyser->expected_types_start])) {
-            analyser->had_error = 1;
-            EPRINTF_AT_OP(op, LEVEL_ERR, "Blocks cannot change the state of the stack, expected types: [ ");
-
-            for (size_t j = analyser->expected_types_start; j < analyser->expected_types.count; j++)
-                fprintf(stderr, "%s ", type_spelling(analyser->expected_types.items[j]));
-
-            fprintf(stderr, "], actual types: [ ");
-            for (size_t j = analyser->block_start; j < analyser->stack.count; j++)
-                fprintf(stderr, "%s ", type_spelling(analyser->stack.items[j]));
-
-            fprintf(stderr, "]\n");
+        if (had_error) break;
+        if (!types_compatible(analyser->expected_types.items[i], analyser->stack.items[analyser->stack.count-1 - i + analyser->expected_types_start])) {
+            had_error = 1;
             break;
         }
+    }
+
+    if (had_error) {
+        analyser->had_error = 1;
+        EPRINTF_AT_OP(op, LEVEL_ERR, "Blocks cannot change the state of the stack, expected types: [ ");
+
+        for (size_t j = analyser->expected_types_start; j < analyser->expected_types.count; j++)
+            fprintf(stderr, "%s ", type_spelling(analyser->expected_types.items[j]));
+
+        fprintf(stderr, "], actual types: [ ");
+        for (size_t j = analyser->block_start; j < analyser->stack.count; j++)
+            fprintf(stderr, "%s ", type_spelling(analyser->stack.items[j]));
+
+        fprintf(stderr, "]\n");
     }
 }
 
@@ -128,6 +130,9 @@ void type_check_if(Analyser *analyser) {
     int in_block = analyser->in_block;
     analyser->in_block = 1;
 
+    analyser->ops->items[analyser->pos].opcode = OP_JMPF;
+    type_check_op(analyser);
+
     int block_start = analyser->block_start;
     int expected_types_start = analyser->expected_types_start;
     analyser->block_start = analyser->stack.count;
@@ -138,17 +143,40 @@ void type_check_if(Analyser *analyser) {
     DA_EXPAND(&copy, copy.count);
     memcpy(copy.items, analyser->stack.items, analyser->stack.count * sizeof(Type));
 
-    analyser->pos++;
-    while (analyser->ops->items[analyser->pos].opcode != OP_END && analyser->ops->items[analyser->pos].opcode != OP_ELSE
-        && analyser->pos < analyser->ops->count)
+    while (analyser->ops->items[analyser->pos].opcode != OP_END && analyser->ops->items[analyser->pos].opcode != OP_ELSE && 
+           analyser->ops->items[analyser->pos].opcode != OP_ELSEIF && analyser->pos < analyser->ops->count)
         type_check_op(analyser);
 
-    if (analyser->pos == analyser->ops->count) {
-        EPRINTF_AT_OP(&analyser->ops->items[analyser->pos-1], LEVEL_ERR, "Analyser did not reach end of block. This is a bug.\n");
-        exit(1);
+    while (analyser->ops->items[analyser->pos].opcode == OP_ELSEIF && analyser->pos < analyser->ops->count) {
+        analyser->ops->items[analyser->pos].opcode = OP_LABEL;
+
+        DA_EXPAND(&analyser->expected_types, analyser->expected_types_start + analyser->stack.count - analyser->block_start);
+        analyser->expected_types.count = analyser->expected_types_start + analyser->stack.count - analyser->block_start;
+        memcpy(analyser->expected_types.items + analyser->expected_types_start, analyser->stack.items + analyser->block_start,
+               (analyser->stack.count - analyser->block_start) * sizeof(Type));
+
+        analyser->stack.count = copy.count;
+        memcpy(analyser->stack.items, copy.items, copy.count * sizeof(Type));
+
+        Types expected_types = analyser->expected_types;
+        analyser->expected_types = copy;
+
+        while (analyser->ops->items[analyser->pos-1].opcode != OP_JMPF && analyser->pos < analyser->ops->count)
+            type_check_op(analyser);
+        check_expected_types(analyser);
+
+        analyser->expected_types = expected_types;
+        while (analyser->ops->items[analyser->pos].opcode != OP_END && analyser->ops->items[analyser->pos].opcode != OP_ELSE && 
+               analyser->ops->items[analyser->pos].opcode != OP_ELSEIF && analyser->pos < analyser->ops->count)
+            type_check_op(analyser);
+
+        check_expected_types(analyser);
     }
 
-    if (analyser->ops->items[analyser->pos].opcode == OP_ELSE) {
+    if (analyser->ops->items[analyser->pos].opcode == OP_END) {
+        analyser->expected_types.count = analyser->expected_types_start;
+    }
+    else {
         analyser->ops->items[analyser->pos].opcode = OP_LABEL;
 
         DA_EXPAND(&analyser->expected_types, analyser->expected_types_start + analyser->stack.count - analyser->block_start);
@@ -161,11 +189,12 @@ void type_check_if(Analyser *analyser) {
 
         while (analyser->ops->items[analyser->pos].opcode != OP_END && analyser->pos < analyser->ops->count)
             type_check_op(analyser);
+        check_expected_types(analyser);
+    }
 
-        if (analyser->pos == analyser->ops->count) {
-            EPRINTF_AT_OP(&analyser->ops->items[analyser->pos-1], LEVEL_ERR, "Analyser did not reach end of block. This is a bug.\n");
-            exit(1);
-        }
+    if (analyser->pos == analyser->ops->count) {
+        EPRINTF_AT_OP(&analyser->ops->items[analyser->pos-1], LEVEL_ERR, "Analyser did not reach end of block. This is a bug.\n");
+        exit(1);
     }
 
     analyser->ops->items[analyser->pos].opcode = OP_LABEL;
@@ -483,7 +512,7 @@ void type_check_op(Analyser *analyser) {
         break;
     }
     case OP_JMP:
-        if (op[1].opcode != OP_ELSE && op[1].opcode != OP_END)
+        if (op[1].opcode != OP_ELSE && op[1].opcode != OP_END && op[1].opcode != OP_ELSEIF)
             check_expected_types(analyser);
         break;
     case OP_FUNC: {
@@ -588,7 +617,8 @@ void type_check_op(Analyser *analyser) {
         break;
     }
     case OP_CONVERT: {
-        Type a = peek(analyser, 1);
+        if (!check_operand_count(analyser, 1)) break;
+        Type a = pop(analyser);
 
         if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT) {
             analyser->had_error = 1;
@@ -597,7 +627,7 @@ void type_check_op(Analyser *analyser) {
         }
 
         op->types[0].as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
-        analyser->stack.items[analyser->stack.count-1] = op->types[1];
+        DA_APPEND(&analyser->stack, op->types[1]);
         break;
     }
     case OP_INIT: {

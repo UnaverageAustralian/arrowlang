@@ -34,8 +34,9 @@ typedef enum {
     OP_INIT,   OP_ACCESS_DROP,
 
     // For the analyser
-    OP_START, OP_END,
-    OP_IF,    OP_ELSE,
+    OP_START,  OP_END,
+    OP_IF,     OP_ELSE,
+    OP_ELSEIF,
 } Opcode;
 
 typedef enum {
@@ -66,6 +67,12 @@ typedef struct {
     size_t capacity;
     Op *items;
 } Ops;
+
+typedef struct {
+    size_t count;
+    size_t capacity;
+    int *items;
+} Dyn_Backpatchees;
 
 typedef struct {
     size_t count;

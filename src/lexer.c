@@ -27,6 +27,7 @@ static const char *keywords[] = {
     "import",  "neg",
     "return",  "rot",
     "rotn",    "else",
+    "then",    "elseif",
 
     "i8",      "u8",
     "i16",     "u16",
@@ -474,10 +475,6 @@ void lexer_next(Lexer *lexer) {
         skip(lexer, 1);
         make_token(lexer, TOK_NOT);
         break;
-    case '?':
-        skip(lexer, 1);
-        make_token(lexer, TOK_IF);
-        break;
     case ';':
         skip(lexer, 1);
         make_token(lexer, TOK_SEMICOLON);
@@ -691,6 +688,8 @@ char *tok_spelling(Token_Type type) {
     case TOK_SCOPE:      return "SCOPE";
     case TOK_HASH:       return "HASH";
     case TOK_ARROW_HASH: return "ARROW_HASH";
+    case TOK_THEN:       return "THEN";
+    case TOK_ELSEIF:     return "ELSEIF";
     case TOK_DOT:        return "DOT";
     case TOK_INT_LIT:    return "INT_LIT";
     case TOK_FLOAT_LIT:  return "FLOAT_LIT";

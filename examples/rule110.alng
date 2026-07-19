@@ -5,7 +5,7 @@ $main ( -> u8 )
     0 while dup 63 < loop
         swap
         63 while dup 0 >= loop
-            dup2 >> 1 & if
+            if dup2 >> 1 & then
                 '#' io::printc
             else
                 '.' io::printc

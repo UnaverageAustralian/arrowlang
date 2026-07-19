@@ -95,6 +95,7 @@ char *opcode_spelling(Opcode opcode) {
     case OP_END:         return "END";
     case OP_IF:          return "IF";
     case OP_ELSE:        return "ELSE";
+    case OP_ELSEIF:      return "ELSEIF";
     case OP_INIT:        return "INIT";
     case OP_ACCESS:      return "ACCESS";
     case OP_STORE:       return "STORE";
@@ -110,6 +111,9 @@ void print_op(Op *op) {
     case OP_JMPF:
     case OP_JMP:
     case OP_LABEL:
+    case OP_ELSEIF:
+    case OP_ELSE:
+    case OP_END:
         printf(" %llu", op->operand);
         break;
     case OP_PUSH:
@@ -207,43 +211,75 @@ inline Unresolved_Symbol *make_unresolved(Compilation_Unit *compiler, Unresolved
     return &compiler->unresolved.items[compiler->unresolved.count-1];
 }
 
-static inline void expect(Compilation_Unit *compiler, Token_Type type) {
+static inline int expect(Compilation_Unit *compiler, Token_Type type) {
     lexer_next(compiler->lexer);
     if (compiler->lexer->prev.type != type) {
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Expected %s, got %s\n", tok_spelling(type), tok_spelling(compiler->lexer->prev.type));
+        return 0;
     }
+    return 1;
 }
 
 void compile_stmt(Compilation_Unit *compiler);
 
 void compile_if_stmt(Compilation_Unit *compiler) {
+    Token *cur = &compiler->lexer->cur;
+    while (cur->type != TOK_THEN && cur->type != TOK_FUNC && cur->type != TOK_EOF)
+        compile_stmt(compiler);
+    if (!expect(compiler, TOK_THEN)) return;
+
     int if_start = compiler->ops.count;
-    make_op(compiler, OP_JMPF, 0);
     make_op(compiler, OP_IF, 0);
 
-    Token *cur = &compiler->lexer->cur;
-    while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_COLON && cur->type != TOK_ELSE && cur->type != TOK_EOF)
+    while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_ELSEIF && cur->type != TOK_ELSE &&
+           cur->type != TOK_FUNC && cur->type != TOK_EOF)
         compile_stmt(compiler);
     compiler->ops.items[if_start].operand = compiler->label_count;
 
-    if (cur->type == TOK_COLON || cur->type == TOK_ELSE) {
+    Dyn_Backpatchees elseifs = {0};
+
+    while (cur->type == TOK_ELSEIF) {
+        lexer_next(compiler->lexer);
+
+        ARENA_DA_APPEND(&compiler->global->arena, &elseifs, compiler->ops.count);
+        make_op(compiler, OP_JMP, 0);
+        make_op_at_cur(compiler, OP_ELSEIF, compiler->label_count++);
+
+        while (cur->type != TOK_THEN && cur->type != TOK_FUNC && cur->type != TOK_EOF)
+            compile_stmt(compiler);
+        lexer_next(compiler->lexer);
+
+        int branch_start = compiler->ops.count;
+        make_op(compiler, OP_JMPF, 0);
+
+        while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_ELSEIF && cur->type != TOK_ELSE &&
+               cur->type != TOK_FUNC && cur->type != TOK_EOF)
+            compile_stmt(compiler);
+        compiler->ops.items[branch_start].operand = compiler->label_count;
+    }
+
+    if (cur->type == TOK_ELSE) {
         lexer_next(compiler->lexer);
 
         int else_start = compiler->ops.count;
         make_op(compiler, OP_JMP, 0);
         make_op_at_cur(compiler, OP_ELSE, compiler->label_count++);
 
-        while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_EOF)
+        while (cur->type != TOK_SEMICOLON && cur->type != TOK_END && cur->type != TOK_FUNC && cur->type != TOK_EOF)
             compile_stmt(compiler);
         compiler->ops.items[else_start].operand = compiler->label_count;
     }
 
-    if (cur->type == TOK_EOF) {
+    if (cur->type == TOK_EOF || cur->type == TOK_FUNC) {
         compiler->global->had_error = 1;
-        COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected end of if statement, got end of file. Did you forget a semicolon somewhere?\n");
+        COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected end of if statement.\n");
         return;
     }
+
+    for (size_t i = 0; i < elseifs.count; i++)
+        compiler->ops.items[elseifs.items[i]].operand = compiler->label_count;
+    compiler->global->arena.allocated -= elseifs.count * sizeof(int);
 
     lexer_next(compiler->lexer);
     make_op(compiler, OP_END, compiler->label_count++);
@@ -256,7 +292,7 @@ void compile_while_stmt(Compilation_Unit *compiler) {
     make_op(compiler, OP_START, compiler->label_count++);
 
     Token *cur = &compiler->lexer->cur;
-    while (cur->type != TOK_LOOP && cur->type != TOK_LBRACE && cur->type != TOK_EOF)
+    while (cur->type != TOK_LOOP && cur->type != TOK_LBRACE && cur->type != TOK_FUNC && cur->type != TOK_EOF)
         compile_stmt(compiler);
 
     int loop_start = compiler->ops.count;
@@ -269,25 +305,20 @@ void compile_while_stmt(Compilation_Unit *compiler) {
     else
         end_type = TOK_END;
 
-    if (cur->type == TOK_EOF) {
+    if (cur->type == TOK_EOF || cur->type == TOK_FUNC) {
         compiler->global->had_error = 1;
-        COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected start of loop, got end of file\n");
+        COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected start of loop\n");
         return;
     }
 
     lexer_next(compiler->lexer);
     make_op(compiler, OP_START, UINT64_MAX);
 
-    while (cur->type != TOK_RBRACE && cur->type != TOK_END && cur->type != TOK_EOF)
+    while (cur->type != TOK_RBRACE && cur->type != TOK_END && cur->type != TOK_FUNC && cur->type != TOK_EOF)
         compile_stmt(compiler);
     compiler->ops.items[loop_start].operand = compiler->label_count;
 
-    if (compiler->lexer->cur.type == TOK_EOF) {
-        compiler->global->had_error = 1;
-        COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected end of loop, got end of file. Did you forget an end or right brace?\n");
-        return;
-    }
-    expect(compiler, end_type);
+    if (!expect(compiler, end_type)) return;
 
     make_op(compiler, OP_JMP, loop_label);
 
@@ -320,15 +351,9 @@ void compile_loop_stmt(Compilation_Unit *compiler) {
     int loop_start = compiler->ops.count;
 
     Token *cur = &compiler->lexer->cur;
-    while (cur->type != TOK_RBRACE && cur->type != TOK_END)
+    while (cur->type != TOK_RBRACE && cur->type != TOK_FUNC && cur->type != TOK_END)
         compile_stmt(compiler);
-
-    if (compiler->lexer->cur.type == TOK_EOF) {
-        compiler->global->had_error = 1;
-        COMPILER_EPRINTF_AT_CUR(LEVEL_ERR, "Expected end of loop, got end of file. Did you forget an end or right brace?\n");
-        return;
-    }
-    expect(compiler, end_type);
+    if (!expect(compiler, end_type)) return;
 
     make_op(compiler, OP_JMP, loop_label);
 

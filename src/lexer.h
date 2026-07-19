@@ -46,6 +46,7 @@ typedef enum {
     TOK_IMPORT,    TOK_NEG,
     TOK_RET,       TOK_ROT,
     TOK_ROTN,      TOK_ELSE,
+    TOK_THEN,      TOK_ELSEIF,
     // Types
     TOK_I8,        TOK_U8,
     TOK_I16,       TOK_U16,
