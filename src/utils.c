@@ -25,11 +25,14 @@ char *level_str(Level level) {
     }
 }
 
-void eprintf(const char *file_path, int line, int pos, Level level, const char *format, ...) {
+void eprintf(const char *file_path, Loc loc, Level level, const char *format, ...) {
     va_list args;
     va_start(args, format);
 
-    fprintf(stderr, "%s:%d:%d: %s: ", file_path, line, pos, level_str(level));
+    if (loc.pos < 0)
+        fprintf(stderr, "%s:%d: %s: ", file_path, loc.line, level_str(level));
+    else
+        fprintf(stderr, "%s:%d:%d: %s: ", file_path, loc.line, loc.pos, level_str(level));
     vfprintf(stderr, format, args);
 
     va_end(args);

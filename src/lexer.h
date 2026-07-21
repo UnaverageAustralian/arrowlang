@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "utils.h"
+
 typedef enum {
     TOK_ERROR,
 
@@ -70,7 +72,7 @@ typedef struct {
     } as;
     const char *start;
     size_t len;
-    int pos, line;
+    Loc loc;
 } Token;
 
 typedef struct {
@@ -79,13 +81,14 @@ typedef struct {
     const char *src;
     const char *start;
     const char *current;
-    int pos, line;
+    Loc loc;
 } Lexer;
 
 void init_lexer(Lexer *lexer, const char *src, const char *file_path);
 void lexer_next(Lexer *lexer);
 
 char *tok_spelling(Token_Type type);
+char *err_tok_spelling(Token_Type type);
 void print_token(Token token);
 
 #endif // ARROW_LEXER_H

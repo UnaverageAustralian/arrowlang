@@ -9,7 +9,7 @@
 #include "types.h"
 #include "utils.h"
 
-#define EPRINTF_AT_OP(op, level, ...) eprintf((op)->file_path, (op)->line, (op)->pos, level, __VA_ARGS__);
+#define EPRINTF_AT_OP(op, level, ...) eprintf((op)->file_path, (op)->loc, level, __VA_ARGS__);
 
 inline void init_analyser(Analyser *analyser, Ops *ops) {
     *analyser = (Analyser){0};
@@ -32,8 +32,8 @@ inline int check_operand_count(Analyser *analyser, size_t expected) {
     Op *op = &analyser->ops->items[analyser->pos];
     if (analyser->stack.count < expected) {
         analyser->had_error = 1;
-        EPRINTF_AT_OP(op, LEVEL_ERR, "Not enough items on the stack for %s, expected at least %d elements\n",
-                      opcode_spelling(op->opcode), expected);
+        EPRINTF_AT_OP(op, LEVEL_ERR, "Not enough items on the stack for %s, need at least %d element(s)\n",
+                      err_opcode_spelling(op->opcode), expected);
         return 0;
     }
     return 1;
@@ -44,8 +44,7 @@ inline void make_conversion_op(Analyser *analyser, Type greater, Type lesser, in
     Op op = {
         .opcode = OP_CONVERT,
         .file_path = cur.file_path,
-        .line = cur.line,
-        .pos = cur.pos,
+        .loc = cur.loc,
         .operand = operand,
         .types = { lesser, greater },
     };
@@ -330,7 +329,7 @@ void type_check_op(Analyser *analyser) {
         else {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Invalid operand types for %s: %s %s\n",
-                             opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
+                             err_opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
         }
         break;
     }
@@ -494,7 +493,7 @@ void type_check_op(Analyser *analyser) {
         else {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Invalid operand types for %s: %s %s\n",
-                             opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
+                             err_opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
         }
         break;
     }

@@ -80,7 +80,12 @@ typedef struct {
     const char *str;
 } String_View;
 
-void eprintf(const char *file_path, int line, int pos, Level level, const char *format, ...);
+typedef struct {
+    int pos;
+    int line;
+} Loc;
+
+void eprintf(const char *file_path, Loc loc, Level level, const char *format, ...);
 void sb_appendf(String_Builder *sb, const char *format, ...);
 
 void cmd_append_many(Cmd *cmd, int argc, ...);

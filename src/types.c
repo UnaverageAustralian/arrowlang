@@ -15,8 +15,8 @@ char *basic_type_spelling(Basic_Type type) {
     case TYPE_F32:     return "f32";
     case TYPE_F64:     return "f64";
     case TYPE_STR:     return "str";
-    case TYPE_INTEGER: return "int_lit";
-    case TYPE_REAL:    return "real_lit";
+    case TYPE_INTEGER: return "int";
+    case TYPE_REAL:    return "real";
     default:           return "unknown";
     }
 }
@@ -25,16 +25,11 @@ char *type_spelling(Type type) {
     if (type.kind == KIND_BASIC)
         return basic_type_spelling(type.as.basic);
 
-    switch (type.as.advanced->kind) {
-    case KIND_STRUCT:
-        if (type.as.advanced->as.structure.name.len == 0)
-            return "anon_struct";
-        String_Builder sb = {0};
-        sb_appendf(&sb, "%.*s", type.as.advanced->as.structure.name.len, type.as.advanced->as.structure.name.str);
-        return sb.items;
-    default:
-        return "unknown";
-    }
+    if (type.as.advanced->as.structure.name.len == 0)
+        return "anon_struct";
+    String_Builder sb = {0};
+    sb_appendf(&sb, "%.*s", type.as.advanced->as.structure.name.len, type.as.advanced->as.structure.name.str);
+    return sb.items;
 }
 
 int struct_size(Struct structure) {

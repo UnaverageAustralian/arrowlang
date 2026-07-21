@@ -59,7 +59,7 @@ typedef struct {
     const char *file_path;
     uint64_t operand;
     Type types[2];
-    int pos, line;
+    Loc loc;
 } Op;
 
 typedef struct {
@@ -81,7 +81,7 @@ typedef struct {
 
 typedef struct {
     String_View name;
-    int pos, line;
+    Loc loc;
     Unresolved_Type type;
     union {
         Op *op;
@@ -144,5 +144,6 @@ typedef struct {
 
 void compile(Compiler_Options options);
 char *opcode_spelling(Opcode opcode);
+char *err_opcode_spelling(Opcode opcode);
 
 #endif // ARROW_COMPILER_H

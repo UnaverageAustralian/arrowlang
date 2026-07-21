@@ -44,8 +44,7 @@ void init_lexer(Lexer *lexer, const char *src, const char *file_path) {
     lexer->prev = (Token){0};
     lexer->cur = (Token){0};
 
-    lexer->line = 1;
-    lexer->pos = 1;
+    lexer->loc = (Loc){ .pos = 1, .line = 1 };
 
     lexer->src = src;
     lexer->file_path = file_path;
@@ -55,7 +54,7 @@ void init_lexer(Lexer *lexer, const char *src, const char *file_path) {
 }
 
 static inline char skip(Lexer *lexer, int count) {
-    lexer->pos += count;
+    lexer->loc.pos += count;
     lexer->current += count;
     return *lexer->current;
 }
@@ -66,11 +65,6 @@ static inline char peek(Lexer *lexer, int count) {
 
 static inline int is_hex(char c) {
     return (c >= '0' && c <= '9') || (c >= 'a' &&  c <= 'f') || (c >= 'A' && c <= 'F');
-}
-
-inline void begin_token(Lexer *lexer) {
-    lexer->cur.pos = lexer->pos;
-    lexer->cur.line = lexer->line;
 }
 
 inline void make_token(Lexer *lexer, Token_Type type) {
@@ -387,13 +381,13 @@ void single_line_comment(Lexer *lexer) {
     while (c && c != '\n')
         c = skip(lexer, 1);
     if (c) skip(lexer, 1);
-    lexer->line++;
+    lexer->loc.line++;
 }
 
 void multi_line_comment(Lexer *lexer) {
     char c = skip(lexer, 2);
     while (c && (c != '*' || peek(lexer, 1) != '/') ) {
-        if (c == '\n') lexer->line++;
+        if (c == '\n') lexer->loc.line++;
         c = skip(lexer, 1);
     }
     if (c) skip(lexer, 2);
@@ -419,8 +413,8 @@ void skip_whitespace(Lexer *lexer) {
             break;
         case '\n':
             c = skip(lexer, 1);
-            lexer->pos = 1;
-            lexer->line++;
+            lexer->loc.pos = 1;
+            lexer->loc.line++;
             break;
         default: return;
         }
@@ -433,7 +427,7 @@ void lexer_next(Lexer *lexer) {
 
     skip_whitespace(lexer);
     lexer->start = lexer->current;
-    begin_token(lexer);
+    lexer->cur.loc = lexer->loc;
 
     char c = peek(lexer, 0);
     switch (c) {
@@ -713,8 +707,43 @@ char *tok_spelling(Token_Type type) {
     }
 }
 
+char *err_tok_spelling(Token_Type type) {
+    switch (type) {
+    case TOK_IF:         return "if";
+    case TOK_ELSE:       return "else";
+    case TOK_WHILE:      return "while";
+    case TOK_LBRACE:     return "left brace";
+    case TOK_RBRACE:     return "right brace";
+    case TOK_LOOP:       return "loop";
+    case TOK_END:        return "end";
+    case TOK_COLON:      return "colon";
+    case TOK_SEMICOLON:  return "semicolon";
+    case TOK_FUNC:       return "function character";
+    case TOK_LPAREN:     return "left parenthesis";
+    case TOK_RPAREN:     return "right parenthesis";
+    case TOK_ARROW:      return "arrow";
+    case TOK_EXT_FUNC:   return "external function";
+    case TOK_C_FUNC:     return "C function";
+    case TOK_IMPORT:     return "import";
+    case TOK_SCOPE:      return "scope";
+    case TOK_THEN:       return "then";
+    case TOK_ELSEIF:     return "elseif";
+    case TOK_INT_LIT:    return "integer literal";
+    case TOK_FLOAT_LIT:  return "real literal";
+    case TOK_STR_LIT:    return "string literal";
+    case TOK_CHAR_LIT:   return "character literal";
+    case TOK_STR:        return "string";
+    case TOK_WORD:       return "word";
+    case TOK_EOF:        return "end of file";
+    default:
+        if (type >= TOK_I8 && type <= TOK_NUMBER)
+            return "type";
+        return "operation";
+    }
+}
+
 void print_token(Token token) {
-    printf("%d:%d: ", token.line, token.pos);
+    printf("%d:%d: ", token.loc.line, token.loc.pos);
     printf("%s", tok_spelling(token.type));
     printf(" \"%.*s\" (%lld/%lf)\n", token.len, token.start, token.as.integer, token.as.real);
 }

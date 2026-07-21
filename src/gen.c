@@ -8,7 +8,7 @@
 #include "types.h"
 #include "utils.h"
 
-#define GEN_EPRINTF(op, level, ...) eprintf((op)->file_path, (op)->line, (op)->pos, level, __VA_ARGS__)
+#define GEN_EPRINTF(op, level, ...) eprintf((op)->file_path, (op)->loc, level, __VA_ARGS__)
 
 static char size_sufs[]  = ".bw.l...q";
 static char fsize_sufs[] = "....s...d";

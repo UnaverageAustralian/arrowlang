@@ -55,7 +55,7 @@ typedef struct {
         Struct structure;
     } as;
     Resolve_Status resolve_status;
-    int pos, line;
+    Loc loc;
 } Advanced_Type;
 
 typedef struct {
