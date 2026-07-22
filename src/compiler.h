@@ -124,6 +124,7 @@ typedef struct {
     Arena arena;
     Compiler_Options options;
     Hashmap modules;
+    String_Array cleanup;
     uint8_t had_error;
 } Compiler;
 

@@ -937,6 +937,7 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
     snprintf(obj_name, unit.module.name.len + 3, "%.*s.o", unit.module.name.len, unit.module.name.str);
 
     DA_APPEND(&global->options.link_cmd, obj_name);
+    DA_APPEND(&global->cleanup, obj_name);
 
     lexer_next(&lexer);
     if (lexer.cur.type == TOK_EOF)
@@ -989,11 +990,9 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
     print_ops(&unit.ops);
 #else
     if (!global->had_error) {
-        char *output_file = arena_calloc(&global->arena, unit.module.name.len + 1);
-        strncpy(output_file, unit.module.name.str, unit.module.name.len);
-
         Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
-        generate_x86_64_linux(&unit.ops, output_file, main != NULL && main->key != NULL);
+        char *output_asm = generate_x86_64_linux(&unit.ops, obj_name, main != NULL && main->key != NULL);
+        DA_APPEND(&global->cleanup, output_asm);
     }
 #endif
 
@@ -1022,6 +1021,14 @@ void link_files(Compiler_Options options) {
     cmd_exec(&cmd);
 }
 
+void clean_files(Compiler *compiler) {
+    Cmd cmd = {0};
+    cmd_append_many(&cmd, 2, "rm", "-f");
+    memcpy(cmd.items + cmd.count, compiler->cleanup.items, compiler->cleanup.count * sizeof(char *));
+    cmd.count += compiler->cleanup.count;
+    cmd_exec(&cmd);
+}
+
 void compile(Compiler_Options options) {
     Compiler compiler;
     init_compiler(&compiler, options);
@@ -1040,6 +1047,7 @@ void compile(Compiler_Options options) {
         link_files(compiler.options);
 #endif
 
+    clean_files(&compiler);
     free_arena(&compiler.arena);
 }
 

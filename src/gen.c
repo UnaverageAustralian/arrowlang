@@ -306,7 +306,7 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
     gen->depth += func.return_types.count;
 }
 
-void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
+char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
     Generator gen;
     init_generator(&gen, ops);
 
@@ -819,39 +819,35 @@ void generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
 
     if (gen.had_error) {
         free(gen.sb.items);
-        return;
+        return NULL;
     }
 
-    size_t len = strlen(output_file) + 3;
+    size_t len = strlen(output_file) + 1;
     char *output_asm = malloc(len);
-    snprintf(output_asm, len, "%s.s", output_file);
+    snprintf(output_asm, len, "%.*ss", len - 2, output_file);
 
     FILE *out = fopen(output_asm, "wb");
     if (!out) {
         fprintf(stderr, "\x1b[31mFailed to create output file\x1b[0m\n");
         free(gen.sb.items);
-        return;
+        return NULL;
     }
 
     fwrite(gen.sb.items, sizeof(char), gen.sb.count, out);
     if (ferror(out)) {
         fprintf(stderr, "\x1b[31mFailed to write to output file\x1b[0m\n");
         free(gen.sb.items);
-        return;
+        return NULL;
     }
 
     fclose(out);
 
-    char *output_obj = malloc(len);
-    snprintf(output_obj, len, "%s.o", output_file);
-
     Cmd cmd = {0};
-    cmd_append_many(&cmd, 4, "as", "-o", output_obj, output_asm);
-    if (!cmd_exec(&cmd)) return;
+    cmd_append_many(&cmd, 4, "as", "-o", output_file, output_asm);
+    if (!cmd_exec(&cmd)) return output_asm;
 
     free(cmd.items);
     free(gen.sb.items);
-    free(output_asm);
-    free(output_obj);
+    return output_asm;
 }
 
