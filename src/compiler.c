@@ -1033,7 +1033,7 @@ void compile(Compiler_Options options) {
     Compiler compiler;
     init_compiler(&compiler, options);
 
-    for (int i = 0; options.input_files[i] != NULL; i++) {
+    for (int i = 0; options.input_files[i] != NULL && i < options.input_file_count; i++) {
         char *contents = open_file(options.input_files[i]);
         if (!contents) {
             fprintf(stderr, "\x1b[31mERROR:\x1b[0m Could not read file: %s\n", strerror(errno));

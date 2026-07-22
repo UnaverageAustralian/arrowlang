@@ -52,6 +52,7 @@ typedef struct {
     char **input_files;
     char *output_file;
     Cmd link_cmd;
+    int input_file_count;
 } Compiler_Options;
 
 typedef struct {
