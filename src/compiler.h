@@ -55,6 +55,7 @@ typedef struct {
     int input_file_count;
     uint8_t verbose;
     uint8_t emit_asm;
+    uint8_t emit_obj;
 } Compiler_Options;
 
 typedef struct {

@@ -937,7 +937,8 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
     snprintf(obj_name, unit.module.name.len + 3, "%.*s.o", unit.module.name.len, unit.module.name.str);
 
     DA_APPEND(&global->options.link_cmd, obj_name);
-    DA_APPEND(&global->cleanup, obj_name);
+    if (!global->options.emit_obj)
+        DA_APPEND(&global->cleanup, obj_name);
 
     lexer_next(&lexer);
     if (lexer.cur.type == TOK_EOF)
@@ -1049,7 +1050,7 @@ void compile(Compiler_Options options) {
     }
 
 #if !defined(PRINT_IR) && !defined(DEBUG)
-    if (!compiler.had_error && !compiler.options.emit_asm)
+    if (!compiler.had_error && !compiler.options.emit_asm && !compiler.options.emit_obj)
         link_files(compiler.options);
 #endif
 

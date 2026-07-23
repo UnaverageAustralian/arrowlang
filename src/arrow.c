@@ -12,7 +12,8 @@ void usage(char *file) {
     fprintf(stderr, "   -L <path>       - Add path to linker search paths\n");
     fprintf(stderr, "   -l <library>    - Link with library\n");
     fprintf(stderr, "   -v              - Show all commands executed\n");
-    fprintf(stderr, "   -C              - Emit assembly files instead of an executable\n");
+    fprintf(stderr, "   -S              - Emit assembly files instead of an executable\n");
+    fprintf(stderr, "   -C              - Emit object files instead of an executable\n");
     fprintf(stderr, "   --help          - Display this\n");
     fprintf(stderr, "   --version       - Display compiler version\n");
     fprintf(stderr, "\n");
@@ -32,8 +33,11 @@ int parse_flags(Compiler_Options *options, int argc, char **argv, int i) {
         else if (strcmp(argv[i], "-v") == 0) {
             options->verbose = 1;
         }
-        else if (strcmp(argv[i], "-C") == 0) {
+        else if (strcmp(argv[i], "-S") == 0) {
             options->emit_asm = 1;
+        }
+        else if (strcmp(argv[i], "-C") == 0) {
+            options->emit_obj = 1;
         }
         else if (strncmp(argv[i], "-L", 2) == 0 || strncmp(argv[i], "-l", 2) == 0) {
             if (argv[i][2] == '\0' && i == argc) {
@@ -53,7 +57,7 @@ int parse_flags(Compiler_Options *options, int argc, char **argv, int i) {
             exit(0);
         }
         else if (strcmp(argv[i], "--version") == 0) {
-            printf("Version: 0.26.0b4\n");
+            printf("Version: 0.26.0b5\n");
             exit(0);
         }
         else {
