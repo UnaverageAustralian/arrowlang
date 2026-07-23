@@ -991,7 +991,7 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
 #else
     if (!global->had_error) {
         Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
-        char *output_asm = generate_x86_64_linux(&unit.ops, obj_name, main != NULL && main->key != NULL);
+        char *output_asm = generate_x86_64_linux(&unit.ops, obj_name, global->options, main != NULL && main->key != NULL);
         DA_APPEND(&global->cleanup, output_asm);
     }
 #endif
@@ -1018,7 +1018,7 @@ void link_files(Compiler_Options options) {
     memcpy(cmd.items + cmd.count, options.link_cmd.items, options.link_cmd.count * sizeof(char *));
     cmd.count += options.link_cmd.count;
     cmd_append_many(&cmd, 4, "-dynamic-linker", "/lib64/ld-linux-x86-64.so.2", "-o", options.output_file);
-    cmd_exec(&cmd);
+    cmd_exec(&cmd, options.verbose);
 }
 
 void clean_files(Compiler *compiler) {
@@ -1026,7 +1026,7 @@ void clean_files(Compiler *compiler) {
     cmd_append_many(&cmd, 2, "rm", "-f");
     memcpy(cmd.items + cmd.count, compiler->cleanup.items, compiler->cleanup.count * sizeof(char *));
     cmd.count += compiler->cleanup.count;
-    cmd_exec(&cmd);
+    cmd_exec(&cmd, compiler->options.verbose);
 }
 
 void compile(Compiler_Options options) {

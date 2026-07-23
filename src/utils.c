@@ -66,7 +66,14 @@ void cmd_append_many(Cmd *cmd, int argc, ...) {
     va_end(args);
 }
 
-int cmd_exec(Cmd *cmd) {
+int cmd_exec(Cmd *cmd, int verbose) {
+    if (verbose) {
+        printf("[CMD]: ");
+        for (size_t i = 0; i < cmd->count; i++)
+            printf("%s ", cmd->items[i]);
+        printf("\n");
+    }
+
     DA_APPEND(cmd, NULL);
 
     pid_t pid = fork();

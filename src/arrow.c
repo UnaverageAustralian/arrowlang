@@ -11,6 +11,7 @@ void usage(char *file) {
     fprintf(stderr, "   -o <file>       - Output file\n");
     fprintf(stderr, "   -L <path>       - Add path to linker search paths\n");
     fprintf(stderr, "   -l <library>    - Link with library\n");
+    fprintf(stderr, "   -v              - Show all commands executed\n");
     fprintf(stderr, "\n");
 }
 
@@ -23,11 +24,10 @@ int parse_flags(Compiler_Options *options, int argc, char **argv, int i) {
                 fprintf(stderr, "ERROR: Expected argument after -o\n");
                 exit(1);
             }
-            if (options->output_file) {
-                fprintf(stderr, "ERROR: -o cannot be used multiple times\n");
-                exit(1);
-            }
             options->output_file = argv[i];
+        }
+        else if (strcmp(argv[i], "-v") == 0) {
+            options->verbose = 1;
         }
         else if (strncmp(argv[i], "-L", 2) == 0 || strncmp(argv[i], "-l", 2) == 0) {
             if (argv[i][2] == '\0' && i == argc) {
@@ -69,7 +69,7 @@ Compiler_Options parse_arguments(int argc, char **argv) {
     options.input_files = argv + i;
 
     int count = 0;
-    for (; argv[i][0] != '-'; i++)
+    for (; i < argc && argv[i][0] != '-'; i++)
         count++;
     options.input_file_count = count;
 

@@ -89,7 +89,7 @@ void eprintf(const char *file_path, Loc loc, Level level, const char *format, ..
 void sb_appendf(String_Builder *sb, const char *format, ...);
 
 void cmd_append_many(Cmd *cmd, int argc, ...);
-int cmd_exec(Cmd *cmd);
+int cmd_exec(Cmd *cmd, int verbose);
 
 Hash_Entry *hashmap_add(Hashmap *map, const char *key, size_t key_len, void *val);
 Hash_Entry *hashmap_get(Hashmap *map, const char *key, size_t key_len);
