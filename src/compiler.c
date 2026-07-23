@@ -983,29 +983,24 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
     resolve_symbols(&unit);
     resolve_types(&unit);
 
-#ifndef DEBUG
-    if (!global->had_error)
+    if (!global->had_error && !global->options.debug) {
         global->had_error = type_check(&unit.ops);
 
-#ifdef PRINT_IR
-    print_ops(&unit.ops);
-#else
-    if (!global->had_error) {
-        Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
-        char *output_asm = generate_x86_64_linux(&unit.ops, obj_name, main != NULL && main->key != NULL);
-        DA_APPEND(&global->cleanup, output_asm);
+        if (!global->options.print_ir) {
+            Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
+            char *output_asm = generate_x86_64_linux(&unit.ops, obj_name, main != NULL && main->key != NULL);
+            DA_APPEND(&global->cleanup, output_asm);
 
-        if (!global->options.emit_asm) {
-            Cmd cmd = {0};
-            cmd_append_many(&cmd, 4, "as", "-o", obj_name, output_asm);
-            cmd_exec(&cmd, global->options.verbose);
+            if (!global->options.emit_asm) {
+                Cmd cmd = {0};
+                cmd_append_many(&cmd, 4, "as", "-o", obj_name, output_asm);
+                cmd_exec(&cmd, global->options.verbose);
+            }
         }
     }
-#endif
 
-#else
-    print_ops(&unit.ops);
-#endif
+    if (global->options.debug || global->options.print_ir)
+        print_ops(&unit.ops);
 
     Symbol *module_sym = arena_calloc(&global->arena, sizeof(Symbol));
     module_sym->type = STYPE_MODULE;
@@ -1049,12 +1044,10 @@ void compile(Compiler_Options options) {
         compile_module(&compiler, contents, options.input_files[i]);
     }
 
-#if !defined(PRINT_IR) && !defined(DEBUG)
-    if (!compiler.had_error && !compiler.options.emit_asm && !compiler.options.emit_obj)
+    if (!compiler.had_error && !compiler.options.emit_asm && !compiler.options.emit_obj && !compiler.options.debug && !compiler.options.print_ir)
         link_files(compiler.options);
-#endif
 
-    if (!compiler.options.emit_asm)
+    if (!compiler.options.emit_asm && !compiler.options.debug && !compiler.options.print_ir)
         clean_files(&compiler);
     free_arena(&compiler.arena);
 }

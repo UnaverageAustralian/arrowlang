@@ -53,9 +53,11 @@ typedef struct {
     char *output_file;
     Cmd link_cmd;
     int input_file_count;
-    uint8_t verbose;
-    uint8_t emit_asm;
-    uint8_t emit_obj;
+    uint8_t verbose  : 1;
+    uint8_t emit_asm : 1;
+    uint8_t emit_obj : 1;
+    uint8_t debug    : 1;
+    uint8_t print_ir : 1;
 } Compiler_Options;
 
 typedef struct {
