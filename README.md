@@ -3,7 +3,7 @@
 > [!WARNING]
 > This language is a work in progress so some things are subject to change!
 
-<img src="./logo.svg" width=400>
+<img src="./logo.svg" width=300>
 
 Arrowlang is a compiled stack-based programming language that is statically and strongly typed.
 
