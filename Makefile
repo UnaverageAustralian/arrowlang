@@ -7,7 +7,7 @@ SRC = $(wildcard src/*.c)
 all: arrow
 
 arrow:
-	$(CC) $(CFLAGS) -o arrow $(SRC)
+	$(CC) $(CFLAGS) -o arrowc $(SRC)
 
 clean:
-	rm -f arrow *.o *.s
+	rm -f arrowc *.o *.s
