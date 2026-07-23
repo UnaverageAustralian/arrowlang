@@ -991,8 +991,14 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
 #else
     if (!global->had_error) {
         Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
-        char *output_asm = generate_x86_64_linux(&unit.ops, obj_name, global->options, main != NULL && main->key != NULL);
+        char *output_asm = generate_x86_64_linux(&unit.ops, obj_name, main != NULL && main->key != NULL);
         DA_APPEND(&global->cleanup, output_asm);
+
+        if (!global->options.emit_asm) {
+            Cmd cmd = {0};
+            cmd_append_many(&cmd, 4, "as", "-o", obj_name, output_asm);
+            cmd_exec(&cmd, global->options.verbose);
+        }
     }
 #endif
 
@@ -1043,11 +1049,12 @@ void compile(Compiler_Options options) {
     }
 
 #if !defined(PRINT_IR) && !defined(DEBUG)
-    if (!compiler.had_error)
+    if (!compiler.had_error && !compiler.options.emit_asm)
         link_files(compiler.options);
 #endif
 
-    clean_files(&compiler);
+    if (!compiler.options.emit_asm)
+        clean_files(&compiler);
     free_arena(&compiler.arena);
 }
 

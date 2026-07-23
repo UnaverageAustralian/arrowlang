@@ -54,6 +54,7 @@ typedef struct {
     Cmd link_cmd;
     int input_file_count;
     uint8_t verbose;
+    uint8_t emit_asm;
 } Compiler_Options;
 
 typedef struct {

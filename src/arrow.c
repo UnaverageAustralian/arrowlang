@@ -12,6 +12,7 @@ void usage(char *file) {
     fprintf(stderr, "   -L <path>       - Add path to linker search paths\n");
     fprintf(stderr, "   -l <library>    - Link with library\n");
     fprintf(stderr, "   -v              - Show all commands executed\n");
+    fprintf(stderr, "   -C              - Emit assembly files instead of an executable\n");
     fprintf(stderr, "\n");
 }
 
@@ -28,6 +29,9 @@ int parse_flags(Compiler_Options *options, int argc, char **argv, int i) {
         }
         else if (strcmp(argv[i], "-v") == 0) {
             options->verbose = 1;
+        }
+        else if (strcmp(argv[i], "-C") == 0) {
+            options->emit_asm = 1;
         }
         else if (strncmp(argv[i], "-L", 2) == 0 || strncmp(argv[i], "-l", 2) == 0) {
             if (argv[i][2] == '\0' && i == argc) {

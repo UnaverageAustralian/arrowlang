@@ -306,7 +306,7 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
     gen->depth += func.return_types.count;
 }
 
-char *generate_x86_64_linux(Ops *ops, char *output_file, Compiler_Options options, int gen_start) {
+char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
     Generator gen;
     init_generator(&gen, ops);
 
@@ -842,11 +842,6 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, Compiler_Options option
 
     fclose(out);
 
-    Cmd cmd = {0};
-    cmd_append_many(&cmd, 4, "as", "-o", output_file, output_asm);
-    if (!cmd_exec(&cmd, options.verbose)) return output_asm;
-
-    free(cmd.items);
     free(gen.sb.items);
     return output_asm;
 }
