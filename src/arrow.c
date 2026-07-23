@@ -13,6 +13,8 @@ void usage(char *file) {
     fprintf(stderr, "   -l <library>    - Link with library\n");
     fprintf(stderr, "   -v              - Show all commands executed\n");
     fprintf(stderr, "   -C              - Emit assembly files instead of an executable\n");
+    fprintf(stderr, "   --help          - Display this\n");
+    fprintf(stderr, "   --version       - Display compiler version\n");
     fprintf(stderr, "\n");
 }
 
@@ -45,6 +47,14 @@ int parse_flags(Compiler_Options *options, int argc, char **argv, int i) {
                 i++;
                 DA_APPEND(&options->link_cmd, argv[i]);
             }
+        }
+        else if (strcmp(argv[i], "--help") == 0) {
+            usage(argv[0]);
+            exit(0);
+        }
+        else if (strcmp(argv[i], "--version") == 0) {
+            printf("Version: 0.26.0b4\n");
+            exit(0);
         }
         else {
             usage(argv[0]);
