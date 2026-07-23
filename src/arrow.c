@@ -65,7 +65,7 @@ int parse_flags(Compiler_Options *options, int argc, char **argv, int i) {
             exit(0);
         }
         else if (strcmp(argv[i], "--version") == 0) {
-            printf("Version: 0.26.0b6\n");
+            printf("Version: 0.26.0\n");
             exit(0);
         }
         else {
