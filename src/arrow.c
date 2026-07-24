@@ -1,7 +1,10 @@
+#define _POSIX_C_SOURCE 200112L
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "compiler.h"
 
@@ -108,6 +111,14 @@ Compiler_Options parse_arguments(int argc, char **argv) {
 
     if (options.output_file == NULL)
         options.output_file = "a";
+
+    options.compiler_dir.str = malloc(4096 * sizeof(char));
+
+    int len = readlink("/proc/self/exe", (char *)options.compiler_dir.str, 4096);
+    while (options.compiler_dir.str[len] != '/')
+        len--;
+    options.compiler_dir.len = len;
+
     return options;
 }
 

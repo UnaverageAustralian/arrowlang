@@ -49,6 +49,7 @@ typedef enum {
 } Unresolved_Type;
 
 typedef struct {
+    String_View compiler_dir;
     char **input_files;
     char *output_file;
     Cmd link_cmd;

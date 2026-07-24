@@ -949,8 +949,9 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
 
         lexer_next(&lexer);
         if (lexer.prev.type == TOK_WORD) {
-            char *path = arena_calloc(&global->arena, lexer.prev.len + 12);
-            snprintf(path, lexer.prev.len + 12, "./std/%.*s.alng", lexer.prev.len, lexer.prev.start);
+            char *path = arena_calloc(&global->arena, lexer.prev.len + global->options.compiler_dir.len + 11);
+            snprintf(path, lexer.prev.len + global->options.compiler_dir.len + 11, "%.*s/std/%.*s.alng",
+                     global->options.compiler_dir.len, global->options.compiler_dir.str, lexer.prev.len, lexer.prev.start);
 
             char *contents = open_file(path);
             if (!contents) {
