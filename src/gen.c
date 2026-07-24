@@ -241,7 +241,7 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
             }
         }
         else if ((param->as.basic & TYPE_REAL) && fparams >= 0) {
-            sb_appendf(&gen->sb, "    movsd (%%rax), %%xmm%d\n", fparams-1);
+            sb_appendf(&gen->sb, "    movsd (%%rsp), %%xmm%d\n", fparams-1);
             sb_appendf(&gen->sb, "    addq $8, %%rsp\n");
             fparams--;
         }
@@ -313,8 +313,10 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
     if (gen_start) {
         sb_appendf(&gen.sb, ".globl _start\n");
         sb_appendf(&gen.sb, "_start:\n");
-        sb_appendf(&gen.sb, "    call main\n");
-        sb_appendf(&gen.sb, "    movq (%%rax), %%rdi\n");
+        sb_appendf(&gen.sb, "    call \"main\"\n");
+        sb_appendf(&gen.sb, "    movq (%%rax), %%rbx\n");
+        sb_appendf(&gen.sb, "    call \"io::flush\"\n");
+        sb_appendf(&gen.sb, "    movq %%rbx, %%rdi\n");
         sb_appendf(&gen.sb, "    movq $60, %%rax\n");
         sb_appendf(&gen.sb, "    syscall\n");
     }

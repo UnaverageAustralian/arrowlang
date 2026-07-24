@@ -1045,6 +1045,14 @@ void compile(Compiler_Options options) {
         compile_module(&compiler, contents, options.input_files[i]);
     }
 
+    Hash_Entry *io = hashmap_get(&compiler.modules, "io", 2);
+    if (!io || !io->key) {
+        char *path = arena_calloc(&compiler.arena, compiler.options.compiler_dir.len + 14);
+        snprintf(path, compiler.options.compiler_dir.len + 14, "%.*s/std/io_ext.o",
+                 compiler.options.compiler_dir.len, compiler.options.compiler_dir.str);
+        DA_APPEND(&compiler.options.link_cmd, path);
+    }
+
     if (!compiler.had_error && !compiler.options.emit_asm && !compiler.options.emit_obj && !compiler.options.debug && !compiler.options.print_ir)
         link_files(compiler.options);
 

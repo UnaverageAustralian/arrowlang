@@ -2,6 +2,5 @@ import io
 
 $main ( -> u8 )
     "Hello, World!" io::printsln
-    io::flush
     0
 $

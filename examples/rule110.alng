@@ -24,7 +24,5 @@ $main ( -> u8 )
         end drop swap drop
         swap 1+
     end
-
-    io::flush
     0
 $

@@ -4,6 +4,5 @@ $assert ( u8 str -> u8 )
     if over ! then
         "Assertion failed: " io::prints
         dup io::printsln
-        io::flush
     end swap !
 $
