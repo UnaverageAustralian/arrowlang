@@ -693,7 +693,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
                     Struct structure = func.return_types.items[i].as.advanced->as.structure;
 
                     sb_appendf(&gen.sb, "    popq %%rsi\n");
-                    sb_appendf(&gen.sb, "    leaq %d(%%rbp) %%rdi\n", gen.allocated - gen.func.max_allocated);
+                    sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", gen.allocated - gen.func.max_allocated);
                     move_struct(&gen, structure, 0);
                     gen.allocated += structure.size;
                 }
