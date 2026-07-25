@@ -661,8 +661,11 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    movq %%rsp, %%rbp\n");
             sb_appendf(&gen.sb, "    subq $%d, %%rsp\n", ALIGN(gen.func.max_allocated, 16));
 
-            for (size_t offs = (gen.func.param_types.count-1)*8 + 16; offs >= 16; offs -= 8)
-                sb_appendf(&gen.sb, "    pushq %zu(%%rbp)\n", offs);
+            for (size_t i = 0; i < gen.func.param_types.count; i++) {
+                sb_appendf(&gen.sb, "    pushq %zu(%%rbp)\n", (gen.func.param_types.count-i-1)*8 + 16);
+                if (gen.func.param_types.items[i].kind == KIND_ADVANCED && gen.func.param_types.items[i].as.advanced->kind == KIND_STRUCT)
+                    duplicate_struct(&gen, gen.func.param_types.items[i].as.advanced->as.structure);
+            }
 
             gen.depth += gen.func.param_types.count;
             break;
@@ -689,16 +692,11 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
                 sb_appendf(&gen.sb, "    call \"%.*s::%.*s\"\n", func.module_name.len, func.module_name.str, func.extern_name.len, func.extern_name.str);
 
             for (int64_t i = func.return_types.count-1; i >= 0; i--) {
+                sb_appendf(&gen.sb, "    pushq %zu(%%rax)\n", i*8);
                 if (func.return_types.items[i].kind == KIND_ADVANCED && func.return_types.items[i].as.advanced->kind == KIND_STRUCT) {
                     Struct structure = func.return_types.items[i].as.advanced->as.structure;
-
-                    sb_appendf(&gen.sb, "    popq %%rsi\n");
-                    sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", gen.allocated - gen.func.max_allocated);
-                    move_struct(&gen, structure, 0);
+                    duplicate_struct(&gen, func.return_types.items[i].as.advanced->as.structure);
                     gen.allocated += structure.size;
-                }
-                else {
-                    sb_appendf(&gen.sb, "    pushq %zu(%%rax)\n", i*8);
                 }
             }
 

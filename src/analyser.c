@@ -517,8 +517,11 @@ void type_check_op(Analyser *analyser) {
     case OP_FUNC: {
         Hash_Entry *func_entry = (Hash_Entry *)op->operand;
         analyser->func = &((Symbol *)func_entry->val)->as.func;
-        for (size_t i = 0; i < analyser->func->param_types.count; i++)
+        for (size_t i = 0; i < analyser->func->param_types.count; i++) {
             DA_APPEND(&analyser->stack, analyser->func->param_types.items[i]);
+            if (analyser->func->param_types.items[i].kind == KIND_ADVANCED && analyser->func->param_types.items[i].as.advanced->kind == KIND_STRUCT)
+                allocate(analyser, analyser->func->param_types.items[i]);
+        }
         break;
     }
     case OP_RET: {
