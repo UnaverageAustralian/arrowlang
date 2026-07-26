@@ -1045,7 +1045,7 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
     if (!global->had_error && !global->options.debug) {
         global->had_error = type_check(&unit.ops);
 
-        if (!global->options.print_ir) {
+        if (!global->had_error && !global->options.print_ir) {
             Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
             char *output_asm = generate_x86_64_linux(&unit.ops, obj_name, main != NULL && main->key != NULL);
             DA_APPEND(&global->cleanup, output_asm);
