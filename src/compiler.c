@@ -414,6 +414,12 @@ void compile_loop_stmt(Compilation_Unit *compiler) {
     compiler->is_in_loop = 0;
 }
 
+void compile_grouping(Compilation_Unit *compiler) {
+    while (compiler->lexer->cur.type != TOK_RPAREN && compiler->lexer->cur.type != TOK_FUNC && compiler->lexer->cur.type != TOK_EOF)
+        compile_stmt(compiler);
+    expect(compiler, TOK_RPAREN);
+}
+
 void compile_struct_fields(Compilation_Unit *compiler, Struct *structure);
 
 Advanced_Type *compile_anonymous_struct(Compilation_Unit *compiler) {
@@ -580,6 +586,9 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_LOOP:
         compile_loop_stmt(compiler);
         break;
+    case TOK_LPAREN:
+        compile_grouping(compiler);
+        break;
     case TOK_BRK:
         if (!compiler->is_in_loop) {
             compiler->global->had_error = 1;
@@ -658,6 +667,7 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_SEMICOLON:
     case TOK_END:
     case TOK_RBRACE:
+    case TOK_RPAREN:
     case TOK_SCOPE:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Lone %s\n", err_tok_spelling(tok->type));

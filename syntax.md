@@ -204,3 +204,11 @@ You can also declare anonymous structs:
  4 >#x
  #x // 4
 ```
+
+## Groupings
+
+Groupings are started with `(` and ended with `)`. Groupings only serve to make code more readable and don't change its behaviour.
+```
+ (2 3) + // Same as 2 3 +
+```
+
