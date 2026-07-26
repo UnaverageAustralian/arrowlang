@@ -209,7 +209,7 @@ void type_check_if(Analyser *analyser) {
 
 void expected_types_error(Analyser *analyser, char *msg, Types expected) {
     analyser->had_error = 1;
-    EPRINTF_AT_OP(&analyser->ops->items[analyser->ops->count-1], LEVEL_ERR, "%s, expected types: [ ", msg);
+    EPRINTF_AT_OP(&analyser->ops->items[analyser->pos], LEVEL_ERR, "%s, expected types: [ ", msg);
 
     for (size_t i = 0; i < expected.count; i++)
         fprintf(stderr, "%s ", type_spelling(expected.items[i]));

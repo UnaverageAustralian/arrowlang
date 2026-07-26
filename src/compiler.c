@@ -709,8 +709,14 @@ Hash_Entry *compile_function_signature(Compilation_Unit *compiler) {
         get_type(compiler, &sym->as.func.param_types.items[sym->as.func.param_types.count-1]);
     }
 
-    expect(compiler, TOK_ARROW);
-    if (compiler->lexer->prev.type == TOK_EOF) return entry;
+    lexer_next(compiler->lexer);
+    if (compiler->lexer->prev.type == TOK_EOF) {
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Expected arrow or right parenthesis, got end of file\n");
+        return entry;
+    }
+
+    if (compiler->lexer->prev.type == TOK_RPAREN) return entry;
 
     while (compiler->lexer->cur.type != TOK_RPAREN && compiler->lexer->cur.type != TOK_EOF) {
         lexer_next(compiler->lexer);
