@@ -10,7 +10,7 @@ typedef enum {
     TOK_ERROR,
 
     // Literals
-    TOK_INT_LIT,  TOK_FLOAT_LIT,
+    TOK_INT_LIT,  TOK_REAL_LIT,
     TOK_CHAR_LIT, TOK_STR_LIT,
 
     TOK_WORD,
@@ -49,6 +49,7 @@ typedef enum {
     TOK_RET,       TOK_ROT,
     TOK_ROTN,      TOK_ELSE,
     TOK_THEN,      TOK_ELSEIF,
+    TOK_CONST,
     // Types
     TOK_I8,        TOK_U8,
     TOK_I16,       TOK_U16,

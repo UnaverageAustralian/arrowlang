@@ -40,8 +40,8 @@ typedef enum {
 } Opcode;
 
 typedef enum {
-    STYPE_FUNC,  STYPE_MODULE,
-    STYPE_TYPE,
+    STYPE_FUNC, STYPE_MODULE,
+    STYPE_TYPE, STYPE_CONST,
 } Symbol_Type;
 
 typedef enum {
@@ -119,11 +119,17 @@ typedef struct {
 } Function;
 
 typedef struct {
+    int64_t val;
+    Basic_Type type;
+} Constant;
+
+typedef struct {
     Symbol_Type type;
     union {
         Function func;
         Module module;
         Advanced_Type *type;
+        Constant constant;
     } as;
 } Symbol;
 

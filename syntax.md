@@ -212,3 +212,13 @@ Groupings are started with `(` and ended with `)`. Groupings only serve to make 
  (2 3) + // Same as 2 3 +
 ```
 
+## Constants
+
+Compile-type constants are declared with `const`. Constants can only be set to integer literals, real literals, or character literals.
+```
+ const x 10.5
+ const y 20.2
+ ...
+ x y + // 30.7
+```
+

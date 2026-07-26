@@ -1,0 +1,13 @@
+import errors
+
+const x 10
+const y 20
+const e 'E'
+const pi 3.14
+
+$main ( -> u8 )
+    x  10   = "x = 10"    errors::assert
+    y  20   = "y = 20"    errors::assert |
+    e  0x45 = "e = 0x45"  errors::assert |
+    pi 3.14 = "pi = 3.14" errors::assert |
+$

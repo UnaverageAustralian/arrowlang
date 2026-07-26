@@ -517,6 +517,11 @@ void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
         compile_entry(compiler, entry);
         break;
     }
+    case STYPE_CONST: {
+        Op *op = make_op(compiler, OP_PUSH, sym->as.constant.val);
+        op->types[0] = BASIC_TYPE(sym->as.constant.type);
+        break;
+    }
     }
 }
 
@@ -530,7 +535,7 @@ void compile_stmt(Compilation_Unit *compiler) {
         op->types[0] = BASIC_TYPE(TYPE_INTEGER);
         break;
     }
-    case TOK_FLOAT_LIT: {
+    case TOK_REAL_LIT: {
         Op *op = make_op(compiler, OP_PUSH, tok->as.integer);
         op->types[0] = BASIC_TYPE(TYPE_REAL);
         break;
@@ -818,6 +823,35 @@ void compile_struct(Compilation_Unit *compiler) {
     compile_struct_fields(compiler, &sym->as.type->as.structure);
 }
 
+void compile_const(Compilation_Unit *compiler) {
+    lexer_next(compiler->lexer);
+    expect(compiler, TOK_WORD);
+    if (compiler->lexer->prev.type == TOK_EOF) return;
+
+    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
+    sym->type = STYPE_CONST;
+    add_symbol(compiler, sym);
+
+    lexer_next(compiler->lexer);
+    sym->as.constant.val = compiler->lexer->prev.as.integer;
+
+    switch (compiler->lexer->prev.type) {
+    case TOK_INT_LIT:
+        sym->as.constant.type = TYPE_INTEGER;
+        break;
+    case TOK_REAL_LIT:
+        sym->as.constant.type = TYPE_REAL;
+        break;
+    case TOK_CHAR_LIT:
+        sym->as.constant.type = TYPE_CHAR;
+        break;
+    default:
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Constants can only be set to integer literals, real literals, or character literals\n");
+        break;
+    }
+}
+
 void compile_decls(Compilation_Unit *compiler) {
     for (; ;) {
         switch (compiler->lexer->cur.type) {
@@ -832,6 +866,9 @@ void compile_decls(Compilation_Unit *compiler) {
             continue;
         case TOK_STRUCT:
             compile_struct(compiler);
+            continue;
+        case TOK_CONST:
+            compile_const(compiler);
             continue;
         default: break;
         }
@@ -916,6 +953,11 @@ void resolve_symbols(Compilation_Unit *compiler) {
             case STYPE_TYPE:
                 op->opcode = OP_INIT;
                 op->types[0] = ADVANCED_TYPE(sym->as.type);
+                break;
+            case STYPE_CONST:
+                op->opcode = OP_PUSH;
+                op->operand = sym->as.constant.val;
+                op->types[0] = BASIC_TYPE(sym->as.constant.type);
                 break;
             case STYPE_MODULE:
                 compiler->global->had_error = 1;

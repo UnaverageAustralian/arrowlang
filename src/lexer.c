@@ -28,6 +28,7 @@ static const char *keywords[] = {
     "return",  "rot",
     "rotn",    "else",
     "then",    "elseif",
+    "const",
 
     "i8",      "u8",
     "i16",     "u16",
@@ -208,7 +209,7 @@ void lex_hex(Lexer *lexer, int sign) {
     if (!real && overflowed)
         make_err_token(lexer, "Number is too large for 64 bits.");
     else
-        make_token(lexer, real ? TOK_FLOAT_LIT : TOK_INT_LIT);
+        make_token(lexer, real ? TOK_REAL_LIT : TOK_INT_LIT);
 
     if (real)
         lexer->cur.as.real = float_num * sign;
@@ -255,7 +256,7 @@ void lex_decimal(Lexer *lexer, int sign) {
     if (!real && overflowed)
         make_err_token(lexer, "Number is too large for 64 bits.");
     else
-        make_token(lexer, real ? TOK_FLOAT_LIT : TOK_INT_LIT);
+        make_token(lexer, real ? TOK_REAL_LIT : TOK_INT_LIT);
 
     if (real)
         lexer->cur.as.real = float_num * sign;
@@ -684,9 +685,10 @@ char *tok_spelling(Token_Type type) {
     case TOK_ARROW_HASH: return "ARROW_HASH";
     case TOK_THEN:       return "THEN";
     case TOK_ELSEIF:     return "ELSEIF";
+    case TOK_CONST:      return "CONST";
     case TOK_DOT:        return "DOT";
     case TOK_INT_LIT:    return "INT_LIT";
-    case TOK_FLOAT_LIT:  return "FLOAT_LIT";
+    case TOK_REAL_LIT:   return "REAL_LIT";
     case TOK_STR_LIT:    return "STR_LIT";
     case TOK_CHAR_LIT:   return "CHAR_LIT";
     case TOK_I8:         return "I8";
@@ -729,11 +731,12 @@ char *err_tok_spelling(Token_Type type) {
     case TOK_THEN:       return "then";
     case TOK_ELSEIF:     return "elseif";
     case TOK_INT_LIT:    return "integer literal";
-    case TOK_FLOAT_LIT:  return "real literal";
+    case TOK_REAL_LIT:   return "real literal";
     case TOK_STR_LIT:    return "string literal";
     case TOK_CHAR_LIT:   return "character literal";
     case TOK_STR:        return "string";
     case TOK_WORD:       return "word";
+    case TOK_CONST:      return "const";
     case TOK_EOF:        return "end of file";
     default:
         if (type >= TOK_I8 && type <= TOK_NUMBER)
