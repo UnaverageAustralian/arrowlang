@@ -40,7 +40,7 @@ Arrowlang's bit operators are: `&`/`and`, `|`/`or`, `^`/`xor`, `<<`/`shl`, `>>`/
 
 `dup2` duplicates the top two elements.
 
-`.`/`drop` drops the top of the stack.
+`drop` drops the top of the stack.
 
 `\`/`swap` swaps the top two elements.
 
