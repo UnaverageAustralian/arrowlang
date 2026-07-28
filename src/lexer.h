@@ -68,6 +68,7 @@ typedef enum {
 typedef struct {
     Token_Type type;
     union {
+        char *str;
         int64_t integer;
         double real;
     } as;

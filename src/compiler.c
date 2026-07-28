@@ -575,12 +575,9 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_LNOT:  make_op(compiler, OP_LNOT, 0);  break;
     case TOK_ROT:   make_op(compiler, OP_ROT, 0);   break;
     case TOK_ROTN:  make_op(compiler, OP_ROTN, 0);  break;
-    case TOK_STR_LIT: {
-        char *str = arena_calloc(&compiler->global->arena, tok->len + 1);
-        strncpy(str, tok->start, tok->len);
-        make_op(compiler, OP_STR, (int64_t)str);
+    case TOK_STR_LIT:
+        make_op(compiler, OP_STR, (int64_t)tok->as.str);
         break;
-    }
     case TOK_IF:
         compile_if_stmt(compiler);
         break;

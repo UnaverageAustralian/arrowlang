@@ -814,8 +814,13 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
 
     if (gen.strs.count > 0)
         sb_appendf(&gen.sb, ".section .rodata\n");
-    for (size_t i = 0; i < gen.strs.count; i++)
-        sb_appendf(&gen.sb, ".str%zu: .asciz \"%s\"\n", i, gen.strs.items[i]);
+
+    for (size_t i = 0; i < gen.strs.count; i++) {
+        sb_appendf(&gen.sb, ".str%zu: .asciz \"", i);
+        for (size_t j = 0; gen.strs.items[i][j] != '\0'; j++)
+            sb_appendf(&gen.sb, "\\%o", gen.strs.items[i][j]);
+        sb_appendf(&gen.sb, "\"\n");
+    }
 
     if (gen.had_error) {
         free(gen.sb.items);

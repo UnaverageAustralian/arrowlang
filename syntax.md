@@ -131,7 +131,8 @@ You can return early from a function with `return`.
 Modules are imported using `import`. You can either import standard library modules by putting a word after it (`import io`), or a local module by putting a string after it (`import "foo"`).
 
 The standard library modules are:
-`io` - For input-output functions (but no input yet).
+`io`     - For input-output functions (but no input yet).
+`errors` - Only has the assert function, which asserts that a condition is true.
 
 Here is an example using the `io` module:
 ```
@@ -221,4 +222,21 @@ Compile-type constants are declared with `const`. Constants can only be set to i
  ...
  x y + // 30.7
 ```
+
+## Escaped sequences
+
+Arrowlang's escape characters are:
+`\a` - Bell character
+`\b` - Backspace
+`\e` - Escape character
+`\f` - Form feed
+`\n` - Newline
+`\r` - Carriage return
+`\t` - Horizontal tab
+`\v` - Vertical tab
+`\\` - Backslash
+`\'` - Single quote
+`\"` - Double quote
+`\XXX` - The character represented by the 3-digit octal number given in `XXX`
+`\xXX` - The character represented by the 2-digit hex number given in `XX`
 

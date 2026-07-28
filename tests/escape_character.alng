@@ -1,0 +1,20 @@
+import errors
+
+$main ( -> u8 )
+    '\a' 7   = "'\\a' = 7"   errors::assert
+    '\b' 8   = "'\\b' = 8"   errors::assert |
+    '\t' 9   = "'\\t' = 9"   errors::assert |
+    '\n' 10  = "'\\n' = 10"  errors::assert |
+    '\v' 11  = "'\\v' = 11"  errors::assert |
+    '\f' 12  = "'\\f' = 12"  errors::assert |
+    '\r' 13  = "'\\r' = 13"  errors::assert |
+    '\e' 27  = "'\\e' = 27"  errors::assert |
+    '\"' 34  = "'\\\"' = 34" errors::assert |
+    '\'' 39  = "'\\'' = 39"  errors::assert |
+    '\\' 92  = "'\\\\' = 92" errors::assert |
+    '\p' 112 = "'\\p' = 112" errors::assert |
+
+    '\0'   0   = "'\\0'   = 0"   errors::assert |
+    '\145' 101 = "'\\145' = 101" errors::assert |
+    '\x65' 101 = "'\\x65' = 101" errors::assert |
+$

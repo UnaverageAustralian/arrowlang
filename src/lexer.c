@@ -1,10 +1,12 @@
 #include <ctype.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
 
 #include "lexer.h"
+#include "utils.h"
 
 #define NUM_KEYWORDS TOK_LAST - TOK_MOD
 static const char *keywords[] = {
@@ -323,19 +325,62 @@ void lex_word(Lexer *lexer) {
     make_token(lexer, TOK_WORD);
 }
 
-void lex_string(Lexer *lexer) {
+char lex_char(Lexer *lexer) {
+    char c = peek(lexer, 0);
+    if (c != '\\') {
+        skip(lexer, 1);
+        return c;
+    }
+
+    c = skip(lexer, 1);
+
+    char result = c;
+    skip(lexer, 1);
+    switch (c) {
+    case 'a':  result = 0x07; break;
+    case 'b':  result = 0x08; break;
+    case 't':  result = 0x09; break;
+    case 'n':  result = 0x0A; break;
+    case 'v':  result = 0x0B; break;
+    case 'f':  result = 0x0C; break;
+    case 'r':  result = 0x0D; break;
+    case 'e':  result = 0x1B; break;
+    case 'x':
+        c = peek(lexer, 0);
+        result = 0;
+        for (int i = 0; is_hex(c) && i < 2; i++) {
+            result = result * 16 + (c > 'F' ? c - 'a' + 10 : c > '9' ? c - 'A' + 10 : c - '0');
+            c = skip(lexer, 1);
+        }
+        break;
+    default:
+        if (c >= '0' && c <= '7') {
+            result = c - '0';
+            c = peek(lexer, 0);
+            for (int i = 0; c >= '0' && c <= '7' && i < 3; i++) {
+                result = result * 8 + (c - '0');
+                c = skip(lexer, 1);
+            }
+        }
+        break;
+    }
+    return result;
+}
+
+void lex_string_literal(Lexer *lexer) {
     skip(lexer, 1);
 
     char c = peek(lexer, 0);
+    char buf[256];
 
-    int i = 0;
-    while (c && c != '\"' && c != '\n') {
-        c = skip(lexer, 1);
-        i++;
+    int i;
+    for (i = 0; c && c != '\"' && c != '\n'; i++) {
+        buf[i] = lex_char(lexer);
+        c = peek(lexer, 0);
     }
     if (c) skip(lexer, 1);
 
-    if (i >= 255) {
+    if (i >= 256) {
         make_err_token(lexer, "String literal is too long");
         return;
     }
@@ -345,18 +390,25 @@ void lex_string(Lexer *lexer) {
         return;
     }
 
+    char *str = calloc(i, sizeof(char));
+    strncpy(str, buf, i);
+
     make_token(lexer, TOK_STR_LIT);
+    lexer->cur.as.str = str;
+
     lexer->cur.start++;
     lexer->cur.len -= 2;
 }
 
-void lex_char(Lexer *lexer) {
+void lex_char_literal(Lexer *lexer) {
     skip(lexer, 1);
     char c = peek(lexer, 0);
 
     int i = 0;
+    char val;
     while (c && c != '\'' && c != '\n') {
-        c = skip(lexer, 1);
+        val = lex_char(lexer);
+        c = peek(lexer, 0);
         i++;
     }
     if (c) skip(lexer, 1);
@@ -373,7 +425,7 @@ void lex_char(Lexer *lexer) {
 
     make_token(lexer, TOK_CHAR_LIT);
     lexer->cur.start++;
-    lexer->cur.as.integer = lexer->cur.start[0];
+    lexer->cur.as.integer = val;
     lexer->cur.len -= 2;
 }
 
@@ -606,10 +658,10 @@ void lexer_next(Lexer *lexer) {
         }
         break;
     case '\"':
-        lex_string(lexer);
+        lex_string_literal(lexer);
         break;
     case '\'':
-        lex_char(lexer);
+        lex_char_literal(lexer);
         break;
     case '\0':
         make_token(lexer, TOK_EOF);
