@@ -22,13 +22,19 @@ char *basic_type_spelling(Basic_Type type) {
 }
 
 char *type_spelling(Type type) {
-    if (type.kind == KIND_BASIC)
+    if (type.kind == KIND_BASIC) {
         return basic_type_spelling(type.as.basic);
+    }
+    else if (type.kind == KIND_PTR) {
+        String_Builder sb = {0};
+        sb_appendf(&sb, "ptr[%s]", type_spelling(*type.as.pointer));
+        return sb.items;
+    }
 
-    if (type.as.advanced->as.structure.name.len == 0)
+    if (type.as.advanced->structure.name.len == 0)
         return "anon_struct";
     String_Builder sb = {0};
-    sb_appendf(&sb, "%.*s", type.as.advanced->as.structure.name.len, type.as.advanced->as.structure.name.str);
+    sb_appendf(&sb, "%.*s", type.as.advanced->structure.name.len, type.as.advanced->structure.name.str);
     return sb.items;
 }
 
@@ -65,8 +71,11 @@ int type_size(Type type) {
         }
         return 0;
     }
+    else if (type.kind == KIND_PTR) {
+        return 8;
+    }
 
-    return struct_size(type.as.advanced->as.structure);
+    return struct_size(type.as.advanced->structure);
 }
 
 int typeid(Type type) {
@@ -92,20 +101,22 @@ int typeid(Type type) {
 int type_alignment(Type type) {
     if (type.kind == KIND_BASIC)
         return type_size(type);
-    return type.as.advanced->as.structure.alignment;
+    else if (type.kind == KIND_PTR)
+        return 8;
+    return type.as.advanced->structure.alignment;
 }
 
 Field *get_first_leaf_field(Struct structure) {
     Field *result = &structure.fields.items[0];
     while (result->type.kind != KIND_BASIC)
-        result = &result->type.as.advanced->as.structure.fields.items[0];
+        result = &result->type.as.advanced->structure.fields.items[0];
     return result;
 }
 
 Field *get_last_leaf_field(Struct structure) {
     Field *result = &structure.fields.items[structure.fields.count-1];
     while (result->type.kind != KIND_BASIC)
-        result = &result->type.as.advanced->as.structure.fields.items[result->type.as.advanced->as.structure.fields.count-1];
+        result = &result->type.as.advanced->structure.fields.items[result->type.as.advanced->structure.fields.count-1];
     return result;
 }
 
@@ -123,7 +134,9 @@ int types_compatible(Type a, Type b) {
 
     if (a.kind == KIND_BASIC)
         return (a.as.basic & b.as.basic) != 0;
-    return struct_fields_equal(a.as.advanced->as.structure, a.as.advanced->as.structure);
+    else if (a.kind == KIND_PTR)
+        return types_equal(*a.as.pointer, *b.as.pointer);
+    return struct_fields_equal(a.as.advanced->structure, a.as.advanced->structure);
 }
 
 int types_equal(Type a, Type b) {
@@ -131,6 +144,8 @@ int types_equal(Type a, Type b) {
 
     if (a.kind == KIND_BASIC)
         return a.as.basic == b.as.basic;
-    return struct_fields_equal(a.as.advanced->as.structure, a.as.advanced->as.structure);
+    else if (a.kind == KIND_PTR)
+        return types_equal(*a.as.pointer, *b.as.pointer);
+    return struct_fields_equal(a.as.advanced->structure, a.as.advanced->structure);
 }
 

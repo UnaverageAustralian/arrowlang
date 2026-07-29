@@ -424,9 +424,7 @@ void compile_struct_fields(Compilation_Unit *compiler, Struct *structure);
 
 Advanced_Type *compile_anonymous_struct(Compilation_Unit *compiler) {
     Advanced_Type type = {0};
-    type.kind = KIND_STRUCT;
-
-    compile_struct_fields(compiler, &type.as.structure);
+    compile_struct_fields(compiler, &type.structure);
     DA_APPEND(&compiler->types, type);
     return &compiler->types.items[compiler->types.count-1];
 }
@@ -467,6 +465,16 @@ void get_type(Compilation_Unit *compiler, Type *type) {
     case TOK_STRUCT:
         *type = ADVANCED_TYPE(compile_anonymous_struct(compiler));
         break;
+    case TOK_PTR: {
+        expect(compiler, TOK_LBRACKET);
+
+        *type = PTR_TYPE(arena_calloc(&compiler->global->arena, sizeof(Type)));
+        lexer_next(compiler->lexer);
+        get_type(compiler, type->as.pointer);
+
+        expect(compiler, TOK_RBRACKET);
+        break;
+    }
     default:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Expected type, got %s\n", err_tok_spelling(compiler->lexer->prev.type));
@@ -635,6 +643,7 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_U64:
     case TOK_F32:
     case TOK_F64:
+    case TOK_PTR:
     case TOK_STR: {
         Op *op = make_op(compiler, OP_CONVERT, 0);
         get_type(compiler, &op->types[1]);
@@ -670,6 +679,8 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_END:
     case TOK_RBRACE:
     case TOK_RPAREN:
+    case TOK_LBRACKET:
+    case TOK_RBRACKET:
     case TOK_SCOPE:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Lone %s\n", err_tok_spelling(tok->type));
@@ -815,9 +826,9 @@ void compile_struct(Compilation_Unit *compiler) {
     sym->as.type = &compiler->types.items[compiler->types.count-1];
     sym->as.type->loc = compiler->lexer->prev.loc;
 
-    sym->as.type->as.structure.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
+    sym->as.type->structure.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
 
-    compile_struct_fields(compiler, &sym->as.type->as.structure);
+    compile_struct_fields(compiler, &sym->as.type->structure);
 }
 
 void compile_const(Compilation_Unit *compiler) {
@@ -896,8 +907,8 @@ int resolve_type(Compilation_Unit *compiler, Advanced_Type *type) {
     int offset = 0;
     int alignment = 0;
 
-    for (size_t i = 0; i < type->as.structure.fields.count; i++) {
-        Field *field = &type->as.structure.fields.items[i];
+    for (size_t i = 0; i < type->structure.fields.count; i++) {
+        Field *field = &type->structure.fields.items[i];
         if (field->type.kind == KIND_ADVANCED && !resolve_type(compiler, field->type.as.advanced))
             return 0;
 
@@ -911,8 +922,8 @@ int resolve_type(Compilation_Unit *compiler, Advanced_Type *type) {
         offset += type_size(field->type);
     }
 
-    type->as.structure.alignment = alignment;
-    type->as.structure.size = ALIGN(offset, 8);
+    type->structure.alignment = alignment;
+    type->structure.size = ALIGN(offset, 8);
     type->resolve_status = STATUS_RESOLVED;
 
     return 1;

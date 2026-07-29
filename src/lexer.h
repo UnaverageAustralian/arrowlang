@@ -26,6 +26,7 @@ typedef enum {
     TOK_EXT_FUNC,  TOK_C_FUNC,
     TOK_HASH,      TOK_ARROW_HASH,
     TOK_DOT,       TOK_COLON,
+    TOK_LBRACKET,  TOK_RBRACKET,
 
     // Symbols/Words
     TOK_MOD,       TOK_AND,
@@ -57,6 +58,7 @@ typedef enum {
     TOK_I64,       TOK_U64,
     TOK_F32,       TOK_F64,
     TOK_CHAR,      TOK_STR,
+    TOK_PTR,
     // Generics
     TOK_INTEGER,   TOK_REAL,
     TOK_NUMBER,

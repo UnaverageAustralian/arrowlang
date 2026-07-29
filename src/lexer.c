@@ -38,6 +38,7 @@ static const char *keywords[] = {
     "i64",     "u64",
     "f32",     "f64",
     "char",    "str",
+    "ptr",
 
     "Integer", "Real",
     "Number",
@@ -558,6 +559,14 @@ void lexer_next(Lexer *lexer) {
         skip(lexer, 1);
         make_token(lexer, TOK_RPAREN);
         break;
+    case '[':
+        skip(lexer, 1);
+        make_token(lexer, TOK_LBRACKET);
+        break;
+    case ']':
+        skip(lexer, 1);
+        make_token(lexer, TOK_RBRACKET);
+        break;
     case '#':
         skip(lexer, 1);
         make_token(lexer, TOK_HASH);
@@ -719,6 +728,8 @@ char *tok_spelling(Token_Type type) {
     case TOK_WHILE:      return "WHILE";
     case TOK_LBRACE:     return "LBRACE";
     case TOK_RBRACE:     return "RBRACE";
+    case TOK_LBRACKET:   return "LBRACKET";
+    case TOK_RBRACKET:   return "RBRACKET";
     case TOK_LOOP:       return "LOOP";
     case TOK_END:        return "END";
     case TOK_BRK:        return "BRK";
@@ -755,6 +766,7 @@ char *tok_spelling(Token_Type type) {
     case TOK_F32:        return "F32";
     case TOK_F64:        return "F64";
     case TOK_STR:        return "STR";
+    case TOK_PTR:        return "PTR";
     case TOK_WORD:       return "WORD";
     case TOK_EOF:        return "EOF";
     default:             return "UNKNOWN";
@@ -775,6 +787,8 @@ char *err_tok_spelling(Token_Type type) {
     case TOK_FUNC:       return "function character";
     case TOK_LPAREN:     return "left parenthesis";
     case TOK_RPAREN:     return "right parenthesis";
+    case TOK_LBRACKET:   return "left square bracket";
+    case TOK_RBRACKET:   return "right square bracket";
     case TOK_ARROW:      return "arrow";
     case TOK_EXT_FUNC:   return "external function";
     case TOK_C_FUNC:     return "C function";

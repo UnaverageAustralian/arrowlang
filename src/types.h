@@ -4,6 +4,7 @@
 #include "utils.h"
 
 #define BASIC_TYPE(type) (Type){ .kind = KIND_BASIC, .as.basic = type }
+#define PTR_TYPE(type) (Type){ .kind = KIND_PTR, .as.pointer = type }
 #define ADVANCED_TYPE(type) (Type){ .kind = KIND_ADVANCED, .as.advanced = type }
 
 typedef enum {
@@ -22,12 +23,9 @@ typedef enum {
 } Basic_Type;
 
 typedef enum {
-    KIND_BASIC, KIND_ADVANCED,
+    KIND_BASIC, KIND_PTR,
+    KIND_ADVANCED,
 } Type_Kind;
-
-typedef enum {
-    KIND_STRUCT,
-} Advanced_Type_Kind;
 
 typedef enum {
     STATUS_UNRESOLVED, STATUS_RESOLVING,
@@ -50,21 +48,20 @@ typedef struct {
 } Struct;
 
 typedef struct {
-    Advanced_Type_Kind kind;
-    union {
-        Struct structure;
-    } as;
+    Struct structure;
     Resolve_Status resolve_status;
     Loc loc;
 } Advanced_Type;
 
-typedef struct {
+typedef struct Type Type;
+struct Type {
     Type_Kind kind;
     union {
         Basic_Type basic;
+        Type *pointer;
         Advanced_Type *advanced;
     } as;
-} Type;
+};
 
 typedef struct {
     size_t count;

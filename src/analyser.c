@@ -263,7 +263,7 @@ int binop_operands_valid(Op *op, Type a, Type b) {
 }
 
 static inline void allocate(Analyser *analyser, Type a) {
-    analyser->allocated += a.as.advanced->as.structure.size;
+    analyser->allocated += a.as.advanced->structure.size;
     if (analyser->allocated > analyser->max_allocated)
         analyser->max_allocated = analyser->allocated;
 }
@@ -352,7 +352,7 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, a);
         op->types[0] = a;
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT)
+        if (a.kind == KIND_ADVANCED)
             allocate(analyser, a);
         break;
     }
@@ -362,7 +362,7 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, a);
         op->types[0] = a;
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT)
+        if (a.kind == KIND_ADVANCED)
             allocate(analyser, a);
         break;
     }
@@ -373,14 +373,14 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, a);
         op->types[0] = a;
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT)
+        if (a.kind == KIND_ADVANCED)
             allocate(analyser, a);
 
         a = peek(analyser, 2);
         DA_APPEND(&analyser->stack, a);
         op->types[1] = a;
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT)
+        if (a.kind == KIND_ADVANCED)
             allocate(analyser, a);
         break;
     }
@@ -406,14 +406,14 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, a);
         op->types[0] = a;
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT)
+        if (a.kind == KIND_ADVANCED)
             allocate(analyser, a);
 
         a = peek(analyser, 4);
         DA_APPEND(&analyser->stack, a);
         op->types[1] = a;
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT)
+        if (a.kind == KIND_ADVANCED)
             allocate(analyser, a);
         break;
     }
@@ -519,7 +519,7 @@ void type_check_op(Analyser *analyser) {
         analyser->func = &((Symbol *)func_entry->val)->as.func;
         for (size_t i = 0; i < analyser->func->param_types.count; i++) {
             DA_APPEND(&analyser->stack, analyser->func->param_types.items[i]);
-            if (analyser->func->param_types.items[i].kind == KIND_ADVANCED && analyser->func->param_types.items[i].as.advanced->kind == KIND_STRUCT)
+            if (analyser->func->param_types.items[i].kind == KIND_ADVANCED)
                 allocate(analyser, analyser->func->param_types.items[i]);
         }
         break;
@@ -586,7 +586,7 @@ void type_check_op(Analyser *analyser) {
         analyser->stack.count -= func.param_types.count;
         for (size_t i = 0; i < func.return_types.count; i++) {
             DA_APPEND(&analyser->stack, func.return_types.items[i]);
-            if (func.return_types.items[i].kind == KIND_ADVANCED && func.return_types.items[i].as.advanced->kind == KIND_STRUCT)
+            if (func.return_types.items[i].kind == KIND_ADVANCED)
                 allocate(analyser, func.return_types.items[i]);
         }
         break;
@@ -622,7 +622,7 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
         Type a = pop(analyser);
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT) {
+        if (a.kind == KIND_ADVANCED) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct to a basic type\n");
             break;
@@ -633,7 +633,7 @@ void type_check_op(Analyser *analyser) {
         break;
     }
     case OP_INIT: {
-        Fields fields = op->types[0].as.advanced->as.structure.fields;
+        Fields fields = op->types[0].as.advanced->structure.fields;
         if (!check_operand_count(analyser, fields.count)) break;
 
         int had_error = 0;
@@ -677,13 +677,13 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
 
         Type a = peek(analyser, 1);
-        if (a.kind != KIND_ADVANCED || a.as.advanced->kind != KIND_STRUCT) {
+        if (a.kind != KIND_ADVANCED) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source is not a struct\n");
             break;
         }
 
-        Struct structure = a.as.advanced->as.structure;
+        Struct structure = a.as.advanced->structure;
         String_View *sv = (String_View *)op->operand;
 
         Field *field = find_field(&structure, sv);
@@ -696,7 +696,7 @@ void type_check_op(Analyser *analyser) {
         op->operand = (uint64_t)field;
         DA_APPEND(&analyser->stack, field->type);
 
-        if (field->type.kind == KIND_ADVANCED && field->type.as.advanced->kind == KIND_STRUCT)
+        if (field->type.kind == KIND_ADVANCED)
             allocate(analyser, field->type);
         break;
     }
@@ -704,13 +704,13 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
 
         Type a = pop(analyser);
-        if (a.kind != KIND_ADVANCED || a.as.advanced->kind != KIND_STRUCT) {
+        if (a.kind != KIND_ADVANCED) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source is not a struct\n");
             break;
         }
 
-        Struct structure = a.as.advanced->as.structure;
+        Struct structure = a.as.advanced->structure;
         String_View *sv = (String_View *)op->operand;
 
         Field *field = find_field(&structure, sv);
@@ -723,7 +723,7 @@ void type_check_op(Analyser *analyser) {
         op->operand = (uint64_t)field;
         DA_APPEND(&analyser->stack, field->type);
 
-        if (field->type.kind == KIND_ADVANCED && field->type.as.advanced->kind == KIND_STRUCT)
+        if (field->type.kind == KIND_ADVANCED)
             allocate(analyser, field->type);
         break;
     }
@@ -733,13 +733,13 @@ void type_check_op(Analyser *analyser) {
         Type a = pop(analyser);
         Type b = peek(analyser, 1);
 
-        if (b.kind != KIND_ADVANCED || b.as.advanced->kind != KIND_STRUCT) {
+        if (b.kind != KIND_ADVANCED) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Destination is not a struct\n");
             break;
         }
 
-        Struct structure = b.as.advanced->as.structure;
+        Struct structure = b.as.advanced->structure;
         String_View *sv = (String_View *)op->operand;
 
         Field *field = find_field(&structure, sv);
