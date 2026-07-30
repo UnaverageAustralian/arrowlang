@@ -41,6 +41,7 @@ inline int check_operand_count(Analyser *analyser, size_t expected) {
 
 inline void make_conversion_op(Analyser *analyser, Type greater, Type lesser, int operand) {
     Op cur = analyser->ops->items[analyser->pos];
+    greater = greater.kind == KIND_PTR ? BASIC_TYPE(TYPE_U64) : greater;
     Op op = {
         .opcode = OP_CONVERT,
         .file_path = cur.file_path,
@@ -236,7 +237,8 @@ int binop_operands_valid(Op *op, Type a, Type b) {
     case OP_ADD:
     case OP_SUB:
         valid |= (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL) ||
-                 (a.as.basic & (TYPE_INTEGER | TYPE_STR) && b.as.basic & (TYPE_INTEGER | TYPE_STR) && (op->opcode != OP_ADD || a.as.basic != b.as.basic));
+                 ((a.as.basic & (TYPE_INTEGER | TYPE_STR) || a.kind == KIND_PTR) && (b.as.basic & (TYPE_INTEGER | TYPE_STR) || b.kind == KIND_PTR) &&
+                 (op->opcode != OP_ADD || (a.as.basic != b.as.basic && (a.kind & b.kind) != KIND_PTR)));
         break;
     case OP_MUL:
     case OP_DIV:
@@ -246,7 +248,8 @@ int binop_operands_valid(Op *op, Type a, Type b) {
     case OP_LTEQ:
     case OP_LT:
     case OP_EQ:
-        valid |= (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL);
+        valid |= (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL) ||
+                 (a.kind == KIND_PTR && b.kind == KIND_PTR);
         break;
     case OP_MOD:
     case OP_ROR:
@@ -294,7 +297,7 @@ void type_check_op(Analyser *analyser) {
         int depth;
         Type lesser, greater;
 
-        if (a.as.basic > b.as.basic) {
+        if (a.as.basic > b.as.basic || a.kind == KIND_PTR) {
             lesser = b;
             greater = a;
             depth = 8;
@@ -628,8 +631,20 @@ void type_check_op(Analyser *analyser) {
             break;
         }
 
+        if (a.kind == KIND_PTR)
+            op->types[0] = BASIC_TYPE(TYPE_U64);
+
+        if (op->types[1].kind == KIND_PTR && a.kind == KIND_BASIC && (a.as.basic & TYPE_INTEGER) == 0) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a non-integer to a pointer\n");
+            break;
+        }
+
         op->types[0].as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
         DA_APPEND(&analyser->stack, op->types[1]);
+
+        if (op->types[1].kind == KIND_PTR)
+            op->types[1] = BASIC_TYPE(TYPE_U64);
         break;
     }
     case OP_INIT: {
@@ -757,6 +772,58 @@ void type_check_op(Analyser *analyser) {
         }
 
         op->operand = (uint64_t)field;
+        break;
+    }
+    case OP_PTR_STORE: {
+        if (!check_operand_count(analyser, 2)) break;
+
+        Type a = pop(analyser);
+        Type b = peek(analyser, 1);
+
+        if (b.kind != KIND_PTR) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Destination is not a pointer\n");
+            break;
+        }
+
+        if (!types_compatible(a, *b.as.pointer)) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Source type does not match dereferenced destination type, expected %s, got %s\n",
+                          type_spelling(*b.as.pointer), type_spelling(a));
+            break;
+        }
+        break;
+    }
+    case OP_PTR_ACCESS: {
+        if (!check_operand_count(analyser, 1)) break;
+        Type a = peek(analyser, 1);
+
+        if (a.kind != KIND_PTR) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot dereference a non-pointer\n");
+            break;
+        }
+        DA_APPEND(&analyser->stack, *a.as.pointer);
+        break;
+    }
+    case OP_INDEX: {
+        if (!check_operand_count(analyser, 2)) break;
+
+        Type a = pop(analyser);
+        Type b = peek(analyser, 1);
+
+        if (b.kind != KIND_PTR) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot index a non-pointer\n");
+            break;
+        }
+
+        if (a.kind != KIND_BASIC || (a.as.basic & TYPE_INTEGER) == 0) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot index by a non-integer\n");
+            break;
+        }
+        DA_APPEND(&analyser->stack, *b.as.pointer);
         break;
     }
     case OP_LABEL: break;

@@ -485,16 +485,6 @@ void lexer_next(Lexer *lexer) {
 
     char c = peek(lexer, 0);
     switch (c) {
-    case '+':
-        c = peek(lexer, 1);
-        if (c >= '0' && c <= '9') {
-            lex_number(lexer);
-        }
-        else {
-            skip(lexer, 1);
-            make_token(lexer, TOK_ADD);
-        }
-        break;
     case '*':
         skip(lexer, 1);
         make_token(lexer, TOK_MUL);
@@ -526,10 +516,6 @@ void lexer_next(Lexer *lexer) {
     case ';':
         skip(lexer, 1);
         make_token(lexer, TOK_SEMICOLON);
-        break;
-    case '=':
-        skip(lexer, 1);
-        make_token(lexer, TOK_EQ);
         break;
     case '{':
         skip(lexer, 1);
@@ -571,6 +557,24 @@ void lexer_next(Lexer *lexer) {
         skip(lexer, 1);
         make_token(lexer, TOK_HASH);
         break;
+    case '+':
+        c = peek(lexer, 1);
+        if (c >= '0' && c <= '9') {
+            lex_number(lexer);
+        }
+        else if (c == '@') {
+            skip(lexer, 2);
+            make_token(lexer, TOK_ADD_AT);
+        }
+        else {
+            skip(lexer, 1);
+            make_token(lexer, TOK_ADD);
+        }
+        break;
+    case '@':
+        skip(lexer, 1);
+        make_token(lexer, TOK_AT);
+        break;
     case '!':
         skip(lexer, 1);
         c = peek(lexer, 0);
@@ -580,6 +584,17 @@ void lexer_next(Lexer *lexer) {
         }
         else {
             make_token(lexer, TOK_LNOT);
+        }
+        break;
+    case '=':
+        skip(lexer, 1);
+        c = peek(lexer, 0);
+        if (c == '>') {
+            skip(lexer, 1);
+            make_token(lexer, TOK_EQ_ARROW);
+        }
+        else {
+            make_token(lexer, TOK_EQ);
         }
         break;
     case 'E':
@@ -750,6 +765,9 @@ char *tok_spelling(Token_Type type) {
     case TOK_ELSEIF:     return "ELSEIF";
     case TOK_CONST:      return "CONST";
     case TOK_DOT:        return "DOT";
+    case TOK_EQ_ARROW:   return "EQ_ARROW";
+    case TOK_AT:         return "AT";
+    case TOK_ADD_AT:     return "ADD_AT";
     case TOK_INT_LIT:    return "INT_LIT";
     case TOK_REAL_LIT:   return "REAL_LIT";
     case TOK_STR_LIT:    return "STR_LIT";

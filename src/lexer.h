@@ -27,6 +27,7 @@ typedef enum {
     TOK_HASH,      TOK_ARROW_HASH,
     TOK_DOT,       TOK_COLON,
     TOK_LBRACKET,  TOK_RBRACKET,
+    TOK_EQ_ARROW,  TOK_ADD_AT,
 
     // Symbols/Words
     TOK_MOD,       TOK_AND,
