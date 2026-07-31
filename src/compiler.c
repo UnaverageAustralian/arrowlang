@@ -100,52 +100,12 @@ char *opcode_spelling(Opcode opcode) {
     case OP_ACCESS:      return "ACCESS";
     case OP_STORE:       return "STORE";
     case OP_ACCESS_DROP: return "ACCESS_DROP";
+    case OP_PTR_STORE:   return "PTR_STORE";
+    case OP_PTR_ACCESS:  return "PTR_ACCESS";
+    case OP_INDEX:       return "INDEX";
+    case OP_INDEX_STORE: return "INDEX_STORE";
+    case OP_ALLOC:       return "ALLOC";
     default:             return "UNKNOWN";
-    }
-}
-
-char *err_opcode_spelling(Opcode opcode) {
-    switch (opcode) {
-    case OP_JMPF:        return "conditional branch";
-    case OP_CCALL:
-    case OP_CALL:        return "function call";
-    case OP_ADD:         return "addition";
-    case OP_SUB:         return "subtraction";
-    case OP_MUL:         return "multiplication";
-    case OP_DIV:         return "division";
-    case OP_MOD:         return "mod";
-    case OP_AND:         return "and";
-    case OP_OR:          return "or";
-    case OP_XOR:         return "xor";
-    case OP_SHL:         return "shl";
-    case OP_SHR:         return "shr";
-    case OP_ROL:         return "rol";
-    case OP_ROR:         return "ror";
-    case OP_NOT:         return "not";
-    case OP_DUP:         return "dup";
-    case OP_OVER:        return "over";
-    case OP_DUP2:        return "dup2";
-    case OP_DROP:        return "drop";
-    case OP_SWAP:        return "swap";
-    case OP_OVER2:       return "over";
-    case OP_SWAP2:       return "swap2";
-    case OP_NEG:         return "neg";
-    case OP_EQ:          return "eq";
-    case OP_LT:          return "lt";
-    case OP_LTEQ:        return "lteq";
-    case OP_GT:          return "gt";
-    case OP_GTEQ:        return "gteq";
-    case OP_NEQ:         return "neq";
-    case OP_LNOT:        return "lnot";
-    case OP_ROT:         return "rot";
-    case OP_ROTN:        return "rotn";
-    case OP_RET:         return "returning";
-    case OP_CONVERT:     return "type conversion";
-    case OP_INIT:        return "struct initialisation";
-    case OP_ACCESS_DROP:
-    case OP_ACCESS:      return "struct accessing";
-    case OP_STORE:       return "struct storing";
-    default:             return "unknown operation";
     }
 }
 
@@ -221,7 +181,7 @@ inline Hash_Entry *add_symbol(Compilation_Unit *compiler, Symbol *sym) {
     return entry;
 }
 
-inline Op *make_op(Compilation_Unit *compiler, Opcode opcode, uint64_t operand) {
+static inline Op *make_op(Compilation_Unit *compiler, Opcode opcode, uint64_t operand) {
     Op op = {
         .opcode = opcode,
         .operand = operand,
@@ -424,9 +384,7 @@ void compile_struct_fields(Compilation_Unit *compiler, Struct *structure);
 
 Advanced_Type *compile_anonymous_struct(Compilation_Unit *compiler) {
     Advanced_Type type = {0};
-    type.kind = KIND_STRUCT;
-
-    compile_struct_fields(compiler, &type.as.structure);
+    compile_struct_fields(compiler, &type.structure);
     DA_APPEND(&compiler->types, type);
     return &compiler->types.items[compiler->types.count-1];
 }
@@ -467,6 +425,16 @@ void get_type(Compilation_Unit *compiler, Type *type) {
     case TOK_STRUCT:
         *type = ADVANCED_TYPE(compile_anonymous_struct(compiler));
         break;
+    case TOK_PTR: {
+        expect(compiler, TOK_LBRACKET);
+
+        *type = PTR_TYPE(arena_calloc(&compiler->global->arena, sizeof(Type)));
+        lexer_next(compiler->lexer);
+        get_type(compiler, type->as.pointer);
+
+        expect(compiler, TOK_RBRACKET);
+        break;
+    }
     default:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Expected type, got %s\n", err_tok_spelling(compiler->lexer->prev.type));
@@ -545,36 +513,40 @@ void compile_stmt(Compilation_Unit *compiler) {
         op->types[0] = BASIC_TYPE(TYPE_CHAR);
         break;
     }
-    case TOK_ADD:   make_op(compiler, OP_ADD, 0);   break;
-    case TOK_SUB:   make_op(compiler, OP_SUB, 0);   break;
-    case TOK_MUL:   make_op(compiler, OP_MUL, 0);   break;
-    case TOK_DIV:   make_op(compiler, OP_DIV, 0);   break;
-    case TOK_MOD:   make_op(compiler, OP_MOD, 0);   break;
-    case TOK_AND:   make_op(compiler, OP_AND, 0);   break;
-    case TOK_OR:    make_op(compiler, OP_OR, 0);    break;
-    case TOK_XOR:   make_op(compiler, OP_XOR, 0);   break;
-    case TOK_SHL:   make_op(compiler, OP_SHL, 0);   break;
-    case TOK_SHR:   make_op(compiler, OP_SHR, 0);   break;
-    case TOK_ROL:   make_op(compiler, OP_ROL, 0);   break;
-    case TOK_ROR:   make_op(compiler, OP_ROR, 0);   break;
-    case TOK_NOT:   make_op(compiler, OP_NOT, 0);   break;
-    case TOK_DUP:   make_op(compiler, OP_DUP, 0);   break;
-    case TOK_OVER:  make_op(compiler, OP_OVER, 0);  break;
-    case TOK_DUP2:  make_op(compiler, OP_DUP2, 0);  break;
-    case TOK_DROP:  make_op(compiler, OP_DROP, 0);  break;
-    case TOK_SWAP:  make_op(compiler, OP_SWAP, 0);  break;
-    case TOK_OVER2: make_op(compiler, OP_OVER2, 0); break;
-    case TOK_SWAP2: make_op(compiler, OP_SWAP2, 0); break;
-    case TOK_NEG:   make_op(compiler, OP_NEG, 0);   break;
-    case TOK_EQ:    make_op(compiler, OP_EQ, 0);    break;
-    case TOK_LT:    make_op(compiler, OP_LT, 0);    break;
-    case TOK_LTEQ:  make_op(compiler, OP_LTEQ, 0);  break;
-    case TOK_GT:    make_op(compiler, OP_GT, 0);    break;
-    case TOK_GTEQ:  make_op(compiler, OP_GTEQ, 0);  break;
-    case TOK_NEQ:   make_op(compiler, OP_NEQ, 0);   break;
-    case TOK_LNOT:  make_op(compiler, OP_LNOT, 0);  break;
-    case TOK_ROT:   make_op(compiler, OP_ROT, 0);   break;
-    case TOK_ROTN:  make_op(compiler, OP_ROTN, 0);  break;
+    case TOK_ADD:       make_op(compiler, OP_ADD, 0);         break;
+    case TOK_SUB:       make_op(compiler, OP_SUB, 0);         break;
+    case TOK_MUL:       make_op(compiler, OP_MUL, 0);         break;
+    case TOK_DIV:       make_op(compiler, OP_DIV, 0);         break;
+    case TOK_MOD:       make_op(compiler, OP_MOD, 0);         break;
+    case TOK_AND:       make_op(compiler, OP_AND, 0);         break;
+    case TOK_OR:        make_op(compiler, OP_OR, 0);          break;
+    case TOK_XOR:       make_op(compiler, OP_XOR, 0);         break;
+    case TOK_SHL:       make_op(compiler, OP_SHL, 0);         break;
+    case TOK_SHR:       make_op(compiler, OP_SHR, 0);         break;
+    case TOK_ROL:       make_op(compiler, OP_ROL, 0);         break;
+    case TOK_ROR:       make_op(compiler, OP_ROR, 0);         break;
+    case TOK_NOT:       make_op(compiler, OP_NOT, 0);         break;
+    case TOK_DUP:       make_op(compiler, OP_DUP, 0);         break;
+    case TOK_OVER:      make_op(compiler, OP_OVER, 0);        break;
+    case TOK_DUP2:      make_op(compiler, OP_DUP2, 0);        break;
+    case TOK_DROP:      make_op(compiler, OP_DROP, 0);        break;
+    case TOK_SWAP:      make_op(compiler, OP_SWAP, 0);        break;
+    case TOK_OVER2:     make_op(compiler, OP_OVER2, 0);       break;
+    case TOK_SWAP2:     make_op(compiler, OP_SWAP2, 0);       break;
+    case TOK_NEG:       make_op(compiler, OP_NEG, 0);         break;
+    case TOK_EQ:        make_op(compiler, OP_EQ, 0);          break;
+    case TOK_LT:        make_op(compiler, OP_LT, 0);          break;
+    case TOK_LTEQ:      make_op(compiler, OP_LTEQ, 0);        break;
+    case TOK_GT:        make_op(compiler, OP_GT, 0);          break;
+    case TOK_GTEQ:      make_op(compiler, OP_GTEQ, 0);        break;
+    case TOK_NEQ:       make_op(compiler, OP_NEQ, 0);         break;
+    case TOK_LNOT:      make_op(compiler, OP_LNOT, 0);        break;
+    case TOK_ROT:       make_op(compiler, OP_ROT, 0);         break;
+    case TOK_ROTN:      make_op(compiler, OP_ROTN, 0);        break;
+    case TOK_STORE:     make_op(compiler, OP_PTR_STORE, 0);   break;
+    case TOK_AT:        make_op(compiler, OP_PTR_ACCESS, 0);  break;
+    case TOK_ADD_AT:    make_op(compiler, OP_INDEX, 0);       break;
+    case TOK_ADD_STORE: make_op(compiler, OP_INDEX_STORE, 0); break;
     case TOK_STR_LIT:
         make_op(compiler, OP_STR, (int64_t)tok->as.str);
         break;
@@ -635,6 +607,7 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_U64:
     case TOK_F32:
     case TOK_F64:
+    case TOK_PTR:
     case TOK_STR: {
         Op *op = make_op(compiler, OP_CONVERT, 0);
         get_type(compiler, &op->types[1]);
@@ -661,6 +634,12 @@ void compile_stmt(Compilation_Unit *compiler) {
         make_op(compiler, OP_ACCESS_DROP, (uint64_t)sv);
         break;
     }
+    case TOK_ALLOC: {
+        Op *op = make_op(compiler, OP_ALLOC, 0);
+        lexer_next(compiler->lexer);
+        get_type(compiler, &op->types[0]);
+        break;
+    }
     case TOK_ERROR:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "%.*s\n", tok->len, tok->start);
@@ -670,6 +649,8 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_END:
     case TOK_RBRACE:
     case TOK_RPAREN:
+    case TOK_LBRACKET:
+    case TOK_RBRACKET:
     case TOK_SCOPE:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Lone %s\n", err_tok_spelling(tok->type));
@@ -815,9 +796,9 @@ void compile_struct(Compilation_Unit *compiler) {
     sym->as.type = &compiler->types.items[compiler->types.count-1];
     sym->as.type->loc = compiler->lexer->prev.loc;
 
-    sym->as.type->as.structure.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
+    sym->as.type->structure.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
 
-    compile_struct_fields(compiler, &sym->as.type->as.structure);
+    compile_struct_fields(compiler, &sym->as.type->structure);
 }
 
 void compile_const(Compilation_Unit *compiler) {
@@ -896,8 +877,8 @@ int resolve_type(Compilation_Unit *compiler, Advanced_Type *type) {
     int offset = 0;
     int alignment = 0;
 
-    for (size_t i = 0; i < type->as.structure.fields.count; i++) {
-        Field *field = &type->as.structure.fields.items[i];
+    for (size_t i = 0; i < type->structure.fields.count; i++) {
+        Field *field = &type->structure.fields.items[i];
         if (field->type.kind == KIND_ADVANCED && !resolve_type(compiler, field->type.as.advanced))
             return 0;
 
@@ -911,8 +892,8 @@ int resolve_type(Compilation_Unit *compiler, Advanced_Type *type) {
         offset += type_size(field->type);
     }
 
-    type->as.structure.alignment = alignment;
-    type->as.structure.size = ALIGN(offset, 8);
+    type->structure.alignment = alignment;
+    type->structure.size = ALIGN(offset, 8);
     type->resolve_status = STATUS_RESOLVED;
 
     return 1;
@@ -1045,9 +1026,11 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
         if (!global->had_error && !global->options.print_ir) {
             Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
             char *output_asm = generate_x86_64_linux(&unit.ops, obj_name, main != NULL && main->key != NULL);
+            if (!output_asm) global->had_error = 1;
+
             DA_APPEND(&global->cleanup, output_asm);
 
-            if (!global->options.emit_asm) {
+            if (!global->had_error && !global->options.emit_asm) {
                 Cmd cmd = {0};
                 cmd_append_many(&cmd, 4, "as", "-o", obj_name, output_asm);
                 cmd_exec(&cmd, global->options.verbose);

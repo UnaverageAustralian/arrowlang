@@ -33,7 +33,7 @@ inline int check_operand_count(Analyser *analyser, size_t expected) {
     if (analyser->stack.count < expected) {
         analyser->had_error = 1;
         EPRINTF_AT_OP(op, LEVEL_ERR, "Not enough items on the stack for %s, need at least %d element(s)\n",
-                      err_opcode_spelling(op->opcode), expected);
+                      opcode_spelling(op->opcode), expected);
         return 0;
     }
     return 1;
@@ -41,6 +41,7 @@ inline int check_operand_count(Analyser *analyser, size_t expected) {
 
 inline void make_conversion_op(Analyser *analyser, Type greater, Type lesser, int operand) {
     Op cur = analyser->ops->items[analyser->pos];
+    greater = greater.kind == KIND_PTR ? BASIC_TYPE(TYPE_U64) : greater;
     Op op = {
         .opcode = OP_CONVERT,
         .file_path = cur.file_path,
@@ -236,7 +237,8 @@ int binop_operands_valid(Op *op, Type a, Type b) {
     case OP_ADD:
     case OP_SUB:
         valid |= (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL) ||
-                 (a.as.basic & (TYPE_INTEGER | TYPE_STR) && b.as.basic & (TYPE_INTEGER | TYPE_STR) && (op->opcode != OP_ADD || a.as.basic != b.as.basic));
+                 ((a.as.basic & (TYPE_INTEGER | TYPE_STR) || a.kind == KIND_PTR) && (b.as.basic & (TYPE_INTEGER | TYPE_STR) || b.kind == KIND_PTR) &&
+                 (op->opcode != OP_ADD || (a.as.basic != b.as.basic && (a.kind & b.kind) != KIND_PTR)));
         break;
     case OP_MUL:
     case OP_DIV:
@@ -246,7 +248,8 @@ int binop_operands_valid(Op *op, Type a, Type b) {
     case OP_LTEQ:
     case OP_LT:
     case OP_EQ:
-        valid |= (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL);
+        valid |= (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL) ||
+                 (a.kind == KIND_PTR && b.kind == KIND_PTR);
         break;
     case OP_MOD:
     case OP_ROR:
@@ -263,7 +266,7 @@ int binop_operands_valid(Op *op, Type a, Type b) {
 }
 
 static inline void allocate(Analyser *analyser, Type a) {
-    analyser->allocated += a.as.advanced->as.structure.size;
+    analyser->allocated += a.as.advanced->structure.size;
     if (analyser->allocated > analyser->max_allocated)
         analyser->max_allocated = analyser->allocated;
 }
@@ -294,7 +297,7 @@ void type_check_op(Analyser *analyser) {
         int depth;
         Type lesser, greater;
 
-        if (a.as.basic > b.as.basic) {
+        if (a.as.basic > b.as.basic || a.kind == KIND_PTR) {
             lesser = b;
             greater = a;
             depth = 8;
@@ -329,7 +332,7 @@ void type_check_op(Analyser *analyser) {
         else {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Invalid operand types for %s: %s %s\n",
-                             err_opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
+                             opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
         }
         break;
     }
@@ -352,7 +355,7 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, a);
         op->types[0] = a;
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT)
+        if (a.kind == KIND_ADVANCED)
             allocate(analyser, a);
         break;
     }
@@ -362,7 +365,7 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, a);
         op->types[0] = a;
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT)
+        if (a.kind == KIND_ADVANCED)
             allocate(analyser, a);
         break;
     }
@@ -373,14 +376,14 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, a);
         op->types[0] = a;
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT)
+        if (a.kind == KIND_ADVANCED)
             allocate(analyser, a);
 
         a = peek(analyser, 2);
         DA_APPEND(&analyser->stack, a);
         op->types[1] = a;
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT)
+        if (a.kind == KIND_ADVANCED)
             allocate(analyser, a);
         break;
     }
@@ -406,14 +409,14 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, a);
         op->types[0] = a;
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT)
+        if (a.kind == KIND_ADVANCED)
             allocate(analyser, a);
 
         a = peek(analyser, 4);
         DA_APPEND(&analyser->stack, a);
         op->types[1] = a;
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT)
+        if (a.kind == KIND_ADVANCED)
             allocate(analyser, a);
         break;
     }
@@ -493,7 +496,7 @@ void type_check_op(Analyser *analyser) {
         else {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Invalid operand types for %s: %s %s\n",
-                             err_opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
+                             opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
         }
         break;
     }
@@ -519,7 +522,7 @@ void type_check_op(Analyser *analyser) {
         analyser->func = &((Symbol *)func_entry->val)->as.func;
         for (size_t i = 0; i < analyser->func->param_types.count; i++) {
             DA_APPEND(&analyser->stack, analyser->func->param_types.items[i]);
-            if (analyser->func->param_types.items[i].kind == KIND_ADVANCED && analyser->func->param_types.items[i].as.advanced->kind == KIND_STRUCT)
+            if (analyser->func->param_types.items[i].kind == KIND_ADVANCED)
                 allocate(analyser, analyser->func->param_types.items[i]);
         }
         break;
@@ -572,7 +575,7 @@ void type_check_op(Analyser *analyser) {
                 continue;
             }
 
-            if (!types_equal(arg, param)) {
+            if (!types_equal(arg, param) && arg.kind == KIND_BASIC && param.kind == KIND_BASIC) {
                 arg.as.basic = arg.as.basic == TYPE_INTEGER ? TYPE_I64 : arg.as.basic == TYPE_REAL ? TYPE_F64 : arg.as.basic;
                 make_conversion_op(analyser, func.param_types.items[i], arg, (func.param_types.count-i-1)*8);
             }
@@ -586,7 +589,7 @@ void type_check_op(Analyser *analyser) {
         analyser->stack.count -= func.param_types.count;
         for (size_t i = 0; i < func.return_types.count; i++) {
             DA_APPEND(&analyser->stack, func.return_types.items[i]);
-            if (func.return_types.items[i].kind == KIND_ADVANCED && func.return_types.items[i].as.advanced->kind == KIND_STRUCT)
+            if (func.return_types.items[i].kind == KIND_ADVANCED)
                 allocate(analyser, func.return_types.items[i]);
         }
         break;
@@ -622,18 +625,39 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
         Type a = pop(analyser);
 
-        if (a.kind == KIND_ADVANCED && a.as.advanced->kind == KIND_STRUCT) {
+        if (a.kind == KIND_ADVANCED && op->types[1].kind == KIND_BASIC) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct to a basic type\n");
+            break;
+        }
+        if (a.kind == KIND_ADVANCED && !types_equal(a, *op->types[1].as.pointer)) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct into a pointer to a different type\n");
+            break;
+        }
+
+        if (op->types[1].kind == KIND_PTR && a.kind == KIND_BASIC && (a.as.basic & TYPE_INTEGER) == 0) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a non-integer to a pointer\n");
             break;
         }
 
         op->types[0].as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
         DA_APPEND(&analyser->stack, op->types[1]);
+
+        if (a.kind == KIND_PTR)
+            op->types[0] = BASIC_TYPE(TYPE_U64);
+        if (op->types[1].kind == KIND_PTR)
+            op->types[1] = BASIC_TYPE(TYPE_U64);
+
+        if (a.kind == KIND_ADVANCED) {
+            analyser->pos++;
+            return;
+        }
         break;
     }
     case OP_INIT: {
-        Fields fields = op->types[0].as.advanced->as.structure.fields;
+        Fields fields = op->types[0].as.advanced->structure.fields;
         if (!check_operand_count(analyser, fields.count)) break;
 
         int had_error = 0;
@@ -676,14 +700,17 @@ void type_check_op(Analyser *analyser) {
     case OP_ACCESS: {
         if (!check_operand_count(analyser, 1)) break;
 
-        Type a = peek(analyser, 1);
-        if (a.kind != KIND_ADVANCED || a.as.advanced->kind != KIND_STRUCT) {
+        Type src = peek(analyser, 1);
+        if (src.kind == KIND_PTR)
+            src = *src.as.pointer;
+
+        if (src.kind != KIND_ADVANCED) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source is not a struct\n");
             break;
         }
 
-        Struct structure = a.as.advanced->as.structure;
+        Struct structure = src.as.advanced->structure;
         String_View *sv = (String_View *)op->operand;
 
         Field *field = find_field(&structure, sv);
@@ -696,21 +723,24 @@ void type_check_op(Analyser *analyser) {
         op->operand = (uint64_t)field;
         DA_APPEND(&analyser->stack, field->type);
 
-        if (field->type.kind == KIND_ADVANCED && field->type.as.advanced->kind == KIND_STRUCT)
+        if (field->type.kind == KIND_ADVANCED)
             allocate(analyser, field->type);
         break;
     }
     case OP_ACCESS_DROP: {
         if (!check_operand_count(analyser, 1)) break;
 
-        Type a = pop(analyser);
-        if (a.kind != KIND_ADVANCED || a.as.advanced->kind != KIND_STRUCT) {
+        Type src = pop(analyser);
+        if (src.kind == KIND_PTR)
+            src = *src.as.pointer;
+
+        if (src.kind != KIND_ADVANCED) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source is not a struct\n");
             break;
         }
 
-        Struct structure = a.as.advanced->as.structure;
+        Struct structure = src.as.advanced->structure;
         String_View *sv = (String_View *)op->operand;
 
         Field *field = find_field(&structure, sv);
@@ -723,23 +753,25 @@ void type_check_op(Analyser *analyser) {
         op->operand = (uint64_t)field;
         DA_APPEND(&analyser->stack, field->type);
 
-        if (field->type.kind == KIND_ADVANCED && field->type.as.advanced->kind == KIND_STRUCT)
+        if (field->type.kind == KIND_ADVANCED)
             allocate(analyser, field->type);
         break;
     }
     case OP_STORE: {
         if (!check_operand_count(analyser, 2)) break;
 
-        Type a = pop(analyser);
-        Type b = peek(analyser, 1);
+        Type item = pop(analyser);
+        Type dest = peek(analyser, 1);
+        if (dest.kind == KIND_PTR)
+            dest = *dest.as.pointer;
 
-        if (b.kind != KIND_ADVANCED || b.as.advanced->kind != KIND_STRUCT) {
+        if (dest.kind != KIND_ADVANCED) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Destination is not a struct\n");
             break;
         }
 
-        Struct structure = b.as.advanced->as.structure;
+        Struct structure = dest.as.advanced->structure;
         String_View *sv = (String_View *)op->operand;
 
         Field *field = find_field(&structure, sv);
@@ -748,17 +780,113 @@ void type_check_op(Analyser *analyser) {
             EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", structure.name.len, structure.name.str, sv->len, sv->str);
             break;
         }
-
-        if (!types_compatible(a, field->type)) {
+        if (!types_compatible(item, field->type)) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source type does not match destination type, expected %s, got %s\n",
-                          type_spelling(field->type), type_spelling(a));
+                          type_spelling(field->type), type_spelling(item));
             break;
         }
 
         op->operand = (uint64_t)field;
         break;
     }
+    case OP_PTR_STORE: {
+        if (!check_operand_count(analyser, 2)) break;
+
+        Type item = pop(analyser);
+        Type ptr = peek(analyser, 1);
+
+        if (ptr.kind != KIND_PTR) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Destination is not a pointer\n");
+            break;
+        }
+        if (!types_compatible(item, *ptr.as.pointer)) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Source type does not match dereferenced destination type, expected %s, got %s\n",
+                          type_spelling(*ptr.as.pointer), type_spelling(item));
+            break;
+        }
+
+        op->types[0] = *ptr.as.pointer;
+        break;
+    }
+    case OP_PTR_ACCESS: {
+        if (!check_operand_count(analyser, 1)) break;
+        Type ptr = peek(analyser, 1);
+
+        if (ptr.kind != KIND_PTR) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot dereference a non-pointer\n");
+            break;
+        }
+
+        op->types[0] = *ptr.as.pointer;
+        DA_APPEND(&analyser->stack, *ptr.as.pointer);
+
+        if (ptr.as.pointer->kind == KIND_ADVANCED)
+            allocate(analyser, *ptr.as.pointer);
+        break;
+    }
+    case OP_INDEX: {
+        if (!check_operand_count(analyser, 2)) break;
+
+        Type index = pop(analyser);
+        Type ptr = peek(analyser, 1);
+
+        if (ptr.kind != KIND_PTR) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot index a non-pointer\n");
+            break;
+        }
+        if (index.kind != KIND_BASIC || (index.as.basic & TYPE_INTEGER) == 0) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot index by a non-integer\n");
+            break;
+        }
+
+        op->types[0] = *ptr.as.pointer;
+        DA_APPEND(&analyser->stack, *ptr.as.pointer);
+
+        if (ptr.as.pointer->kind == KIND_ADVANCED)
+            allocate(analyser, *ptr.as.pointer);
+        break;
+    }
+    case OP_INDEX_STORE: {
+        if (!check_operand_count(analyser, 3)) break;
+
+        Type index = pop(analyser);
+        Type item = pop(analyser);
+        Type ptr = peek(analyser, 1);
+
+        if (ptr.kind != KIND_PTR) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Destination is not a pointer\n");
+            break;
+        }
+        if (index.kind != KIND_BASIC || (index.as.basic & TYPE_INTEGER) == 0) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot index by a non-integer\n");
+            break;
+        }
+        if (!types_compatible(item, *ptr.as.pointer)) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Source type does not match dereferenced destination type, expected %s, got %s\n",
+                          type_spelling(*ptr.as.pointer), type_spelling(item));
+            break;
+        }
+
+        op->types[0] = *ptr.as.pointer;
+        break;
+    }
+    case OP_ALLOC:
+        if (op->types[0].kind != KIND_ADVANCED) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot allocate a non-struct\n");
+        }
+        allocate(analyser, op->types[0]);
+        DA_APPEND(&analyser->stack, op->types[0]);
+        break;
     case OP_LABEL: break;
     case OP_START:
         type_check_block(analyser);
