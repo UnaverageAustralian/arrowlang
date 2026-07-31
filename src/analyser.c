@@ -575,7 +575,7 @@ void type_check_op(Analyser *analyser) {
                 continue;
             }
 
-            if (!types_equal(arg, param)) {
+            if (!types_equal(arg, param) && arg.kind == KIND_BASIC && param.kind == KIND_BASIC) {
                 arg.as.basic = arg.as.basic == TYPE_INTEGER ? TYPE_I64 : arg.as.basic == TYPE_REAL ? TYPE_F64 : arg.as.basic;
                 make_conversion_op(analyser, func.param_types.items[i], arg, (func.param_types.count-i-1)*8);
             }
@@ -632,12 +632,9 @@ void type_check_op(Analyser *analyser) {
         }
         if (a.kind == KIND_ADVANCED && !types_equal(a, *op->types[1].as.pointer)) {
             analyser->had_error = 1;
-            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct to a pointer to a different type\n");
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct into a pointer to a different type\n");
             break;
         }
-
-        if (a.kind == KIND_PTR)
-            op->types[0] = BASIC_TYPE(TYPE_U64);
 
         if (op->types[1].kind == KIND_PTR && a.kind == KIND_BASIC && (a.as.basic & TYPE_INTEGER) == 0) {
             analyser->had_error = 1;
@@ -648,6 +645,8 @@ void type_check_op(Analyser *analyser) {
         op->types[0].as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
         DA_APPEND(&analyser->stack, op->types[1]);
 
+        if (a.kind == KIND_PTR)
+            op->types[0] = BASIC_TYPE(TYPE_U64);
         if (op->types[1].kind == KIND_PTR)
             op->types[1] = BASIC_TYPE(TYPE_U64);
 
