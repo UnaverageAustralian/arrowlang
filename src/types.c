@@ -146,6 +146,6 @@ int types_equal(Type a, Type b) {
         return a.as.basic == b.as.basic;
     else if (a.kind == KIND_PTR)
         return types_equal(*a.as.pointer, *b.as.pointer);
-    return struct_fields_equal(a.as.advanced->structure, a.as.advanced->structure);
+    return struct_fields_equal(a.as.advanced->structure, b.as.advanced->structure);
 }
 

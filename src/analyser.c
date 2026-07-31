@@ -625,12 +625,12 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
         Type a = pop(analyser);
 
-        if (a.kind == KIND_ADVANCED && op->types[0].kind == KIND_BASIC) {
+        if (a.kind == KIND_ADVANCED && op->types[1].kind == KIND_BASIC) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct to a basic type\n");
             break;
         }
-        if (a.kind == KIND_ADVANCED && !types_equal(a, *op->types[0].as.pointer)) {
+        if (a.kind == KIND_ADVANCED && !types_equal(a, *op->types[1].as.pointer)) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct to a pointer to a different type\n");
             break;
@@ -816,6 +816,9 @@ void type_check_op(Analyser *analyser) {
 
         op->types[0] = *ptr.as.pointer;
         DA_APPEND(&analyser->stack, *ptr.as.pointer);
+
+        if (ptr.as.pointer->kind == KIND_ADVANCED)
+            allocate(analyser, *ptr.as.pointer);
         break;
     }
     case OP_INDEX: {
@@ -837,6 +840,9 @@ void type_check_op(Analyser *analyser) {
 
         op->types[0] = *ptr.as.pointer;
         DA_APPEND(&analyser->stack, *ptr.as.pointer);
+
+        if (ptr.as.pointer->kind == KIND_ADVANCED)
+            allocate(analyser, *ptr.as.pointer);
         break;
     }
     case OP_INDEX_STORE: {

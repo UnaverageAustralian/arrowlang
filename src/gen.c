@@ -803,6 +803,67 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.depth--;
             break;
         }
+        case OP_PTR_STORE:
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    movq (%%rsp), %%rdi\n");
+
+            if (op->types[0].kind == KIND_ADVANCED) {
+                sb_appendf(&gen.sb, "    movq %%rax, %%rsi\n");
+                move_struct(&gen, op->types[0].as.advanced->structure, 0);
+            }
+            else {
+                sb_appendf(&gen.sb, "    mov%c %s, (%%rdi)\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
+            }
+            gen.depth--;
+            break;
+        case OP_PTR_ACCESS:
+            sb_appendf(&gen.sb, "    movq (%%rsp), %%rsi\n");
+
+            if (op->types[0].kind == KIND_ADVANCED) {
+                sb_appendf(&gen.sb, "    pushq %%rsi\n");
+                duplicate_struct(&gen, op->types[0].as.advanced->structure);
+            }
+            else {
+                sb_appendf(&gen.sb, "    pushq (%%rsi)\n");
+            }
+
+            gen.depth++;
+            break;
+        case OP_INDEX:
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    movq (%%rsp), %%rsi\n");
+
+            sb_appendf(&gen.sb, "    add %%rax, %%rsi\n");
+            if (op->types[0].kind == KIND_ADVANCED) {
+                sb_appendf(&gen.sb, "    pushq %%rsi\n");
+                duplicate_struct(&gen, op->types[0].as.advanced->structure);
+            }
+            else {
+                sb_appendf(&gen.sb, "    pushq (%%rsi)\n");
+            }
+            break;
+        case OP_INDEX_STORE:
+            sb_appendf(&gen.sb, "    popq %%rax\n");
+            sb_appendf(&gen.sb, "    popq %%rdx\n");
+            sb_appendf(&gen.sb, "    movq (%%rsp), %%rdi\n");
+
+            sb_appendf(&gen.sb, "    add %%rax, %%rdi\n");
+            if (op->types[0].kind == KIND_ADVANCED) {
+                sb_appendf(&gen.sb, "    movq %%rdx, %%rsi\n");
+                move_struct(&gen, op->types[0].as.advanced->structure, 0);
+            }
+            else {
+                sb_appendf(&gen.sb, "    mov%c %s, (%%rdi)\n", size_sufs[type_size(op->types[0])], rdx[type_size(op->types[0])]);
+            }
+
+            gen.depth -= 2;
+            break;
+        case OP_ALLOC:
+            sb_appendf(&gen.sb, "    movq $%d, %%rcx\n", op->types[0].as.advanced->structure.size/8);
+            sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
+            sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", gen.allocated - gen.func.max_allocated);
+            sb_appendf(&gen.sb, "    stosq\n");
+            break;
         case OP_NOP: break;
         default:
             GEN_EPRINTF(op, LEVEL_ERR, "Unimplemented instruction: %s\n", opcode_spelling(op->opcode));
