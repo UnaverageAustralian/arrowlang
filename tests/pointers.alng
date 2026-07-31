@@ -5,7 +5,7 @@ struct Foo
 end
 
 $main ( -> u8 )
-    3 Foo ptr[Foo]      @.x 3 = "@.x = 3" errors::assert
-    swap 4 Foo =>       @.x 4 = "@.x = 4" errors::assert rot |
+    3 Foo ptr[Foo]       #x 3 = "@.x = 3" errors::assert
+    swap 4 Foo =>        #x 4 = "@.x = 4" errors::assert rot |
     swap 5 Foo 1 +=> 1 +@.x 5 = "@.x = 5" errors::assert rot |
 $

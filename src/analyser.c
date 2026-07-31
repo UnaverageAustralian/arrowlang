@@ -702,6 +702,9 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
 
         Type src = peek(analyser, 1);
+        if (src.kind == KIND_PTR)
+            src = *src.as.pointer;
+
         if (src.kind != KIND_ADVANCED) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source is not a struct\n");
@@ -729,6 +732,9 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
 
         Type src = pop(analyser);
+        if (src.kind == KIND_PTR)
+            src = *src.as.pointer;
+
         if (src.kind != KIND_ADVANCED) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source is not a struct\n");
@@ -757,6 +763,8 @@ void type_check_op(Analyser *analyser) {
 
         Type item = pop(analyser);
         Type dest = peek(analyser, 1);
+        if (dest.kind == KIND_PTR)
+            dest = *dest.as.pointer;
 
         if (dest.kind != KIND_ADVANCED) {
             analyser->had_error = 1;
