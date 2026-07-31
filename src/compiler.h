@@ -91,7 +91,7 @@ typedef struct {
     Loc loc;
     Unresolved_Type type;
     union {
-        Op *op;
+        size_t op;
         Type *type;
     } as;
 } Unresolved_Symbol;

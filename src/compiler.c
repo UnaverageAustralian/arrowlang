@@ -480,7 +480,7 @@ void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
 
     if (!entry || !entry->key) {
         Unresolved_Symbol *unresolved = make_unresolved(compiler, UTYPE_OP);
-        unresolved->as.op = &compiler->ops.items[compiler->ops.count];
+        unresolved->as.op = compiler->ops.count;
         make_op(compiler, OP_UNKNOWN, 0);
         return;
     }
@@ -941,7 +941,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
 
         switch (unresolved.type) {
         case UTYPE_OP: {
-            Op *op = unresolved.as.op;
+            Op *op = &compiler->ops.items[unresolved.as.op];
             switch (sym->type) {
             case STYPE_FUNC:
                 op->opcode = sym->as.func.is_c_func ? OP_CCALL : OP_CALL;
