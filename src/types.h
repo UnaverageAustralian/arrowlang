@@ -1,6 +1,8 @@
 #ifndef ARROW_TYPES_H
 #define ARROW_TYPES_H
 
+#include <stdint.h>
+
 #include "utils.h"
 
 #define BASIC_TYPE(type) (Type){ .kind = KIND_BASIC, .as.basic = type }

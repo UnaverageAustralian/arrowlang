@@ -103,55 +103,9 @@ char *opcode_spelling(Opcode opcode) {
     case OP_PTR_STORE:   return "PTR_STORE";
     case OP_PTR_ACCESS:  return "PTR_ACCESS";
     case OP_INDEX:       return "INDEX";
+    case OP_INDEX_STORE: return "INDEX_STORE";
+    case OP_ALLOC:       return "ALLOC";
     default:             return "UNKNOWN";
-    }
-}
-
-char *err_opcode_spelling(Opcode opcode) {
-    switch (opcode) {
-    case OP_JMPF:        return "conditional branch";
-    case OP_CCALL:
-    case OP_CALL:        return "function call";
-    case OP_ADD:         return "addition";
-    case OP_SUB:         return "subtraction";
-    case OP_MUL:         return "multiplication";
-    case OP_DIV:         return "division";
-    case OP_MOD:         return "mod";
-    case OP_AND:         return "and";
-    case OP_OR:          return "or";
-    case OP_XOR:         return "xor";
-    case OP_SHL:         return "shl";
-    case OP_SHR:         return "shr";
-    case OP_ROL:         return "rol";
-    case OP_ROR:         return "ror";
-    case OP_NOT:         return "not";
-    case OP_DUP:         return "dup";
-    case OP_OVER:        return "over";
-    case OP_DUP2:        return "dup2";
-    case OP_DROP:        return "drop";
-    case OP_SWAP:        return "swap";
-    case OP_OVER2:       return "over";
-    case OP_SWAP2:       return "swap2";
-    case OP_NEG:         return "neg";
-    case OP_EQ:          return "eq";
-    case OP_LT:          return "lt";
-    case OP_LTEQ:        return "lteq";
-    case OP_GT:          return "gt";
-    case OP_GTEQ:        return "gteq";
-    case OP_NEQ:         return "neq";
-    case OP_LNOT:        return "lnot";
-    case OP_ROT:         return "rot";
-    case OP_ROTN:        return "rotn";
-    case OP_RET:         return "returning";
-    case OP_CONVERT:     return "type conversion";
-    case OP_INIT:        return "struct initialisation";
-    case OP_ACCESS_DROP:
-    case OP_ACCESS:      return "struct accessing";
-    case OP_STORE:       return "struct storing";
-    case OP_PTR_STORE:   return "pointer storing";
-    case OP_PTR_ACCESS:  return "pointer accessing";
-    case OP_INDEX:       return "indexing";
-    default:             return "unknown operation";
     }
 }
 
@@ -494,7 +448,7 @@ void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
 
     if (!entry || !entry->key) {
         Unresolved_Symbol *unresolved = make_unresolved(compiler, UTYPE_OP);
-        unresolved->as.op = &compiler->ops.items[compiler->ops.count];
+        unresolved->as.op = compiler->ops.count;
         make_op(compiler, OP_UNKNOWN, 0);
         return;
     }
@@ -678,6 +632,12 @@ void compile_stmt(Compilation_Unit *compiler) {
         String_View *sv = arena_calloc(&compiler->global->arena, sizeof(String_View));
         *sv = (String_View){ .len = tok->len, .str = tok->start };
         make_op(compiler, OP_ACCESS_DROP, (uint64_t)sv);
+        break;
+    }
+    case TOK_ALLOC: {
+        Op *op = make_op(compiler, OP_ALLOC, 0);
+        lexer_next(compiler->lexer);
+        get_type(compiler, &op->types[0]);
         break;
     }
     case TOK_ERROR:
@@ -962,7 +922,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
 
         switch (unresolved.type) {
         case UTYPE_OP: {
-            Op *op = unresolved.as.op;
+            Op *op = &compiler->ops.items[unresolved.as.op];
             switch (sym->type) {
             case STYPE_FUNC:
                 op->opcode = sym->as.func.is_c_func ? OP_CCALL : OP_CALL;
@@ -1066,9 +1026,11 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
         if (!global->had_error && !global->options.print_ir) {
             Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
             char *output_asm = generate_x86_64_linux(&unit.ops, obj_name, main != NULL && main->key != NULL);
+            if (!output_asm) global->had_error = 1;
+
             DA_APPEND(&global->cleanup, output_asm);
 
-            if (!global->options.emit_asm) {
+            if (!global->had_error && !global->options.emit_asm) {
                 Cmd cmd = {0};
                 cmd_append_many(&cmd, 4, "as", "-o", obj_name, output_asm);
                 cmd_exec(&cmd, global->options.verbose);

@@ -33,7 +33,7 @@ inline int check_operand_count(Analyser *analyser, size_t expected) {
     if (analyser->stack.count < expected) {
         analyser->had_error = 1;
         EPRINTF_AT_OP(op, LEVEL_ERR, "Not enough items on the stack for %s, need at least %d element(s)\n",
-                      err_opcode_spelling(op->opcode), expected);
+                      opcode_spelling(op->opcode), expected);
         return 0;
     }
     return 1;
@@ -332,7 +332,7 @@ void type_check_op(Analyser *analyser) {
         else {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Invalid operand types for %s: %s %s\n",
-                             err_opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
+                             opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
         }
         break;
     }
@@ -496,7 +496,7 @@ void type_check_op(Analyser *analyser) {
         else {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Invalid operand types for %s: %s %s\n",
-                             err_opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
+                             opcode_spelling(op->opcode), type_spelling(b), type_spelling(a));
         }
         break;
     }
@@ -625,9 +625,14 @@ void type_check_op(Analyser *analyser) {
         if (!check_operand_count(analyser, 1)) break;
         Type a = pop(analyser);
 
-        if (a.kind == KIND_ADVANCED) {
+        if (a.kind == KIND_ADVANCED && op->types[0].kind == KIND_BASIC) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct to a basic type\n");
+            break;
+        }
+        if (a.kind == KIND_ADVANCED && !types_equal(a, *op->types[0].as.pointer)) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct to a pointer to a different type\n");
             break;
         }
 
@@ -645,6 +650,11 @@ void type_check_op(Analyser *analyser) {
 
         if (op->types[1].kind == KIND_PTR)
             op->types[1] = BASIC_TYPE(TYPE_U64);
+
+        if (a.kind == KIND_ADVANCED) {
+            analyser->pos++;
+            return;
+        }
         break;
     }
     case OP_INIT: {
@@ -790,6 +800,8 @@ void type_check_op(Analyser *analyser) {
                           type_spelling(*ptr.as.pointer), type_spelling(item));
             break;
         }
+
+        op->types[0] = *ptr.as.pointer;
         break;
     }
     case OP_PTR_ACCESS: {
@@ -801,6 +813,8 @@ void type_check_op(Analyser *analyser) {
             EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot dereference a non-pointer\n");
             break;
         }
+
+        op->types[0] = *ptr.as.pointer;
         DA_APPEND(&analyser->stack, *ptr.as.pointer);
         break;
     }
@@ -821,6 +835,7 @@ void type_check_op(Analyser *analyser) {
             break;
         }
 
+        op->types[0] = *ptr.as.pointer;
         DA_APPEND(&analyser->stack, *ptr.as.pointer);
         break;
     }
@@ -847,8 +862,18 @@ void type_check_op(Analyser *analyser) {
                           type_spelling(*ptr.as.pointer), type_spelling(item));
             break;
         }
+
+        op->types[0] = *ptr.as.pointer;
         break;
     }
+    case OP_ALLOC:
+        if (op->types[0].kind != KIND_ADVANCED) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot allocate a non-struct\n");
+        }
+        allocate(analyser, op->types[0]);
+        DA_APPEND(&analyser->stack, op->types[0]);
+        break;
     case OP_LABEL: break;
     case OP_START:
         type_check_block(analyser);

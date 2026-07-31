@@ -34,6 +34,7 @@ typedef enum {
     OP_INIT,       OP_ACCESS_DROP,
     OP_PTR_STORE,  OP_PTR_ACCESS,
     OP_INDEX,      OP_INDEX_STORE,
+    OP_ALLOC,
 
     // For the analyser
     OP_START,  OP_END,
@@ -93,7 +94,7 @@ typedef struct {
     Loc loc;
     Unresolved_Type type;
     union {
-        Op *op;
+        size_t op;
         Type *type;
     } as;
 } Unresolved_Symbol;
@@ -160,6 +161,5 @@ typedef struct {
 
 void compile(Compiler_Options options);
 char *opcode_spelling(Opcode opcode);
-char *err_opcode_spelling(Opcode opcode);
 
 #endif // ARROW_COMPILER_H

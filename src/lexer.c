@@ -30,7 +30,7 @@ static const char *keywords[] = {
     "return",  "rot",
     "rotn",    "else",
     "then",    "elseif",
-    "const",
+    "const",   "alloc",
 
     "i8",      "u8",
     "i16",     "u16",
