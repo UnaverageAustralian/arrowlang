@@ -691,14 +691,14 @@ void type_check_op(Analyser *analyser) {
     case OP_ACCESS: {
         if (!check_operand_count(analyser, 1)) break;
 
-        Type a = peek(analyser, 1);
-        if (a.kind != KIND_ADVANCED) {
+        Type src = peek(analyser, 1);
+        if (src.kind != KIND_ADVANCED) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source is not a struct\n");
             break;
         }
 
-        Struct structure = a.as.advanced->structure;
+        Struct structure = src.as.advanced->structure;
         String_View *sv = (String_View *)op->operand;
 
         Field *field = find_field(&structure, sv);
@@ -718,14 +718,14 @@ void type_check_op(Analyser *analyser) {
     case OP_ACCESS_DROP: {
         if (!check_operand_count(analyser, 1)) break;
 
-        Type a = pop(analyser);
-        if (a.kind != KIND_ADVANCED) {
+        Type src = pop(analyser);
+        if (src.kind != KIND_ADVANCED) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source is not a struct\n");
             break;
         }
 
-        Struct structure = a.as.advanced->structure;
+        Struct structure = src.as.advanced->structure;
         String_View *sv = (String_View *)op->operand;
 
         Field *field = find_field(&structure, sv);
@@ -745,16 +745,16 @@ void type_check_op(Analyser *analyser) {
     case OP_STORE: {
         if (!check_operand_count(analyser, 2)) break;
 
-        Type a = pop(analyser);
-        Type b = peek(analyser, 1);
+        Type item = pop(analyser);
+        Type dest = peek(analyser, 1);
 
-        if (b.kind != KIND_ADVANCED) {
+        if (dest.kind != KIND_ADVANCED) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Destination is not a struct\n");
             break;
         }
 
-        Struct structure = b.as.advanced->structure;
+        Struct structure = dest.as.advanced->structure;
         String_View *sv = (String_View *)op->operand;
 
         Field *field = find_field(&structure, sv);
@@ -763,11 +763,10 @@ void type_check_op(Analyser *analyser) {
             EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", structure.name.len, structure.name.str, sv->len, sv->str);
             break;
         }
-
-        if (!types_compatible(a, field->type)) {
+        if (!types_compatible(item, field->type)) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source type does not match destination type, expected %s, got %s\n",
-                          type_spelling(field->type), type_spelling(a));
+                          type_spelling(field->type), type_spelling(item));
             break;
         }
 
@@ -777,53 +776,77 @@ void type_check_op(Analyser *analyser) {
     case OP_PTR_STORE: {
         if (!check_operand_count(analyser, 2)) break;
 
-        Type a = pop(analyser);
-        Type b = peek(analyser, 1);
+        Type item = pop(analyser);
+        Type ptr = peek(analyser, 1);
 
-        if (b.kind != KIND_PTR) {
+        if (ptr.kind != KIND_PTR) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Destination is not a pointer\n");
             break;
         }
-
-        if (!types_compatible(a, *b.as.pointer)) {
+        if (!types_compatible(item, *ptr.as.pointer)) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source type does not match dereferenced destination type, expected %s, got %s\n",
-                          type_spelling(*b.as.pointer), type_spelling(a));
+                          type_spelling(*ptr.as.pointer), type_spelling(item));
             break;
         }
         break;
     }
     case OP_PTR_ACCESS: {
         if (!check_operand_count(analyser, 1)) break;
-        Type a = peek(analyser, 1);
+        Type ptr = peek(analyser, 1);
 
-        if (a.kind != KIND_PTR) {
+        if (ptr.kind != KIND_PTR) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot dereference a non-pointer\n");
             break;
         }
-        DA_APPEND(&analyser->stack, *a.as.pointer);
+        DA_APPEND(&analyser->stack, *ptr.as.pointer);
         break;
     }
     case OP_INDEX: {
         if (!check_operand_count(analyser, 2)) break;
 
-        Type a = pop(analyser);
-        Type b = peek(analyser, 1);
+        Type index = pop(analyser);
+        Type ptr = peek(analyser, 1);
 
-        if (b.kind != KIND_PTR) {
+        if (ptr.kind != KIND_PTR) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot index a non-pointer\n");
             break;
         }
-
-        if (a.kind != KIND_BASIC || (a.as.basic & TYPE_INTEGER) == 0) {
+        if (index.kind != KIND_BASIC || (index.as.basic & TYPE_INTEGER) == 0) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot index by a non-integer\n");
             break;
         }
-        DA_APPEND(&analyser->stack, *b.as.pointer);
+
+        DA_APPEND(&analyser->stack, *ptr.as.pointer);
+        break;
+    }
+    case OP_INDEX_STORE: {
+        if (!check_operand_count(analyser, 3)) break;
+
+        Type index = pop(analyser);
+        Type item = pop(analyser);
+        Type ptr = peek(analyser, 1);
+
+        if (ptr.kind != KIND_PTR) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Destination is not a pointer\n");
+            break;
+        }
+        if (index.kind != KIND_BASIC || (index.as.basic & TYPE_INTEGER) == 0) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot index by a non-integer\n");
+            break;
+        }
+        if (!types_compatible(item, *ptr.as.pointer)) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Source type does not match dereferenced destination type, expected %s, got %s\n",
+                          type_spelling(*ptr.as.pointer), type_spelling(item));
+            break;
+        }
         break;
     }
     case OP_LABEL: break;
