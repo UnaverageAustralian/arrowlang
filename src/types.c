@@ -108,14 +108,14 @@ int type_alignment(Type type) {
 
 Field *get_first_leaf_field(Struct structure) {
     Field *result = &structure.fields.items[0];
-    while (result->type.kind != KIND_BASIC)
+    while (result->type.kind == KIND_ADVANCED)
         result = &result->type.as.advanced->structure.fields.items[0];
     return result;
 }
 
 Field *get_last_leaf_field(Struct structure) {
     Field *result = &structure.fields.items[structure.fields.count-1];
-    while (result->type.kind != KIND_BASIC)
+    while (result->type.kind == KIND_ADVANCED)
         result = &result->type.as.advanced->structure.fields.items[result->type.as.advanced->structure.fields.count-1];
     return result;
 }

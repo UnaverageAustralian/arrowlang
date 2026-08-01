@@ -177,10 +177,10 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
             if (iparams > 6)
                 iparams = 6;
         }
-        else if ((func.param_types.items[i].as.basic & TYPE_REAL) && fparams < 8) {
+        else if (param->kind == KIND_BASIC && (param->as.basic & TYPE_REAL) && fparams < 8) {
             fparams++;
         }
-        else if (func.param_types.items[i].kind != KIND_ADVANCED && iparams < 6) {
+        else if (param->kind != KIND_ADVANCED && iparams < 6) {
             iparams++;
         }
     }
@@ -240,7 +240,7 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
                 }
             }
         }
-        else if ((param->as.basic & TYPE_REAL) && fparams >= 0) {
+        else if (param->kind == KIND_BASIC && (param->as.basic & TYPE_REAL) && fparams >= 0) {
             sb_appendf(&gen->sb, "    movsd (%%rsp), %%xmm%d\n", fparams-1);
             sb_appendf(&gen->sb, "    addq $8, %%rsp\n");
             fparams--;
@@ -292,7 +292,7 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
 
         gen->allocated += structure.size;
     }
-    else if (func.return_types.count == 1 && func.return_types.items[0].as.basic & TYPE_REAL) {
+    else if (func.return_types.count == 1 && func.return_types.items[0].kind == KIND_BASIC && func.return_types.items[0].as.basic & TYPE_REAL) {
         sb_appendf(&gen->sb, "    subq $8, %%rsp\n");
         sb_appendf(&gen->sb, "    movsd %%xmm0, (%%rsp)\n");
     }
