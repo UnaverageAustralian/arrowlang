@@ -389,6 +389,26 @@ Advanced_Type *compile_anonymous_struct(Compilation_Unit *compiler) {
     return &compiler->types.items[compiler->types.count-1];
 }
 
+Hash_Entry *get_entry_in_module(Compilation_Unit *compiler, Hash_Entry *module) {
+    Token *tok = &compiler->lexer->prev;
+
+    const char *module_name = tok->start;
+    size_t module_name_len = tok->len;
+
+    expect(compiler, TOK_SCOPE);
+    if (compiler->lexer->prev.type == TOK_EOF) return NULL;
+
+    if (!expect(compiler, TOK_WORD)) return NULL;
+
+    Hash_Entry *entry = hashmap_get(&((Symbol *)module->val)->as.module.symbols, tok->start, tok->len);
+    if (!entry || !entry->key) {
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Unknown symbol %.*s in module %.*s\n", tok->len, tok->start, module_name_len, module_name);
+        return NULL;
+    }
+    return entry;
+}
+
 void get_type(Compilation_Unit *compiler, Type *type) {
     switch (compiler->lexer->prev.type) {
     case TOK_I8:   *type = BASIC_TYPE(TYPE_I8);   break;
@@ -412,6 +432,11 @@ void get_type(Compilation_Unit *compiler, Type *type) {
         }
 
         Symbol *sym = (Symbol *)entry->val;
+        if (sym->type == STYPE_MODULE) {
+            entry = get_entry_in_module(compiler, entry);
+            sym = (Symbol *)entry->val;
+        }
+
         if (sym->type != STYPE_TYPE) {
             compiler->global->had_error = 1;
             COMPILER_EPRINTF(LEVEL_ERR, "%.*s is not a structure\n", entry->key_len, entry->key);
@@ -444,8 +469,6 @@ void get_type(Compilation_Unit *compiler, Type *type) {
 }
 
 void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
-    Token *tok = &compiler->lexer->prev;
-
     if (!entry || !entry->key) {
         Unresolved_Symbol *unresolved = make_unresolved(compiler, UTYPE_OP);
         unresolved->as.op = compiler->ops.count;
@@ -467,21 +490,7 @@ void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
         break;
     }
     case STYPE_MODULE: {
-        const char *module_name = tok->start;
-        size_t module_name_len = tok->len;
-
-        expect(compiler, TOK_SCOPE);
-        if (compiler->lexer->prev.type == TOK_EOF) return;
-
-        if (!expect(compiler, TOK_WORD)) return;
-
-        entry = hashmap_get(&((Symbol *)entry->val)->as.module.symbols, tok->start, tok->len);
-        if (!entry || !entry->key) {
-            compiler->global->had_error = 1;
-            COMPILER_EPRINTF(LEVEL_ERR, "Unknown symbol %.*s in module %.*s\n", tok->len, tok->start, module_name_len, module_name);
-            return;
-        }
-
+        entry = get_entry_in_module(compiler, entry);
         compile_entry(compiler, entry);
         break;
     }
