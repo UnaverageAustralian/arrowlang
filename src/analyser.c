@@ -242,6 +242,7 @@ int binop_operands_valid(Op *op, Type a, Type b) {
         break;
     case OP_MUL:
     case OP_DIV:
+        valid |= (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL);
     case OP_NEQ:
     case OP_GTEQ:
     case OP_GT:
