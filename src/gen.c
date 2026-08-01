@@ -829,6 +829,17 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
 
             gen.depth++;
             break;
+        case OP_PTR_ACCESS_DROP:
+            if (op->types[0].kind == KIND_ADVANCED) {
+                duplicate_struct(&gen, op->types[0].as.advanced->structure);
+            }
+            else {
+                sb_appendf(&gen.sb, "    popq %%rsi\n");
+                sb_appendf(&gen.sb, "    pushq (%%rsi)\n");
+            }
+
+            gen.depth++;
+            break;
         case OP_INDEX:
             sb_appendf(&gen.sb, "    popq %%rax\n");
             sb_appendf(&gen.sb, "    movq (%%rsp), %%rsi\n");
@@ -863,6 +874,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
             sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", gen.allocated - gen.func.max_allocated);
             sb_appendf(&gen.sb, "    stosq\n");
+            sb_appendf(&gen.sb, "    pushq %%rdi\n");
             break;
         case OP_NOP: break;
         default:

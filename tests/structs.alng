@@ -19,6 +19,8 @@ $main ( -> u8 )
          #foo.x 1.0 = "#foo.x = 1.0" errors::assert rot |
     swap #foo.y 2.0 = "#foo.y = 2.0" errors::assert rot |
     swap #foo.z 3.0 = "#foo.z = 3.0" errors::assert rot |
+
+    alloc Foo .x 0.0 = ".x = 0.0" errors::assert |
 $
 
 struct Foo

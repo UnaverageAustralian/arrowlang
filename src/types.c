@@ -130,11 +130,6 @@ int struct_fields_equal(Struct a, Struct b) {
 }
 
 int types_compatible(Type a, Type b) {
-    if (a.kind == KIND_PTR && a.as.pointer->kind == KIND_ADVANCED)
-        a = *a.as.pointer;
-    if (b.kind == KIND_PTR && b.as.pointer->kind == KIND_ADVANCED)
-        b = *b.as.pointer;
-
     if (a.kind != b.kind) return 0;
 
     if (a.kind == KIND_BASIC)

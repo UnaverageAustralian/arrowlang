@@ -196,6 +196,12 @@ There is also a variant of the `#` operation which does drop the struct, the `.`
  $
 ```
 
+The `alloc` operation allocates a struct on the stack and zero-initialises it:
+```
+ alloc Foo
+ #x // 0
+```
+
 You can also declare anonymous structs:
 ```
  2 3 struct
@@ -240,3 +246,25 @@ Arrowlang's escape characters are:
 `\XXX` - The character represented by the 3-digit octal number given in `XXX`
 `\xXX` - The character represented by the 2-digit hex number given in `XX`
 
+## Pointers
+
+Pointer types are represented with this `ptr[type]`, where `type` is the type the pointer points to. You can only convert integers the same size as a pointer or structs to a pointer (for structs it has to be a pointer to the same type).
+```
+ struct Foo
+     x : i32
+ end
+
+ 2 Foo
+ // ptr[i32] < illegal
+ ptr[Foo] // legal
+```
+
+The `@` operation pushes the dereferenced value, and the `.@` operation does the same thing but drops the pointer.
+The `+@` operation takes in an index and pushes the value at that index from the pointer.
+```
+ 2 Foo ptr[Foo]
+ @#x // 2
+ // #x < You can also just do this
+```
+
+The `=>` operation stores a value into the pointer, and the `+=>` operation takes in an index and stores a value into the pointer plus the index.

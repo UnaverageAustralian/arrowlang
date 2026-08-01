@@ -28,7 +28,7 @@ typedef enum {
     TOK_DOT,       TOK_COLON,
     TOK_LBRACKET,  TOK_RBRACKET,
     TOK_STORE,     TOK_ADD_AT,
-    TOK_ADD_STORE,
+    TOK_ADD_STORE, TOK_DOT_AT,
 
     // Symbols/Words
     TOK_MOD,       TOK_AND,

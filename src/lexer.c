@@ -525,10 +525,6 @@ void lexer_next(Lexer *lexer) {
         skip(lexer, 1);
         make_token(lexer, TOK_RBRACE);
         break;
-    case '.':
-        skip(lexer, 1);
-        make_token(lexer, TOK_DOT);
-        break;
     case '\\':
         skip(lexer, 1);
         make_token(lexer, TOK_SWAP);
@@ -579,9 +575,18 @@ void lexer_next(Lexer *lexer) {
         skip(lexer, 1);
         make_token(lexer, TOK_AT);
         break;
+    case '.':
+        c = skip(lexer, 1);
+        if (c == '@') {
+            skip(lexer, 1);
+            make_token(lexer, TOK_DOT_AT);
+        }
+        else {
+            make_token(lexer, TOK_DOT);
+        }
+        break;
     case '!':
-        skip(lexer, 1);
-        c = peek(lexer, 0);
+        c = skip(lexer, 1);
         if (c == '=') {
             skip(lexer, 1);
             make_token(lexer, TOK_NEQ);
@@ -591,8 +596,7 @@ void lexer_next(Lexer *lexer) {
         }
         break;
     case '=':
-        skip(lexer, 1);
-        c = peek(lexer, 0);
+        c = skip(lexer, 1);
         if (c == '>') {
             skip(lexer, 1);
             make_token(lexer, TOK_STORE);
@@ -620,8 +624,7 @@ void lexer_next(Lexer *lexer) {
         }
         break;
     case ':':
-        skip(lexer, 1);
-        c = peek(lexer, 0);
+        c = skip(lexer, 1);
         if (c == ':') {
             skip(lexer, 1);
             make_token(lexer, TOK_SCOPE);
@@ -631,8 +634,7 @@ void lexer_next(Lexer *lexer) {
         }
         break;
     case '-':
-        skip(lexer, 1);
-        c = peek(lexer, 0);
+        c = skip(lexer, 1);
         if (c == '>') {
             skip(lexer, 1);
             make_token(lexer, TOK_ARROW);

@@ -309,14 +309,14 @@ void type_check_op(Analyser *analyser) {
         }
 
         if (binop_operands_valid(op, a, b)) {
-            if (b.as.basic == TYPE_INTEGER || b.as.basic == TYPE_REAL) {
+            if ((b.as.basic == TYPE_INTEGER || b.as.basic == TYPE_REAL) && b.kind == KIND_BASIC) {
                 a.as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : a.as.basic == TYPE_REAL ? TYPE_F64 : a.as.basic;
                 greater = a;
                 lesser.as.basic = b.as.basic == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
                 depth = 8;
                 b = a;
             }
-            else if (a.as.basic == TYPE_INTEGER || a.as.basic == TYPE_REAL) {
+            else if ((a.as.basic == TYPE_INTEGER || a.as.basic == TYPE_REAL) && a.kind == KIND_BASIC) {
                 greater = b;
                 lesser.as.basic = a.as.basic == TYPE_INTEGER ? TYPE_I64 : TYPE_F64;
                 depth = 0;
@@ -814,6 +814,23 @@ void type_check_op(Analyser *analyser) {
     case OP_PTR_ACCESS: {
         if (!check_operand_count(analyser, 1)) break;
         Type ptr = peek(analyser, 1);
+
+        if (ptr.kind != KIND_PTR) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot dereference a non-pointer\n");
+            break;
+        }
+
+        op->types[0] = *ptr.as.pointer;
+        DA_APPEND(&analyser->stack, *ptr.as.pointer);
+
+        if (ptr.as.pointer->kind == KIND_ADVANCED)
+            allocate(analyser, *ptr.as.pointer);
+        break;
+    }
+    case OP_PTR_ACCESS_DROP: {
+        if (!check_operand_count(analyser, 1)) break;
+        Type ptr = pop(analyser);
 
         if (ptr.kind != KIND_PTR) {
             analyser->had_error = 1;
