@@ -50,6 +50,8 @@ Arrowlang's bit operators are: `&`/`and`, `|`/`or`, `^`/`xor`, `<<`/`shl`, `>>`/
 
 `rot` moves the third-to-top element to the front of the stack.
 
+`rotn` moves the top element to the third-to-top place in the stack.
+
 ```
  2 3 dup       // STACK: [ 2 | 3 ] -> [ 2 | 3 | 3 ]
  2 3 over      // STACK: [ 2 | 3 ] -> [ 2 | 3 | 2 ]
@@ -59,6 +61,7 @@ Arrowlang's bit operators are: `&`/`and`, `|`/`or`, `^`/`xor`, `<<`/`shl`, `>>`/
  2 3 9 8 over2 // STACK: [ 2 | 3 | 9 | 8 ] -> [ 2 | 3 | 9 | 8 | 2 | 3 ]
  2 3 9 8 swap2 // STACK: [ 2 | 3 | 9 | 8 ] -> [ 9 | 8 | 2 | 3 ]
  2 3 9 rot     // STACK: [ 2 | 3 | 9 ] -> [ 3 | 9 | 2 ]
+ 2 3 9 rotn    // STACK: [ 2 | 3 | 9 ] -> [ 9 | 2 | 3 ]
 ```
 
 ## Other operations
@@ -232,23 +235,36 @@ Compile-type constants are declared with `const`. Constants can only be set to i
 ## Escaped sequences
 
 Arrowlang's escape characters are:
+
 `\a` - Bell character
+
 `\b` - Backspace
+
 `\e` - Escape character
+
 `\f` - Form feed
+
 `\n` - Newline
+
 `\r` - Carriage return
+
 `\t` - Horizontal tab
+
 `\v` - Vertical tab
+
 `\\` - Backslash
+
 `\'` - Single quote
+
 `\"` - Double quote
+
 `\XXX` - The character represented by the 3-digit octal number given in `XXX`
+
 `\xXX` - The character represented by the 2-digit hex number given in `XX`
 
 ## Pointers
 
-Pointer types are represented with this `ptr[type]`, where `type` is the type the pointer points to. You can only convert integers the same size as a pointer or structs to a pointer (for structs it has to be a pointer to the same type).
+Pointer types are represented with this `ptr[type]`, where `type` is the type the pointer points to. You can only convert integers or structs to a pointer (for structs it has to be a pointer to the same type).
 ```
  struct Foo
      x : i32
@@ -268,3 +284,87 @@ The `+@` operation takes in an index and pushes the value at that index from the
 ```
 
 The `=>` operation stores a value into the pointer, and the `+=>` operation takes in an index and stores a value into the pointer plus the index.
+
+## List of Operations
+
+`Integer` = any integer type
+
+`Real` = any floating-point type
+
+`Number` = any integer or floating-point type
+
+`ptr` = any pointer type (including `str`)
+
+`a`/`b`/`c`/.../`A`/`B`/... = any type
+
+`Basic` = any basic type (anything other than structs and pointers)
+
+`Advanced` = any advanced type (structs)
+
+|           Op            |                   Signature                     |
+| ---                     | ---                                             |
+| `+`                     | `( Integer Integer -> Integer )`                |
+|                         | `( Real Real -> Real )`                         |
+|                         | `( Integer ptr -> ptr )`                        |
+|                         | `( ptr Integer -> ptr )`                        |
+| `-`                     | `( Integer Integer -> Integer )`                |
+|                         | `( Real Real -> Real )`                         |
+|                         | `( Integer ptr -> ptr )`                        |
+|                         | `( ptr Integer -> ptr )`                        |
+|                         | `( ptr ptr -> ptr )`                            |
+| `*`                     | `( Integer Integer -> Integer )`                |
+|                         | `( Real Real -> Real )`                         |
+| `/`                     | `( Integer Integer -> Integer )`                |
+|                         | `( Real Real -> Real )`                         |
+| `=`/`eq`                | `( Integer Integer -> u8 )`                     |
+|                         | `( Real Real -> u8 )`                           |
+|                         | `( ptr ptr -> u8 )`                             |
+| `<`/`lt`                | `( Integer Integer -> u8 )`                     |
+|                         | `( Real Real -> u8 )`                           |
+|                         | `( ptr ptr -> u8 )`                             |
+| `>`/`gt`                | `( Integer Integer -> u8 )`                     |
+|                         | `( Real Real -> u8 )`                           |
+|                         | `( ptr ptr -> u8 )`                             |
+| `<=`/`lteq`             | `( Integer Integer -> u8 )`                     |
+|                         | `( Real Real -> u8 )`                           |
+|                         | `( ptr ptr -> u8 )`                             |
+| `>=`/`gteq`             | `( Integer Integer -> u8 )`                     |
+|                         | `( Real Real -> u8 )`                           |
+|                         | `( ptr ptr -> u8 )`                             |
+| `!=`/`nteq`             | `( Integer Integer -> u8 )`                     |
+|                         | `( Real Real -> u8 )`                           |
+|                         | `( ptr ptr -> u8 )`                             |
+| `!`                     | `( Number -> u8 )`                              |
+| `%`/`mod`               | `( Integer Integer -> Integer )`                |
+| `&`/`and`               | `( Integer Integer -> Integer )`                |
+| `\|`/`or`               | `( Integer Integer -> Integer )`                |
+| `^`/`xor`               | `( Integer Integer -> Integer )`                |
+| `<<`/`shl`              | `( Integer Integer -> Integer )`                |
+| `>>`/`shr`              | `( Integer Integer -> Integer )`                |
+| `<<<`/`rol`             | `( Integer Integer -> Integer )`                |
+| `>>>`/`ror`             | `( Integer Integer -> Integer )`                |
+| `~`/`not`               | `( Integer -> Integer )`                        |
+| `neg`                   | `( Number -> Number )`                          |
+| `dup`                   | `( a -> a a )`                                  |
+| `over`                  | `( a b -> a b a )`                              |
+| `dup2`                  | `( a b -> a b a b )`                            |
+| `drop`                  | `( a -> )`                                      |
+| `\`/`swap`              | `( a b -> b a )`                                |
+| `over2`                 | `( a b c d -> a b c d a b)`                     |
+| `swap2`                 | `( a b c d -> c d a b)`                         |
+| `rot`                   | `( a b c -> b c a )`                            |
+| `rotn`                  | `( a b c -> c a b )`                            |
+| `<basic type>`          | `( Basic -> <basic type> )`                     |
+|                         | `( ptr -> <basic type> )`                       |
+| `<advanced type>`       | `( <fields> -> <advanced type> )`               |
+| `ptr[<advanced type>]`  | `( <advanced type> -> ptr[<advanced type>] )`   |
+| `ptr[<type>]`           | `( Integer -> ptr[<type>] )`                    |
+| `#<field>`              | `( <advanced type> -> <advanced type> <type> )` |
+| `.<field>`              | `( <advanced type> -> <type> )`                 |
+| `>#<field>`             | `( <advanced type> <type> -> <advanced type> )` |
+| `alloc <advanced type>` | `( -> <advanced type> )`                        |
+| `@`                     | `( ptr[T] -> ptr[T] T )`                        |
+| `.@`                    | `( ptr[T] -> T )`                               |
+| `+@`                    | `( ptr[T] Integer -> ptr[T] T )`                |
+| `=>`                    | `( ptr[T] T -> ptr[T] )`                        |
+| `+=>`                   | `( ptr[T] T Integer -> ptr[T] )`                |
