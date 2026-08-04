@@ -42,6 +42,7 @@ inline int check_operand_count(Analyser *analyser, size_t expected) {
 inline void make_conversion_op(Analyser *analyser, Type greater, Type lesser, int operand) {
     Op cur = analyser->ops->items[analyser->pos];
     greater = greater.kind == KIND_PTR ? BASIC_TYPE(TYPE_U64) : greater;
+    lesser = lesser.kind == KIND_PTR ? BASIC_TYPE(TYPE_U64) : lesser;
     Op op = {
         .opcode = OP_CONVERT,
         .file_path = cur.file_path,
@@ -233,12 +234,16 @@ Field *find_field(Struct *structure, String_View *sv) {
 
 int binop_operands_valid(Op *op, Type a, Type b) {
     int valid = a.kind == KIND_BASIC && b.kind == KIND_BASIC;
-    switch (op->operand) {
+    switch (op->opcode) {
     case OP_ADD:
+        valid |= ((a.kind == KIND_PTR || b.kind == KIND_PTR) && (a.kind & b.kind) != KIND_PTR)
+              || (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL)
+              || ((a.as.basic & (TYPE_INTEGER | TYPE_STR)) && (b.as.basic & (TYPE_INTEGER | TYPE_STR)) && a.as.basic != b.as.basic);
+        break;
     case OP_SUB:
-        valid |= (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL) ||
-                 ((a.as.basic & (TYPE_INTEGER | TYPE_STR) || a.kind == KIND_PTR) && (b.as.basic & (TYPE_INTEGER | TYPE_STR) || b.kind == KIND_PTR) &&
-                 (op->opcode != OP_ADD || (a.as.basic != b.as.basic && (a.kind & b.kind) != KIND_PTR)));
+        valid |= (a.kind == KIND_PTR || b.kind == KIND_PTR)
+              || (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL)
+              || ((a.as.basic & (TYPE_INTEGER | TYPE_STR)) && (b.as.basic & (TYPE_INTEGER | TYPE_STR)));
         break;
     case OP_MUL:
     case OP_DIV:
@@ -250,8 +255,8 @@ int binop_operands_valid(Op *op, Type a, Type b) {
     case OP_LTEQ:
     case OP_LT:
     case OP_EQ:
-        valid |= (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL) ||
-                 (a.kind == KIND_PTR && b.kind == KIND_PTR);
+        valid |= (a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER) || (a.as.basic & TYPE_REAL && b.as.basic & TYPE_REAL)
+              || (a.kind == KIND_PTR && b.kind == KIND_PTR);
         break;
     case OP_MOD:
     case OP_ROR:
@@ -262,6 +267,8 @@ int binop_operands_valid(Op *op, Type a, Type b) {
     case OP_OR:
     case OP_AND:
         valid |= a.as.basic & TYPE_INTEGER && b.as.basic & TYPE_INTEGER;
+        break;
+    default:
         break;
     }
     return valid;
@@ -326,6 +333,8 @@ void type_check_op(Analyser *analyser) {
             }
 
             op->types[0] = greater;
+            op->types[1] = lesser;
+            op->operand = depth;
             DA_APPEND(&analyser->stack, a.as.basic > b.as.basic ? a : b);
 
             if (greater.as.basic != lesser.as.basic)
@@ -545,7 +554,7 @@ void type_check_op(Analyser *analyser) {
         analyser->stack.count = 0;
         analyser->allocated = 0;
 
-        analyser->func->max_allocated = analyser->max_allocated;
+        analyser->func->max_allocated = ALIGN(analyser->max_allocated, 16);
         break;
     }
     case OP_LNOT: {

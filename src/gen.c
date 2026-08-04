@@ -341,7 +341,15 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.depth++;
             break;
         case OP_ADD:
-            if (op->types[0].as.basic & TYPE_REAL) {
+            if (op->types[0].kind == KIND_PTR && type_size(*op->types[0].as.pointer) > 1) {
+                int size = type_size(*op->types[0].as.pointer);
+                sb_appendf(&gen.sb, "    popq %%rax\n");
+                sb_appendf(&gen.sb, "    imulq $%d, %s, %s\n", size, op->operand == 8 ? "(%rsp)" : "%rax", op->operand == 8 ? "%rdx" : "%rax");
+                sb_appendf(&gen.sb, "    addq %%rax, %s\n", op->operand == 8 ? "%rdx" : "(%rsp)");
+                if (op->operand == 8)
+                    sb_appendf(&gen.sb, "    movq %%rdx, (%%rsp)\n");
+            }
+            else if (op->types[0].as.basic & TYPE_REAL) {
                 sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    adds%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
@@ -354,7 +362,24 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.depth--;
             break;
         case OP_SUB:
-            if (op->types[0].as.basic & TYPE_REAL) {
+            if (op->types[0].kind == KIND_PTR && op->types[1].kind != KIND_PTR && type_size(*op->types[0].as.pointer) > 1) {
+                int size = type_size(*op->types[0].as.pointer);
+                sb_appendf(&gen.sb, "    popq %%rax\n");
+                sb_appendf(&gen.sb, "    imulq $%d, %s, %s\n", size, op->operand == 8 ? "(%rsp)" : "%rax", op->operand == 8 ? "%rdx" : "%rax");
+                sb_appendf(&gen.sb, "    subq %%rax, %s\n", op->operand == 8 ? "%rdx" : "(%rsp)");
+                if (op->operand == 8)
+                    sb_appendf(&gen.sb, "    movq %%rdx, (%%rsp)\n");
+            }
+            else if (op->types[1].kind == KIND_PTR && type_size(*op->types[1].as.pointer) > 1) {
+                int size = type_size(*op->types[0].as.pointer);
+                sb_appendf(&gen.sb, "    popq %%rax\n");
+                sb_appendf(&gen.sb, "    popq %%rcx\n");
+                sb_appendf(&gen.sb, "    subq %%rcx, %%rax\n");
+                sb_appendf(&gen.sb, "    movq $%d, %%rcx\n", size);
+                sb_appendf(&gen.sb, "    idivq %%rcx\n");
+                sb_appendf(&gen.sb, "    pushq %%rax\n");
+            }
+            else if (op->types[0].as.basic & TYPE_REAL) {
                 sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    subs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
@@ -659,7 +684,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             }
             sb_appendf(&gen.sb, "    pushq %%rbp\n");
             sb_appendf(&gen.sb, "    movq %%rsp, %%rbp\n");
-            sb_appendf(&gen.sb, "    subq $%d, %%rsp\n", ALIGN(gen.func.max_allocated, 16));
+            sb_appendf(&gen.sb, "    subq $%d, %%rsp\n", gen.func.max_allocated);
 
             for (size_t i = 0; i < gen.func.param_types.count; i++) {
                 sb_appendf(&gen.sb, "    pushq %zu(%%rbp)\n", (gen.func.param_types.count-i-1)*8 + 16);
@@ -693,11 +718,8 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
 
             for (int64_t i = func.return_types.count-1; i >= 0; i--) {
                 sb_appendf(&gen.sb, "    pushq %zu(%%rax)\n", i*8);
-                if (func.return_types.items[i].kind == KIND_ADVANCED) {
-                    Struct structure = func.return_types.items[i].as.advanced->structure;
+                if (func.return_types.items[i].kind == KIND_ADVANCED)
                     duplicate_struct(&gen, func.return_types.items[i].as.advanced->structure);
-                    gen.allocated += structure.size;
-                }
             }
 
             gen.depth -= func.param_types.count - func.return_types.count;
@@ -844,7 +866,10 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    popq %%rax\n");
             sb_appendf(&gen.sb, "    movq (%%rsp), %%rsi\n");
 
+            if (type_size(op->types[0]) > 1)
+                sb_appendf(&gen.sb, "    imulq $%d, %%rax, %%rax\n", type_size(op->types[0]));
             sb_appendf(&gen.sb, "    add %%rax, %%rsi\n");
+
             if (op->types[0].kind == KIND_ADVANCED) {
                 sb_appendf(&gen.sb, "    pushq %%rsi\n");
                 duplicate_struct(&gen, op->types[0].as.advanced->structure);
@@ -858,7 +883,10 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    popq %%rdx\n");
             sb_appendf(&gen.sb, "    movq (%%rsp), %%rdi\n");
 
+            if (type_size(op->types[0]) > 1)
+                sb_appendf(&gen.sb, "    imulq $%d, %%rax, %%rax\n", type_size(op->types[0]));
             sb_appendf(&gen.sb, "    add %%rax, %%rdi\n");
+
             if (op->types[0].kind == KIND_ADVANCED) {
                 sb_appendf(&gen.sb, "    movq %%rdx, %%rsi\n");
                 move_struct(&gen, op->types[0].as.advanced->structure, 0);
@@ -875,6 +903,8 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", gen.allocated - gen.func.max_allocated);
             sb_appendf(&gen.sb, "    stosq\n");
             sb_appendf(&gen.sb, "    pushq %%rdi\n");
+
+            gen.depth++;
             break;
         case OP_NOP: break;
         default:

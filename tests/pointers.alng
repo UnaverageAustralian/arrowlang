@@ -18,4 +18,6 @@ $main ( -> u8 )
     swap 5 Foo 1 +=> 1 +@.x 5  = "#x = 5"  errors::assert rot |
     swap   foo           #x 20 = "#x = 20" errors::assert rot |
     swap .@ bar          #x 9  = "#x = 9"  errors::assert rot |
+
+    swap ptr[Foo] dup 5 + - 5 = "dup 5 +@ - = 5" errors::assert |
 $
