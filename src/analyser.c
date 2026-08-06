@@ -632,6 +632,14 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, b);
         break;
     }
+    case OP_LDROP:
+        if (!check_operand_count(analyser, 2)) break;
+
+        Type a = pop(analyser);
+        pop(analyser);
+
+        DA_APPEND(&analyser->stack, a);
+        break;
     case OP_CONVERT: {
         if (!check_operand_count(analyser, 1)) break;
         Type a = pop(analyser);

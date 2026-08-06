@@ -35,6 +35,7 @@ typedef enum {
     OP_PTR_STORE,  OP_PTR_ACCESS,
     OP_INDEX,      OP_INDEX_STORE,
     OP_ALLOC,      OP_PTR_ACCESS_DROP,
+    OP_LDROP,
 
     // For the analyser
     OP_START,  OP_END,

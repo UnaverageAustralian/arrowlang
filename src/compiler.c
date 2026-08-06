@@ -106,6 +106,7 @@ char *opcode_spelling(Opcode opcode) {
     case OP_INDEX:           return "INDEX";
     case OP_INDEX_STORE:     return "INDEX_STORE";
     case OP_ALLOC:           return "ALLOC";
+    case OP_LDROP:           return "LDROP";
     default:                 return "UNKNOWN";
     }
 }
@@ -558,6 +559,7 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_ADD_AT:    make_op(compiler, OP_INDEX, 0);           break;
     case TOK_ADD_STORE: make_op(compiler, OP_INDEX_STORE, 0);     break;
     case TOK_DOT_AT:    make_op(compiler, OP_PTR_ACCESS_DROP, 0); break;
+    case TOK_LDROP:     make_op(compiler, OP_LDROP, 0);           break;
     case TOK_STR_LIT:
         make_op(compiler, OP_STR, (int64_t)tok->as.str);
         break;

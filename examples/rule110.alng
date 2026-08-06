@@ -21,7 +21,7 @@ $main ( -> u8 )
             swap2 rotn |
             rot
             1-
-        end drop swap drop
+        end drop ldrop
         swap 1+
     end
     0

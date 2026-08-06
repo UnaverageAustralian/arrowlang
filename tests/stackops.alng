@@ -56,4 +56,9 @@ $main ( -> u8 )
     swap 2 = and
     swap 9 = and
     "2 3 9 rotn = [ 9 2 3 ]" errors::assert |
+
+    5 2 3 ldrop
+    3 =
+    swap 5 = and
+    "5 2 3 ldrop = [ 5 3 ]" errors::assert |
 $

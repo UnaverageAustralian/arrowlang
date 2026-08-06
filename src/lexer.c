@@ -31,6 +31,7 @@ static const char *keywords[] = {
     "rotn",    "else",
     "then",    "elseif",
     "const",   "alloc",
+    "ldrop",
 
     "i8",      "u8",
     "i16",     "u16",
@@ -743,6 +744,7 @@ char *tok_spelling(Token_Type type) {
     case TOK_NEG:        return "NEG";
     case TOK_ROT:        return "ROT";
     case TOK_ROTN:       return "ROTN";
+    case TOK_LDROP:      return "LDROP";
     case TOK_IF:         return "IF";
     case TOK_ELSE:       return "ELSE";
     case TOK_COLON:      return "COLON";

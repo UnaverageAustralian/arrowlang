@@ -354,6 +354,7 @@ The `=>` operation stores a value into the pointer, and the `+=>` operation take
 | `swap2`                 | `( a b c d -> c d a b)`                         |
 | `rot`                   | `( a b c -> b c a )`                            |
 | `rotn`                  | `( a b c -> c a b )`                            |
+| `ldrop`                 | `( a b -> b )`                                  |
 | `<basic type>`          | `( Basic -> <basic type> )`                     |
 |                         | `( ptr -> <basic type> )`                       |
 | `<advanced type>`       | `( <fields> -> <advanced type> )`               |

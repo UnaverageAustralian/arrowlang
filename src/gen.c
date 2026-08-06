@@ -542,6 +542,9 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    movq %%rdx, 8(%%rsp)\n");
             sb_appendf(&gen.sb, "    movq %%rax, 16(%%rsp)\n");
             break;
+        case OP_LDROP:
+            sb_appendf(&gen.sb, "    popq (%%rsp)\n");
+            break;
         case OP_NEG:
             if (op->types[0].as.basic == TYPE_F32) {
                 sb_appendf(&gen.sb, "    xorl $0x80000000, (%%rsp)\n");
