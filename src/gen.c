@@ -414,28 +414,27 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
                 sb_appendf(&gen.sb, "    movs%c %%xmm0, (%%rsp)\n", fsize_sufs[type_size(op->types[0])]);
             }
             else {
+                char size_suf = size_sufs[type_size(op->types[0])];
+
                 sb_appendf(&gen.sb, "    popq %%r8\n");
                 sb_appendf(&gen.sb, "    popq %%rax\n");
-                sb_appendf(&gen.sb, "    xorq %%rdx, %%rdx\n");
-
-                char size_suf = size_sufs[type_size(op->types[0])];
+                sb_appendf(&gen.sb, "    c%c%c\n", size_suf, size_suf == 'q' ? 'o' : size_sufs[type_size(op->types[0]) * 2]);
                 sb_appendf(&gen.sb, "    idiv%c %%r8%c\n", size_suf, size_suf == 'q' ? ' ' : size_suf);
-
                 sb_appendf(&gen.sb, "    pushq %%rax\n");
             }
             gen.depth--;
             break;
-        case OP_MOD:
+        case OP_MOD: {
+            char size_suf = size_sufs[type_size(op->types[0])];
+
             sb_appendf(&gen.sb, "    popq %%r8\n");
             sb_appendf(&gen.sb, "    popq %%rax\n");
-            sb_appendf(&gen.sb, "    xorq %%rdx, %%rdx\n");
-
-            char size_suf = size_sufs[type_size(op->types[0])];
+            sb_appendf(&gen.sb, "    c%c%c\n", size_suf, size_suf == 'q' ? 'o' : size_sufs[type_size(op->types[0]) * 2]);
             sb_appendf(&gen.sb, "    idiv%c %%r8%c\n", size_suf, size_suf == 'q' ? ' ' : size_suf);
-
             sb_appendf(&gen.sb, "    pushq %%rdx\n");
             gen.depth--;
             break;
+        }
         case OP_AND:
             sb_appendf(&gen.sb, "    popq %%rax\n");
             sb_appendf(&gen.sb, "    and%c %s, (%%rsp)\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
