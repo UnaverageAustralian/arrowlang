@@ -5,28 +5,24 @@
 
 #include "utils.h"
 
-#define BASIC_TYPE(type) (Type){ .kind = KIND_BASIC, .as.basic = type }
-#define PTR_TYPE(type) (Type){ .kind = KIND_PTR, .as.pointer = type }
-#define ADVANCED_TYPE(type) (Type){ .kind = KIND_ADVANCED, .as.advanced = type }
+#define BASIC_TYPE(type) (Type){ .kind = type }
+#define PTR_TYPE(type) (Type){ .kind = TYPE_PTR, .ptr_depth = 1, .deref_kind = type }
+#define ADVANCED_TYPE(type_kind, type) (Type){ .kind = type_kind, .advanced = type }
+
+#define IS_INTEGER(type) ((type).kind >= TYPE_I8 && (type).kind <= TYPE_INT)
+#define IS_REAL(type) ((type).kind >= TYPE_F32 && (type).kind <= TYPE_REAL)
+#define IS_NUMBER(type) ((type).kind >= TYPE_I8 && (type).kind <= TYPE_REAL)
+#define IS_ADVANCED(type) ((type).kind >= TYPE_STRUCT)
 
 typedef enum {
-    TYPE_VOID = 0x0,
-    TYPE_I8   = 0x1,   TYPE_CHAR = 0x2,
-    TYPE_U8   = 0x4,   TYPE_I16  = 0x8,
-    TYPE_U16  = 0x10,  TYPE_I32  = 0x20,
-    TYPE_U32  = 0x40,  TYPE_I64  = 0x80,
-    TYPE_U64  = 0x100, TYPE_F32  = 0x200,
-    TYPE_F64  = 0x400, TYPE_STR  = 0x800,
-
-    TYPE_INTEGER = TYPE_I8  | TYPE_CHAR | TYPE_U8  | TYPE_I16 |
-                   TYPE_U16 | TYPE_I32  | TYPE_U32 | TYPE_I64 | TYPE_U64,
-    TYPE_REAL    = TYPE_F32 | TYPE_F64,
-    TYPE_NUMBER  = TYPE_INTEGER | TYPE_REAL,
-} Basic_Type;
-
-typedef enum {
-    KIND_BASIC, KIND_PTR,
-    KIND_ADVANCED,
+    TYPE_VOID, TYPE_I8,
+    TYPE_CHAR, TYPE_U8,
+    TYPE_I16,  TYPE_U16,
+    TYPE_I32,  TYPE_U32,
+    TYPE_I64,  TYPE_U64,
+    TYPE_INT,  TYPE_F32,
+    TYPE_F64,  TYPE_REAL,
+    TYPE_PTR,  TYPE_STRUCT,
 } Type_Kind;
 
 typedef enum {
@@ -57,12 +53,10 @@ typedef struct {
 
 typedef struct Type Type;
 struct Type {
-    Type_Kind kind;
-    union {
-        Basic_Type basic;
-        Type *pointer;
-        Advanced_Type *advanced;
-    } as;
+    Advanced_Type *advanced;
+    Type_Kind kind : 8;
+    Type_Kind deref_kind : 8;
+    uint8_t ptr_depth;
 };
 
 typedef struct {
@@ -94,7 +88,8 @@ int struct_size(Struct structure);
 Field *get_first_leaf_field(Struct structure);
 Field *get_last_leaf_field(Struct structure);
 
-char *basic_type_spelling(Basic_Type type);
+Type deref_type(Type ptr);
+
 char *type_spelling(Type type);
 
 #endif // ARROW_TYPES_H

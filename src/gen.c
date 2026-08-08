@@ -158,16 +158,16 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
 
     for (size_t i = 0; i < func.param_types.count; i++) {
         Type *param = &func.param_types.items[i];
-        if (param->kind == KIND_ADVANCED && param->as.advanced->structure.size <= 16) {
-            Field *first = get_first_leaf_field(param->as.advanced->structure);
-            Field *last = get_last_leaf_field(param->as.advanced->structure);
+        if (IS_ADVANCED(*param) && param->advanced->structure.size <= 16) {
+            Field *first = get_first_leaf_field(param->advanced->structure);
+            Field *last = get_last_leaf_field(param->advanced->structure);
 
-            if (first->type.as.basic == TYPE_F64)
+            if (first->type.kind == TYPE_F64)
                 fparams++;
             else
                 iparams++;
 
-            if (last->offset - first->offset >= 8 && last->type.as.basic == TYPE_F64)
+            if (last->offset - first->offset >= 8 && last->type.kind == TYPE_F64)
                 fparams++;
             else if (last->offset - first->offset >= 8)
                 iparams++;
@@ -177,17 +177,16 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
             if (iparams > 6)
                 iparams = 6;
         }
-        else if (param->kind == KIND_BASIC && (param->as.basic & TYPE_REAL) && fparams < 8) {
+        else if (IS_REAL(*param) && fparams < 8) {
             fparams++;
         }
-        else if (param->kind != KIND_ADVANCED && iparams < 6) {
+        else if (!IS_ADVANCED(*param) && iparams < 6) {
             iparams++;
         }
     }
 
     int start_arg = 0;
-    if (func.return_types.count == 1 && func.return_types.items[0].kind == KIND_ADVANCED &&
-        func.return_types.items[0].as.advanced->structure.size > 16) {
+    if (func.return_types.count == 1 && IS_ADVANCED(func.return_types.items[0]) && func.return_types.items[0].advanced->structure.size > 16) {
         start_arg = 1;
         sb_appendf(&gen->sb, "    leaq %d(%%rbp), %%rdi\n", gen->allocated - gen->func.max_allocated);
     }
@@ -196,19 +195,19 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
     gen->depth -= func.param_types.count;
     for (int i = func.param_types.count-1; i >= 0; i--) {
         Type *param = &func.param_types.items[i];
-        if (param->kind == KIND_ADVANCED) {
+        if (IS_ADVANCED(*param)) {
             sb_appendf(&gen->sb, "    popq %%rax\n");
 
-            Field *first = get_first_leaf_field(param->as.advanced->structure);
-            Field *last = get_last_leaf_field(param->as.advanced->structure);
+            Field *first = get_first_leaf_field(param->advanced->structure);
+            Field *last = get_last_leaf_field(param->advanced->structure);
 
-            int needed_fparams = (first->type.as.basic == TYPE_F64) + (last->type.as.basic == TYPE_F64);
+            int needed_fparams = (first->type.kind == TYPE_F64) + (last->type.kind == TYPE_F64);
             if (last->offset - first->offset < 8)
                 needed_fparams--;
 
-            int size = struct_size(param->as.advanced->structure);
+            int size = struct_size(param->advanced->structure);
             if (size <= 16 && fparams >= needed_fparams && iparams >= size/8 - needed_fparams) {
-                if (first->type.as.basic == TYPE_F64) {
+                if (first->type.kind == TYPE_F64) {
                     sb_appendf(&gen->sb, "    movsd (%%rax), %%xmm%d\n", fparams - 1);
                     fparams--;
                 }
@@ -217,7 +216,7 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
                     iparams--;
                 }
 
-                if (last->type.as.basic == TYPE_F64 && last->offset - first->offset >= 8) {
+                if (last->type.kind == TYPE_F64 && last->offset - first->offset >= 8) {
                     sb_appendf(&gen->sb, "    movsd 8(%%rax), %%xmm%d\n", fparams - 1);
                     fparams--;
                 }
@@ -227,20 +226,20 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
                 }
             }
             else {
-                extra_depth += param->as.advanced->structure.size/8;
+                extra_depth += param->advanced->structure.size/8;
                 if (((gen->depth + extra_depth) & 1) != 0) {
                     sb_appendf(&gen->sb, "    subq $8, %%rsp\n");
                     extra_depth++;
                 }
 
-                sb_appendf(&gen->sb, "    subq $%d, %%rsp\n", param->as.advanced->structure.size);
-                for (int i = 0; i < param->as.advanced->structure.size; i += 8) {
+                sb_appendf(&gen->sb, "    subq $%d, %%rsp\n", param->advanced->structure.size);
+                for (int i = 0; i < param->advanced->structure.size; i += 8) {
                     sb_appendf(&gen->sb, "    movq %d(%%rax), %%r11\n", i);
                     sb_appendf(&gen->sb, "    movq %%r11, %d(%%rsp)\n", i);
                 }
             }
         }
-        else if (param->kind == KIND_BASIC && (param->as.basic & TYPE_REAL) && fparams >= 0) {
+        else if (IS_REAL(*param) && fparams >= 0) {
             sb_appendf(&gen->sb, "    movsd (%%rsp), %%xmm%d\n", fparams-1);
             sb_appendf(&gen->sb, "    addq $8, %%rsp\n");
             fparams--;
@@ -262,18 +261,18 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
     if (start_arg == 1) {
         sb_appendf(&gen->sb, "    leaq %d(%%rbp), %%rax\n", gen->allocated - gen->func.max_allocated);
         sb_appendf(&gen->sb, "    pushq %%rax\n");
-        gen->allocated += func.return_types.items[0].as.advanced->structure.size;
+        gen->allocated += func.return_types.items[0].advanced->structure.size;
         gen->depth++;
     }
 
-    if (func.return_types.count == 1 && func.return_types.items[0].kind == KIND_ADVANCED) {
-        Struct structure = func.return_types.items[0].as.advanced->structure;
+    if (func.return_types.count == 1 && IS_ADVANCED(func.return_types.items[0])) {
+        Struct structure = func.return_types.items[0].advanced->structure;
         if (structure.size > 16) return;
 
         Field *first = get_first_leaf_field(structure);
         Field *last = get_last_leaf_field(structure);
 
-        if (first->type.as.basic == TYPE_F64) {
+        if (first->type.kind == TYPE_F64) {
             sb_appendf(&gen->sb, "    subq $8, %%rsp\n");
             sb_appendf(&gen->sb, "    movsd %%xmm0, (%%rsp)\n");
         }
@@ -281,18 +280,18 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
             sb_appendf(&gen->sb, "    movq %%rax, %d(%%rbp)\n", gen->allocated - gen->func.max_allocated);
         }
 
-        if (last->type.as.basic == TYPE_F64 && last->offset - first->offset >= 8) {
+        if (last->type.kind == TYPE_F64 && last->offset - first->offset >= 8) {
             sb_appendf(&gen->sb, "    subq $8, %%rsp\n");
-            sb_appendf(&gen->sb, "    movsd %%xmm%d, (%%rsp)\n", first->type.as.basic == TYPE_F64 ? 1 : 0);
+            sb_appendf(&gen->sb, "    movsd %%xmm%d, (%%rsp)\n", first->type.kind == TYPE_F64 ? 1 : 0);
         }
         else if (last->offset - first->offset >= 8) {
-            sb_appendf(&gen->sb, "    movq %s, %d(%%rbp)\n", first->type.as.basic == TYPE_F64 ? "%rax" : "%rdx",
+            sb_appendf(&gen->sb, "    movq %s, %d(%%rbp)\n", first->type.kind == TYPE_F64 ? "%rax" : "%rdx",
                        gen->allocated - gen->func.max_allocated + 8);
         }
 
         gen->allocated += structure.size;
     }
-    else if (func.return_types.count == 1 && func.return_types.items[0].kind == KIND_BASIC && func.return_types.items[0].as.basic & TYPE_REAL) {
+    else if (func.return_types.count == 1 && IS_REAL(func.return_types.items[0])) {
         sb_appendf(&gen->sb, "    subq $8, %%rsp\n");
         sb_appendf(&gen->sb, "    movsd %%xmm0, (%%rsp)\n");
     }
@@ -340,16 +339,17 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             }
             gen.depth++;
             break;
-        case OP_ADD:
-            if (op->types[0].kind == KIND_PTR && type_size(*op->types[0].as.pointer) > 1) {
-                int size = type_size(*op->types[0].as.pointer);
+        case OP_ADD: {
+            Type deref = deref_type(op->types[0]);
+            if (op->types[0].kind == TYPE_PTR && type_size(deref) > 1) {
+                int size = type_size(deref);
                 sb_appendf(&gen.sb, "    popq %%rax\n");
                 sb_appendf(&gen.sb, "    imulq $%d, %s, %s\n", size, op->operand == 8 ? "(%rsp)" : "%rax", op->operand == 8 ? "%rdx" : "%rax");
                 sb_appendf(&gen.sb, "    addq %%rax, %s\n", op->operand == 8 ? "%rdx" : "(%rsp)");
                 if (op->operand == 8)
                     sb_appendf(&gen.sb, "    movq %%rdx, (%%rsp)\n");
             }
-            else if (op->types[0].as.basic & TYPE_REAL) {
+            else if (IS_REAL(op->types[0])) {
                 sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    adds%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
@@ -361,17 +361,19 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             }
             gen.depth--;
             break;
-        case OP_SUB:
-            if (op->types[0].kind == KIND_PTR && op->types[1].kind != KIND_PTR && type_size(*op->types[0].as.pointer) > 1) {
-                int size = type_size(*op->types[0].as.pointer);
+        }
+        case OP_SUB: {
+            Type deref = deref_type(op->types[0]);
+            if (op->types[0].kind == TYPE_PTR && op->types[1].kind != TYPE_PTR && type_size(deref) > 1) {
+                int size = type_size(deref);
                 sb_appendf(&gen.sb, "    popq %%rax\n");
                 sb_appendf(&gen.sb, "    imulq $%d, %s, %s\n", size, op->operand == 8 ? "(%rsp)" : "%rax", op->operand == 8 ? "%rdx" : "%rax");
                 sb_appendf(&gen.sb, "    subq %%rax, %s\n", op->operand == 8 ? "%rdx" : "(%rsp)");
                 if (op->operand == 8)
                     sb_appendf(&gen.sb, "    movq %%rdx, (%%rsp)\n");
             }
-            else if (op->types[1].kind == KIND_PTR && type_size(*op->types[1].as.pointer) > 1) {
-                int size = type_size(*op->types[0].as.pointer);
+            else if (op->types[1].kind == TYPE_PTR && type_size(deref_type(op->types[1])) > 1) {
+                int size = type_size(deref);
                 sb_appendf(&gen.sb, "    popq %%rax\n");
                 sb_appendf(&gen.sb, "    popq %%rcx\n");
                 sb_appendf(&gen.sb, "    subq %%rcx, %%rax\n");
@@ -379,7 +381,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
                 sb_appendf(&gen.sb, "    idivq %%rcx\n");
                 sb_appendf(&gen.sb, "    pushq %%rax\n");
             }
-            else if (op->types[0].as.basic & TYPE_REAL) {
+            else if (IS_REAL(op->types[0])) {
                 sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    subs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
@@ -391,8 +393,9 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             }
             gen.depth--;
             break;
+        }
         case OP_MUL:
-            if (op->types[0].as.basic & TYPE_REAL) {
+            if (IS_REAL(op->types[0])) {
                 sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    muls%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
@@ -407,7 +410,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.depth--;
             break;
         case OP_DIV:
-            if (op->types[0].as.basic & TYPE_REAL) {
+            if (IS_REAL(op->types[0])) {
                 sb_appendf(&gen.sb, "    movs%c 8(%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    divs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
@@ -475,26 +478,26 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_DUP:
             sb_appendf(&gen.sb, "    pushq (%%rsp)\n");
-            if (op->types[0].kind == KIND_ADVANCED)
-                duplicate_struct(&gen, op->types[0].as.advanced->structure);
+            if (IS_ADVANCED(op->types[0]))
+                duplicate_struct(&gen, op->types[0].advanced->structure);
 
             gen.depth++;
             break;
         case OP_OVER:
             sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
-            if (op->types[0].kind == KIND_ADVANCED)
-                duplicate_struct(&gen, op->types[0].as.advanced->structure);
+            if (IS_ADVANCED(op->types[0]))
+                duplicate_struct(&gen, op->types[0].advanced->structure);
 
             gen.depth++;
             break;
         case OP_DUP2:
             sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
-            if (op->types[0].kind == KIND_ADVANCED)
-                duplicate_struct(&gen, op->types[0].as.advanced->structure);
+            if (IS_ADVANCED(op->types[0]))
+                duplicate_struct(&gen, op->types[0].advanced->structure);
 
             sb_appendf(&gen.sb, "    pushq 8(%%rsp)\n");
-            if (op->types[1].kind == KIND_ADVANCED)
-                duplicate_struct(&gen, op->types[1].as.advanced->structure);
+            if (IS_ADVANCED(op->types[1]))
+                duplicate_struct(&gen, op->types[1].advanced->structure);
 
             gen.depth += 2;
             break;
@@ -509,12 +512,12 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         case OP_OVER2:
             sb_appendf(&gen.sb, "    pushq 24(%%rsp)\n");
-            if (op->types[0].kind == KIND_ADVANCED)
-                duplicate_struct(&gen, op->types[0].as.advanced->structure);
+            if (IS_ADVANCED(op->types[0]))
+                duplicate_struct(&gen, op->types[0].advanced->structure);
 
             sb_appendf(&gen.sb, "    pushq 24(%%rsp)\n");
-            if (op->types[1].kind == KIND_ADVANCED)
-                duplicate_struct(&gen, op->types[1].as.advanced->structure);
+            if (IS_ADVANCED(op->types[1]))
+                duplicate_struct(&gen, op->types[1].advanced->structure);
 
             gen.depth += 2;
             break;
@@ -545,10 +548,10 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    popq (%%rsp)\n");
             break;
         case OP_NEG:
-            if (op->types[0].as.basic == TYPE_F32) {
+            if (op->types[0].kind == TYPE_F32) {
                 sb_appendf(&gen.sb, "    xorl $0x80000000, (%%rsp)\n");
             }
-            else if (op->types[0].as.basic == TYPE_F64) {
+            else if (op->types[0].kind == TYPE_F64) {
                 sb_appendf(&gen.sb, "    movabsq $0x8000000000000000, %%rax\n");
                 sb_appendf(&gen.sb, "    xorq %%rax, (%%rsp)\n");
             }
@@ -557,7 +560,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             }
             break;
         case OP_EQ:
-            if (op->types[0].as.basic & TYPE_REAL) {
+            if (IS_REAL(op->types[0])) {
                 sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
                 sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
@@ -572,7 +575,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.depth--;
             break;
         case OP_LT:
-            if (op->types[0].as.basic & TYPE_REAL) {
+            if (IS_REAL(op->types[0])) {
                 sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
                 sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
@@ -588,7 +591,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.depth--;
             break;
         case OP_GT:
-            if (op->types[0].as.basic & TYPE_REAL) {
+            if (IS_REAL(op->types[0])) {
                 sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
                 sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
@@ -604,7 +607,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.depth--;
             break;
         case OP_LTEQ:
-            if (op->types[0].as.basic & TYPE_REAL) {
+            if (IS_REAL(op->types[0])) {
                 sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
                 sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
@@ -620,7 +623,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.depth--;
             break;
         case OP_GTEQ:
-            if (op->types[0].as.basic & TYPE_REAL) {
+            if (IS_REAL(op->types[0])) {
                 sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
                 sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
@@ -636,7 +639,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.depth--;
             break;
         case OP_NEQ:
-            if (op->types[0].as.basic & TYPE_REAL) {
+            if (IS_REAL(op->types[0])) {
                 sb_appendf(&gen.sb, "    movs%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
                 sb_appendf(&gen.sb, "    addq $8, %%rsp\n");
                 sb_appendf(&gen.sb, "    ucomis%c (%%rsp), %%xmm0\n", fsize_sufs[type_size(op->types[0])]);
@@ -690,8 +693,8 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
 
             for (size_t i = 0; i < gen.func.param_types.count; i++) {
                 sb_appendf(&gen.sb, "    pushq %zu(%%rbp)\n", (gen.func.param_types.count-i-1)*8 + 16);
-                if (gen.func.param_types.items[i].kind == KIND_ADVANCED)
-                    duplicate_struct(&gen, gen.func.param_types.items[i].as.advanced->structure);
+                if (IS_ADVANCED(gen.func.param_types.items[i]))
+                    duplicate_struct(&gen, gen.func.param_types.items[i].advanced->structure);
             }
 
             gen.depth += gen.func.param_types.count;
@@ -720,8 +723,8 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
 
             for (int64_t i = func.return_types.count-1; i >= 0; i--) {
                 sb_appendf(&gen.sb, "    pushq %zu(%%rax)\n", i*8);
-                if (func.return_types.items[i].kind == KIND_ADVANCED)
-                    duplicate_struct(&gen, func.return_types.items[i].as.advanced->structure);
+                if (IS_ADVANCED(func.return_types.items[i]))
+                    duplicate_struct(&gen, func.return_types.items[i].advanced->structure);
             }
 
             gen.depth -= func.param_types.count - func.return_types.count;
@@ -752,7 +755,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             break;
         }
         case OP_INIT: {
-            Struct structure = op->types[0].as.advanced->structure;
+            Struct structure = op->types[0].advanced->structure;
 
             sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", gen.allocated - gen.func.max_allocated);
             gen.allocated += structure.size;
@@ -760,9 +763,9 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    addq $%lld, %%rsp\n", structure.fields.count*8);
             for (size_t i = 0; i < structure.fields.count; i++) {
                 Field *field = &structure.fields.items[i];
-                if (field->type.kind == KIND_ADVANCED) {
+                if (IS_ADVANCED(field->type)) {
                     sb_appendf(&gen.sb, "    movq %d(%%rsp), %%rsi\n", -i*8 - 8);
-                    move_struct(&gen, field->type.as.advanced->structure, field->offset);
+                    move_struct(&gen, field->type.advanced->structure, field->offset);
                 }
                 else {
                     sb_appendf(&gen.sb, "    mov%c %lld(%%rsp), %s\n", size_sufs[type_size(field->type)], -i*8 - 8, rax[type_size(field->type)]);
@@ -779,15 +782,15 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    movq (%%rsp), %%rsi\n");
             sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
 
-            if (field->type.kind == KIND_ADVANCED)
+            if (IS_ADVANCED(field->type))
                 sb_appendf(&gen.sb, "    leaq %d(%%rsi), %%rax\n", field->offset);
             else
                 sb_appendf(&gen.sb, "    mov%c %d(%%rsi), %s\n", size_sufs[type_size(field->type)], field->offset, rax[type_size(field->type)]);
 
             sb_appendf(&gen.sb, "    pushq %%rax\n");
 
-            if (field->type.kind == KIND_ADVANCED)
-                duplicate_struct(&gen, field->type.as.advanced->structure);
+            if (IS_ADVANCED(field->type))
+                duplicate_struct(&gen, field->type.advanced->structure);
 
             gen.depth++;
             break;
@@ -798,15 +801,15 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    popq %%rsi\n");
             sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
 
-            if (field->type.kind == KIND_ADVANCED)
+            if (IS_ADVANCED(field->type))
                 sb_appendf(&gen.sb, "    leaq %d(%%rsi), %%rax\n", field->offset);
             else
                 sb_appendf(&gen.sb, "    mov%c %d(%%rsi), %s\n", size_sufs[type_size(field->type)], field->offset, rax[type_size(field->type)]);
 
             sb_appendf(&gen.sb, "    pushq %%rax\n");
 
-            if (field->type.kind == KIND_ADVANCED)
-                duplicate_struct(&gen, field->type.as.advanced->structure);
+            if (IS_ADVANCED(field->type))
+                duplicate_struct(&gen, field->type.advanced->structure);
 
             gen.depth++;
             break;
@@ -817,9 +820,9 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    popq %%rax\n");
             sb_appendf(&gen.sb, "    movq (%%rsp), %%rdi\n");
 
-            if (field->type.kind == KIND_ADVANCED) {
+            if (IS_ADVANCED(field->type)) {
                 sb_appendf(&gen.sb, "    movq %%rax, %%rsi\n");
-                move_struct(&gen, field->type.as.advanced->structure, field->offset);
+                move_struct(&gen, field->type.advanced->structure, field->offset);
             }
             else {
                 sb_appendf(&gen.sb, "    mov%c %s, %d(%%rdi)\n", size_sufs[type_size(field->type)], rax[type_size(field->type)], field->offset);
@@ -831,9 +834,9 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    popq %%rax\n");
             sb_appendf(&gen.sb, "    movq (%%rsp), %%rdi\n");
 
-            if (op->types[0].kind == KIND_ADVANCED) {
+            if (IS_ADVANCED(op->types[0])) {
                 sb_appendf(&gen.sb, "    movq %%rax, %%rsi\n");
-                move_struct(&gen, op->types[0].as.advanced->structure, 0);
+                move_struct(&gen, op->types[0].advanced->structure, 0);
             }
             else {
                 sb_appendf(&gen.sb, "    mov%c %s, (%%rdi)\n", size_sufs[type_size(op->types[0])], rax[type_size(op->types[0])]);
@@ -843,9 +846,9 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
         case OP_PTR_ACCESS:
             sb_appendf(&gen.sb, "    movq (%%rsp), %%rsi\n");
 
-            if (op->types[0].kind == KIND_ADVANCED) {
+            if (IS_ADVANCED(op->types[0])) {
                 sb_appendf(&gen.sb, "    pushq %%rsi\n");
-                duplicate_struct(&gen, op->types[0].as.advanced->structure);
+                duplicate_struct(&gen, op->types[0].advanced->structure);
             }
             else {
                 sb_appendf(&gen.sb, "    pushq (%%rsi)\n");
@@ -854,8 +857,8 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.depth++;
             break;
         case OP_PTR_ACCESS_DROP:
-            if (op->types[0].kind == KIND_ADVANCED) {
-                duplicate_struct(&gen, op->types[0].as.advanced->structure);
+            if (IS_ADVANCED(op->types[0])) {
+                duplicate_struct(&gen, op->types[0].advanced->structure);
             }
             else {
                 sb_appendf(&gen.sb, "    popq %%rsi\n");
@@ -872,9 +875,9 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
                 sb_appendf(&gen.sb, "    imulq $%d, %%rax, %%rax\n", type_size(op->types[0]));
             sb_appendf(&gen.sb, "    add %%rax, %%rsi\n");
 
-            if (op->types[0].kind == KIND_ADVANCED) {
+            if (IS_ADVANCED(op->types[0])) {
                 sb_appendf(&gen.sb, "    pushq %%rsi\n");
-                duplicate_struct(&gen, op->types[0].as.advanced->structure);
+                duplicate_struct(&gen, op->types[0].advanced->structure);
             }
             else {
                 sb_appendf(&gen.sb, "    pushq (%%rsi)\n");
@@ -889,9 +892,9 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
                 sb_appendf(&gen.sb, "    imulq $%d, %%rax, %%rax\n", type_size(op->types[0]));
             sb_appendf(&gen.sb, "    add %%rax, %%rdi\n");
 
-            if (op->types[0].kind == KIND_ADVANCED) {
+            if (IS_ADVANCED(op->types[0])) {
                 sb_appendf(&gen.sb, "    movq %%rdx, %%rsi\n");
-                move_struct(&gen, op->types[0].as.advanced->structure, 0);
+                move_struct(&gen, op->types[0].advanced->structure, 0);
             }
             else {
                 sb_appendf(&gen.sb, "    mov%c %s, (%%rdi)\n", size_sufs[type_size(op->types[0])], rdx[type_size(op->types[0])]);
@@ -900,7 +903,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.depth -= 2;
             break;
         case OP_ALLOC:
-            sb_appendf(&gen.sb, "    movq $%d, %%rcx\n", op->types[0].as.advanced->structure.size/8);
+            sb_appendf(&gen.sb, "    movq $%d, %%rcx\n", op->types[0].advanced->structure.size/8);
             sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
             sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", gen.allocated - gen.func.max_allocated);
             sb_appendf(&gen.sb, "    stosq\n");

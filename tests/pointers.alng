@@ -19,5 +19,7 @@ $main ( -> u8 )
     swap   foo           #x 20 = "#x = 20" errors::assert rot |
     swap .@ bar          #x 9  = "#x = 9"  errors::assert rot |
 
-    swap ptr[Foo] dup 5 + - 5 = "dup 5 +@ - = 5" errors::assert |
+    swap ptr[Foo] dup 5 + - u64 5 = "dup 5 +@ - = 5" errors::assert |
+
+    "Hello, World!" 1 +@ 'e' = "\"Hello, World!\" 1 +@ = 'e'" errors::assert rot |
 $

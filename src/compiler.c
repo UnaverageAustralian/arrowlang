@@ -126,7 +126,7 @@ void print_op(Op *op) {
     case OP_PUSH:
         printf(" %s ", type_spelling(op->types[0]));
 
-        if (op->types[0].as.basic == TYPE_REAL)
+        if (op->types[0].kind == TYPE_REAL)
             printf("%lf", *(double *)&op->operand);
         else
             printf("%llu", op->operand);
@@ -156,9 +156,9 @@ void print_op(Op *op) {
         break;
     }
     default:
-        if (op->types[1].as.basic != TYPE_VOID)
+        if (op->types[1].kind != TYPE_VOID)
             printf(" %s", type_spelling(op->types[1]));
-        if (op->types[0].as.basic != TYPE_VOID)
+        if (op->types[0].kind != TYPE_VOID)
             printf(" %s", type_spelling(op->types[0]));
         break;
     }
@@ -424,7 +424,7 @@ void get_type(Compilation_Unit *compiler, Type *type) {
     case TOK_U64:  *type = BASIC_TYPE(TYPE_U64);  break;
     case TOK_F32:  *type = BASIC_TYPE(TYPE_F32);  break;
     case TOK_F64:  *type = BASIC_TYPE(TYPE_F64);  break;
-    case TOK_STR:  *type = BASIC_TYPE(TYPE_STR);  break;
+    case TOK_STR:  *type = PTR_TYPE(TYPE_CHAR);   break;
     case TOK_WORD: {
         Hash_Entry *entry = hashmap_get(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len);
         if (!entry || !entry->key) {
@@ -446,18 +446,22 @@ void get_type(Compilation_Unit *compiler, Type *type) {
             break;
         }
 
-        *type = ADVANCED_TYPE(sym->as.type);
+        *type = ADVANCED_TYPE(TYPE_STRUCT, sym->as.type);
         break;
     }
     case TOK_STRUCT:
-        *type = ADVANCED_TYPE(compile_anonymous_struct(compiler));
+        *type = ADVANCED_TYPE(TYPE_STRUCT, compile_anonymous_struct(compiler));
         break;
     case TOK_PTR: {
         expect(compiler, TOK_LBRACKET);
 
-        *type = PTR_TYPE(arena_calloc(&compiler->global->arena, sizeof(Type)));
         lexer_next(compiler->lexer);
-        get_type(compiler, type->as.pointer);
+        get_type(compiler, type);
+
+        type->ptr_depth++;
+        if (type->deref_kind == TYPE_VOID)
+            type->deref_kind = type->kind;
+        type->kind = TYPE_PTR;
 
         expect(compiler, TOK_RBRACKET);
         break;
@@ -488,7 +492,7 @@ void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
         break;
     case STYPE_TYPE: {
         Op *op = make_op(compiler, OP_INIT, 0);
-        op->types[0] = ADVANCED_TYPE(sym->as.type);
+        op->types[0] = ADVANCED_TYPE(TYPE_STRUCT, sym->as.type);
         break;
     }
     case STYPE_MODULE: {
@@ -511,7 +515,7 @@ void compile_stmt(Compilation_Unit *compiler) {
     switch (tok->type) {
     case TOK_INT_LIT: {
         Op *op = make_op(compiler, OP_PUSH, tok->as.integer);
-        op->types[0] = BASIC_TYPE(TYPE_INTEGER);
+        op->types[0] = BASIC_TYPE(TYPE_INT);
         break;
     }
     case TOK_REAL_LIT: {
@@ -605,8 +609,8 @@ void compile_stmt(Compilation_Unit *compiler) {
     }
     case TOK_STRUCT: {
         Op *op = make_op(compiler, OP_INIT, 0);
-        op->types[0].kind = KIND_ADVANCED;
-        op->types[0].as.advanced = compile_anonymous_struct(compiler);
+        op->types[0].kind = TYPE_STRUCT;
+        op->types[0].advanced = compile_anonymous_struct(compiler);
         break;
     }
     case TOK_I8:
@@ -828,7 +832,7 @@ void compile_const(Compilation_Unit *compiler) {
 
     switch (compiler->lexer->prev.type) {
     case TOK_INT_LIT:
-        sym->as.constant.type = TYPE_INTEGER;
+        sym->as.constant.type = TYPE_INT;
         break;
     case TOK_REAL_LIT:
         sym->as.constant.type = TYPE_REAL;
@@ -892,7 +896,7 @@ int resolve_type(Compilation_Unit *compiler, Advanced_Type *type) {
 
     for (size_t i = 0; i < type->structure.fields.count; i++) {
         Field *field = &type->structure.fields.items[i];
-        if (field->type.kind == KIND_ADVANCED && !resolve_type(compiler, field->type.as.advanced))
+        if (IS_ADVANCED(field->type) && !resolve_type(compiler, field->type.advanced))
             return 0;
 
         int field_alignment = type_alignment(field->type);
@@ -943,7 +947,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
                 break;
             case STYPE_TYPE:
                 op->opcode = OP_INIT;
-                op->types[0] = ADVANCED_TYPE(sym->as.type);
+                op->types[0] = ADVANCED_TYPE(TYPE_STRUCT, sym->as.type);
                 break;
             case STYPE_CONST:
                 op->opcode = OP_PUSH;
@@ -965,7 +969,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
                 break;
             }
 
-            *unresolved.as.type = ADVANCED_TYPE(sym->as.type);
+            *unresolved.as.type = ADVANCED_TYPE(TYPE_STRUCT, sym->as.type);
             break;
         }
         }

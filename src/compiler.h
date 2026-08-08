@@ -124,7 +124,7 @@ typedef struct {
 
 typedef struct {
     int64_t val;
-    Basic_Type type;
+    Type_Kind type;
 } Constant;
 
 typedef struct {
