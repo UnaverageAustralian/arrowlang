@@ -810,8 +810,6 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
 
             if (IS_ADVANCED(field->type))
                 duplicate_struct(&gen, field->type.advanced->structure);
-
-            gen.depth++;
             break;
         }
         case OP_STORE: {
@@ -864,8 +862,6 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
                 sb_appendf(&gen.sb, "    popq %%rsi\n");
                 sb_appendf(&gen.sb, "    pushq (%%rsi)\n");
             }
-
-            gen.depth++;
             break;
         case OP_INDEX:
             sb_appendf(&gen.sb, "    popq %%rax\n");
