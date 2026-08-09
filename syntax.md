@@ -363,7 +363,7 @@ The `=>` operation stores a value into the pointer, and the `+=>` operation take
 | `#<field>`              | `( <advanced type> -> <advanced type> <type> )` |
 | `.<field>`              | `( <advanced type> -> <type> )`                 |
 | `>#<field>`             | `( <advanced type> <type> -> <advanced type> )` |
-| `alloc <advanced type>` | `( -> <advanced type> )`                        |
+| `alloc <type>`          | `( -> ptr[<type>] )`                            |
 | `@`                     | `( ptr[T] -> ptr[T] T )`                        |
 | `.@`                    | `( ptr[T] -> T )`                               |
 | `+@`                    | `( ptr[T] Integer -> ptr[T] T )`                |

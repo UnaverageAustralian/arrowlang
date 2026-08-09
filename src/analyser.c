@@ -270,8 +270,8 @@ int binop_operands_valid(Op *op, Type a, Type b) {
     return valid;
 }
 
-static inline void allocate(Analyser *analyser, Type a) {
-    analyser->allocated += a.advanced->structure.size;
+static inline void allocate(Analyser *analyser, int size) {
+    analyser->allocated += size;
     if (analyser->allocated > analyser->max_allocated)
         analyser->max_allocated = analyser->allocated;
 }
@@ -369,7 +369,7 @@ void type_check_op(Analyser *analyser) {
         op->types[0] = a;
 
         if (a.kind == TYPE_STRUCT)
-            allocate(analyser, a);
+            allocate(analyser, a.advanced->structure.size);
         break;
     }
     case OP_OVER: {
@@ -379,7 +379,7 @@ void type_check_op(Analyser *analyser) {
         op->types[0] = a;
 
         if (a.kind == TYPE_STRUCT)
-            allocate(analyser, a);
+            allocate(analyser, a.advanced->structure.size);
         break;
     }
     case OP_DUP2: {
@@ -390,14 +390,14 @@ void type_check_op(Analyser *analyser) {
         op->types[0] = a;
 
         if (a.kind == TYPE_STRUCT)
-            allocate(analyser, a);
+            allocate(analyser, a.advanced->structure.size);
 
         a = peek(analyser, 2);
         DA_APPEND(&analyser->stack, a);
         op->types[1] = a;
 
         if (a.kind == TYPE_STRUCT)
-            allocate(analyser, a);
+            allocate(analyser, a.advanced->structure.size);
         break;
     }
     case OP_DROP: {
@@ -423,14 +423,14 @@ void type_check_op(Analyser *analyser) {
         op->types[0] = a;
 
         if (a.kind == TYPE_STRUCT)
-            allocate(analyser, a);
+            allocate(analyser, a.advanced->structure.size);
 
         a = peek(analyser, 4);
         DA_APPEND(&analyser->stack, a);
         op->types[1] = a;
 
         if (a.kind == TYPE_STRUCT)
-            allocate(analyser, a);
+            allocate(analyser, a.advanced->structure.size);
         break;
     }
     case OP_SWAP2: {
@@ -481,9 +481,11 @@ void type_check_op(Analyser *analyser) {
         Hash_Entry *func_entry = (Hash_Entry *)op->operand;
         analyser->func = &((Symbol *)func_entry->val)->as.func;
         for (size_t i = 0; i < analyser->func->param_types.count; i++) {
-            DA_APPEND(&analyser->stack, analyser->func->param_types.items[i]);
-            if (analyser->func->param_types.items[i].kind == TYPE_STRUCT)
-                allocate(analyser, analyser->func->param_types.items[i]);
+            Type param = analyser->func->param_types.items[i];
+            DA_APPEND(&analyser->stack, param);
+
+            if (param.kind == TYPE_STRUCT)
+                allocate(analyser, param.advanced->structure.size);
         }
         break;
     }
@@ -548,9 +550,11 @@ void type_check_op(Analyser *analyser) {
 
         analyser->stack.count -= func.param_types.count;
         for (size_t i = 0; i < func.return_types.count; i++) {
-            DA_APPEND(&analyser->stack, func.return_types.items[i]);
-            if (func.return_types.items[i].kind == TYPE_STRUCT)
-                allocate(analyser, func.return_types.items[i]);
+            Type return_type = func.return_types.items[i];
+            DA_APPEND(&analyser->stack, return_type);
+
+            if (return_type.kind == TYPE_STRUCT)
+                allocate(analyser, return_type.advanced->structure.size);
         }
         break;
     }
@@ -661,7 +665,7 @@ void type_check_op(Analyser *analyser) {
         analyser->stack.count -= fields.count;
         DA_APPEND(&analyser->stack, op->types[0]);
 
-        allocate(analyser, op->types[0]);
+        allocate(analyser, op->types[0].advanced->structure.size);
         break;
     }
     case OP_ACCESS: {
@@ -691,7 +695,7 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, field->type);
 
         if (field->type.kind == TYPE_STRUCT)
-            allocate(analyser, field->type);
+            allocate(analyser, field->type.advanced->structure.size);
         break;
     }
     case OP_ACCESS_DROP: {
@@ -721,7 +725,7 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, field->type);
 
         if (field->type.kind == TYPE_STRUCT)
-            allocate(analyser, field->type);
+            allocate(analyser, field->type.advanced->structure.size);
         break;
     }
     case OP_STORE: {
@@ -796,7 +800,7 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, deref);
 
         if (deref.kind == TYPE_STRUCT)
-            allocate(analyser, deref);
+            allocate(analyser, deref.advanced->structure.size);
         break;
     }
     case OP_PTR_ACCESS_DROP: {
@@ -815,7 +819,7 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, deref);
 
         if (deref.kind == TYPE_STRUCT)
-            allocate(analyser, deref);
+            allocate(analyser, deref.advanced->structure.size);
         break;
     }
     case OP_INDEX: {
@@ -841,7 +845,7 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, deref);
 
         if (deref.kind == TYPE_STRUCT)
-            allocate(analyser, deref);
+            allocate(analyser, deref.advanced->structure.size);
         break;
     }
     case OP_INDEX_STORE: {
@@ -873,14 +877,13 @@ void type_check_op(Analyser *analyser) {
         op->types[0] = deref;
         break;
     }
-    case OP_ALLOC:
-        if (op->types[0].kind != TYPE_STRUCT) {
-            analyser->had_error = 1;
-            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot allocate a non-struct\n");
-        }
-        allocate(analyser, op->types[0]);
-        DA_APPEND(&analyser->stack, op->types[0]);
+    case OP_ALLOC: {
+        allocate(analyser, type_size(op->types[0]));
+        Type ptr = PTR_TYPE(op->types[0].kind);
+        ptr.advanced = op->types[0].advanced;
+        DA_APPEND(&analyser->stack, ptr);
         break;
+    }
     case OP_LABEL: break;
     case OP_START:
         type_check_block(analyser);

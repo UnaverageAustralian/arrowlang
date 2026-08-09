@@ -902,15 +902,25 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
 
             gen.depth -= 2;
             break;
-        case OP_ALLOC:
-            sb_appendf(&gen.sb, "    movq $%d, %%rcx\n", op->types[0].advanced->structure.size/8);
-            sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
-            sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", gen.allocated - gen.func.max_allocated);
-            sb_appendf(&gen.sb, "    stosq\n");
-            sb_appendf(&gen.sb, "    pushq %%rdi\n");
+        case OP_ALLOC: {
+            int size = type_size(op->types[0]);
+            if (size <= 8) {
+                sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", gen.allocated - gen.func.max_allocated);
+                sb_appendf(&gen.sb, "    movq $0, (%%rdi)\n");
+                sb_appendf(&gen.sb, "    pushq %%rdi\n");
+            }
+            else {
+                sb_appendf(&gen.sb, "    movq $%d, %%rcx\n", ALIGN(type_size(op->types[0]), 8) / 8);
+                sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
+                sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", gen.allocated - gen.func.max_allocated);
+                sb_appendf(&gen.sb, "    stosq\n");
+                sb_appendf(&gen.sb, "    pushq %%rdi\n");
+            }
 
+            gen.allocated += size;
             gen.depth++;
             break;
+        }
         case OP_NOP: break;
         default:
             GEN_EPRINTF(op, LEVEL_ERR, "Unimplemented instruction: %s\n", opcode_spelling(op->opcode));
