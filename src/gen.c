@@ -114,18 +114,18 @@ static char f32_f64[] = "    pxor %xmm0, %xmm0\n"
                         "    movsd %xmm0, (%rsp)";
 
 static char *conv_table[12][12] = {
-    { NULL,   NULL,   NULL,   i8_i16,  NULL,    i8_i32,  NULL,    i8_i64,  NULL,    i8_f32,  i8_f64,  NULL },
-    { NULL,   NULL,   NULL,   NULL,    NULL,    NULL,    NULL,    NULL,    NULL,    u8_f32,  u8_f64,  NULL },
-    { NULL,   NULL,   NULL,   NULL,    NULL,    NULL,    NULL,    NULL,    NULL,    u8_f32,  u8_f64,  NULL },
-    { i16_i8, i16_i8, i16_i8, NULL,    NULL,    i16_i32, NULL,    i16_i64, NULL,    i16_f32, i16_f64, NULL },
-    { i16_i8, i16_i8, i16_i8, NULL,    NULL,    NULL,    NULL,    NULL,    NULL,    u16_f32, u16_f64, NULL },
-    { i32_i8, i32_i8, i32_i8, i32_i16, i32_i16, NULL,    NULL,    i32_i64, NULL,    i32_f32, i32_f64, NULL },
-    { i32_i8, i32_i8, i32_i8, i32_i16, i32_i16, NULL,    NULL,    NULL,    NULL,    u32_f32, u32_f64, NULL },
-    { i64_i8, i64_i8, i64_i8, i32_i16, i32_i16, i64_i32, i64_i32, NULL,    NULL,    i64_f32, i64_f64, NULL },
-    { i64_i8, i64_i8, i64_i8, i32_i16, i32_i16, i64_i32, i64_i32, NULL,    NULL,    i64_f32, i64_f64, NULL },
-    { f32_i8, f32_i8, f32_i8, f32_i16, f32_i16, f32_i32, f32_i32, f32_i64, f32_i64, NULL,    f32_f64, NULL },
-    { f64_i8, f64_i8, f64_i8, f64_i16, f64_i16, f64_i32, f64_i32, f64_i64, f64_i64, f64_f32, NULL,    NULL },
-    { i64_i8, i64_i8, i64_i8, i32_i16, i32_i16, i64_i32, i64_i32, NULL,    NULL,    NULL,    NULL,    NULL },
+    { NULL,   NULL,   NULL,   i8_i16,  NULL,    i8_i32,  NULL,    i8_i64,  NULL,    i8_f32,  i8_f64,  },
+    { NULL,   NULL,   NULL,   NULL,    NULL,    NULL,    NULL,    NULL,    NULL,    u8_f32,  u8_f64,  },
+    { NULL,   NULL,   NULL,   NULL,    NULL,    NULL,    NULL,    NULL,    NULL,    u8_f32,  u8_f64,  },
+    { i16_i8, i16_i8, i16_i8, NULL,    NULL,    i16_i32, NULL,    i16_i64, NULL,    i16_f32, i16_f64, },
+    { i16_i8, i16_i8, i16_i8, NULL,    NULL,    NULL,    NULL,    NULL,    NULL,    u16_f32, u16_f64, },
+    { i32_i8, i32_i8, i32_i8, i32_i16, i32_i16, NULL,    NULL,    i32_i64, NULL,    i32_f32, i32_f64, },
+    { i32_i8, i32_i8, i32_i8, i32_i16, i32_i16, NULL,    NULL,    NULL,    NULL,    u32_f32, u32_f64, },
+    { i64_i8, i64_i8, i64_i8, i32_i16, i32_i16, i64_i32, i64_i32, NULL,    NULL,    i64_f32, i64_f64, },
+    { i64_i8, i64_i8, i64_i8, i32_i16, i32_i16, i64_i32, i64_i32, NULL,    NULL,    i64_f32, i64_f64, },
+    { f32_i8, f32_i8, f32_i8, f32_i16, f32_i16, f32_i32, f32_i32, f32_i64, f32_i64, NULL,    f32_f64, },
+    { f64_i8, f64_i8, f64_i8, f64_i16, f64_i16, f64_i32, f64_i32, f64_i64, f64_i64, f64_f32, NULL,    },
+    { i64_i8, i64_i8, i64_i8, i32_i16, i32_i16, i64_i32, i64_i32, NULL,    NULL,    NULL,    NULL,    },
 };
 
 static char *arg_regs[] = { "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9" };
@@ -136,9 +136,23 @@ void init_generator(Generator *gen, Ops *ops) {
 }
 
 void move_struct(Generator *gen, Struct a, int offs) {
-    for (int i = 0; i < a.size; i += 8) {
+    for (int i = 0; i < a.size - (a.size & 7); i += 8) {
         sb_appendf(&gen->sb, "    movq %d(%%rsi), %%rax\n", i);
         sb_appendf(&gen->sb, "    movq %%rax, %d(%%rdi)\n", i + offs);
+    }
+
+    if ((a.size & 7) == 0) return;
+
+    uint64_t c = 8;
+    while ((a.size & c) == 0)
+        c >>= 1;
+
+    int piece_size = a.size & c;
+    for (int i = a.size - (a.size & 7); i < a.size; i += piece_size) {
+        if (i + piece_size > a.size)
+            i = a.size - piece_size;
+        sb_appendf(&gen->sb, "    mov%c %d(%%rsi), %s\n", size_sufs[piece_size], i, rax[piece_size]);
+        sb_appendf(&gen->sb, "    mov%c %s, %d(%%rdi)\n", size_sufs[piece_size], rax[piece_size], i + offs);
     }
 }
 
@@ -205,7 +219,7 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
             if (last->offset - first->offset < 8)
                 needed_fparams--;
 
-            int size = struct_size(param->advanced->structure);
+            int size = param->advanced->structure.size;
             if (size <= 16 && fparams >= needed_fparams && iparams >= size/8 - needed_fparams) {
                 if (first->type.kind == TYPE_F64) {
                     sb_appendf(&gen->sb, "    movsd (%%rax), %%xmm%d\n", fparams - 1);
@@ -226,13 +240,13 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
                 }
             }
             else {
-                extra_depth += param->advanced->structure.size/8;
+                extra_depth += ALIGN(param->advanced->structure.size, 8)/8;
                 if (((gen->depth + extra_depth) & 1) != 0) {
                     sb_appendf(&gen->sb, "    subq $8, %%rsp\n");
                     extra_depth++;
                 }
 
-                sb_appendf(&gen->sb, "    subq $%d, %%rsp\n", param->advanced->structure.size);
+                sb_appendf(&gen->sb, "    subq $%d, %%rsp\n", ALIGN(param->advanced->structure.size, 8));
                 for (int i = 0; i < param->advanced->structure.size; i += 8) {
                     sb_appendf(&gen->sb, "    movq %d(%%rax), %%r11\n", i);
                     sb_appendf(&gen->sb, "    movq %%r11, %d(%%rsp)\n", i);

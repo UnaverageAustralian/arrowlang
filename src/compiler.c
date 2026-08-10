@@ -915,7 +915,7 @@ int resolve_type(Compilation_Unit *compiler, Advanced_Type *type) {
     }
 
     type->structure.alignment = alignment;
-    type->structure.size = ALIGN(offset, 8);
+    type->structure.size = offset;
     type->resolve_status = STATUS_RESOLVED;
 
     return 1;

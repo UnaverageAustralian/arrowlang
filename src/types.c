@@ -38,15 +38,6 @@ char *type_spelling(Type type) {
     return "unknown";
 }
 
-int struct_size(Struct structure) {
-    int result = 0;
-    for (size_t i = 0; i < structure.fields.count; i++) {
-        result = ALIGN(result, type_alignment(structure.fields.items[i].type));
-        result += type_size(structure.fields.items[i].type);
-    }
-    return result;
-}
-
 int type_size(Type type) {
     switch (type.kind) {
     case TYPE_I8:
@@ -66,7 +57,7 @@ int type_size(Type type) {
     case TYPE_U64:
         return 8;
     case TYPE_STRUCT:
-        return struct_size(type.advanced->structure);
+        return type.advanced->structure.size;
     default:
         return 0;
     }

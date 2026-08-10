@@ -24,6 +24,6 @@ $main ( -> u8 )
         end
         d : i32
     end
-         #c.i 5 = "#c#i = 5" errors::assert
+         #c.i 5 = "#c.i = 5" errors::assert
     swap #d   4 = "#d = 4"   errors::assert rot |
 $

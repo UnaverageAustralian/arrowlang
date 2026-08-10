@@ -1,8 +1,8 @@
 import errors
 
 struct Bar
-    a   : i32
     foo : Foo
+    a   : i32
 end
 
 $main ( -> u8 )
@@ -10,9 +10,9 @@ $main ( -> u8 )
     swap            #y 2.0 = "#y = 2.0" errors::assert rot |
     swap            #z 1.0 = "#z = 1.0" errors::assert rot |
 
-    2 rot Bar #foo.x 3.0 = "#foo.x = 3.0" errors::assert rot |
-    swap      #foo.y 2.0 = "#foo.y = 2.0" errors::assert rot |
-    swap      #foo.z 1.0 = "#foo.z = 1.0" errors::assert rot |
+    swap 2 Bar #foo.x 3.0 = "#foo.x = 3.0" errors::assert rot |
+    swap       #foo.y 2.0 = "#foo.y = 2.0" errors::assert rot |
+    swap       #foo.z 1.0 = "#foo.z = 1.0" errors::assert rot |
     swap            #a 2 = "#a = 2"       errors::assert rot |
 
     swap 1.0 2.0 3.0 Foo >#foo
