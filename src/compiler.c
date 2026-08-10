@@ -501,8 +501,8 @@ void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
         break;
     }
     case STYPE_CONST: {
-        Op *op = make_op(compiler, OP_PUSH, sym->as.constant.val);
-        op->types[0] = BASIC_TYPE(sym->as.constant.type);
+        Op *op = make_op(compiler, sym->as.constant.type.ptr_depth > 0 ? OP_STR : OP_PUSH, sym->as.constant.val);
+        op->types[0] = sym->as.constant.type;
         break;
     }
     }
@@ -828,21 +828,26 @@ void compile_const(Compilation_Unit *compiler) {
     add_symbol(compiler, sym);
 
     lexer_next(compiler->lexer);
-    sym->as.constant.val = compiler->lexer->prev.as.integer;
-
     switch (compiler->lexer->prev.type) {
     case TOK_INT_LIT:
-        sym->as.constant.type = TYPE_INT;
+        sym->as.constant.type = BASIC_TYPE(TYPE_INT);
+        sym->as.constant.val = compiler->lexer->prev.as.integer;
         break;
     case TOK_REAL_LIT:
-        sym->as.constant.type = TYPE_REAL;
+        sym->as.constant.type = BASIC_TYPE(TYPE_REAL);
+        sym->as.constant.val = compiler->lexer->prev.as.integer;
         break;
     case TOK_CHAR_LIT:
-        sym->as.constant.type = TYPE_CHAR;
+        sym->as.constant.type = BASIC_TYPE(TYPE_CHAR);
+        sym->as.constant.val = compiler->lexer->prev.as.integer;
+        break;
+    case TOK_STR_LIT:
+        sym->as.constant.type = PTR_TYPE(TYPE_CHAR);
+        sym->as.constant.val = (uint64_t)compiler->lexer->prev.start;
         break;
     default:
         compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Constants can only be set to integer literals, real literals, or character literals\n");
+        COMPILER_EPRINTF(LEVEL_ERR, "Constants cannot be set to non-literals\n");
         break;
     }
 }
@@ -950,9 +955,9 @@ void resolve_symbols(Compilation_Unit *compiler) {
                 op->types[0] = ADVANCED_TYPE(TYPE_STRUCT, sym->as.type);
                 break;
             case STYPE_CONST:
-                op->opcode = OP_PUSH;
+                op->opcode = sym->as.constant.type.ptr_depth > 0 ? OP_STR : OP_PUSH;
                 op->operand = sym->as.constant.val;
-                op->types[0] = BASIC_TYPE(sym->as.constant.type);
+                op->types[0] = sym->as.constant.type;
                 break;
             case STYPE_MODULE:
                 compiler->global->had_error = 1;

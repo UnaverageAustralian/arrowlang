@@ -1,13 +1,16 @@
 import errors
 
-const x 10
-const y 20
-const e 'E'
-const pi 3.14
+const X 10
+const Y 20
+const E 'E'
+const PI 3.14
+const HELLO_WORLD "Hello, World!"
 
 $main ( -> u8 )
-    x  10   = "x = 10"    errors::assert
-    y  20   = "y = 20"    errors::assert |
-    e  0x45 = "e = 0x45"  errors::assert |
-    pi 3.14 = "pi = 3.14" errors::assert |
+    X  10   = "X = 10"    errors::assert
+    Y  20   = "Y = 20"    errors::assert |
+    E  0x45 = "E = 0x45"  errors::assert |
+    PI 3.14 = "PI = 3.14" errors::assert |
+
+    HELLO_WORLD 1+ .@ 'e' = "HELLO_WORLD 1+ .@ = 'e'" errors::assert |
 $

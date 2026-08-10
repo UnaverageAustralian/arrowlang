@@ -123,8 +123,8 @@ typedef struct {
 } Function;
 
 typedef struct {
-    int64_t val;
-    Type_Kind type;
+    uint64_t val;
+    Type type;
 } Constant;
 
 typedef struct {
