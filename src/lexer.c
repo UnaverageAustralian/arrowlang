@@ -373,7 +373,7 @@ void lex_string_literal(Lexer *lexer) {
     skip(lexer, 1);
 
     char c = peek(lexer, 0);
-    char buf[256];
+    char buf[256] = {0};
 
     int i;
     for (i = 0; c && c != '\"' && c != '\n'; i++) {
@@ -392,7 +392,7 @@ void lex_string_literal(Lexer *lexer) {
         return;
     }
 
-    char *str = calloc(i, sizeof(char));
+    char *str = calloc(i+1, sizeof(char));
     strncpy(str, buf, i);
 
     make_token(lexer, TOK_STR_LIT);
