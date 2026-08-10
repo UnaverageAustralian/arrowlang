@@ -843,7 +843,7 @@ void compile_const(Compilation_Unit *compiler) {
         break;
     case TOK_STR_LIT:
         sym->as.constant.type = PTR_TYPE(TYPE_CHAR);
-        sym->as.constant.val = (uint64_t)compiler->lexer->prev.start;
+        sym->as.constant.val = (uint64_t)compiler->lexer->prev.as.str;
         break;
     default:
         compiler->global->had_error = 1;
