@@ -108,6 +108,7 @@ char *opcode_spelling(Opcode opcode) {
     case OP_ALLOC:           return "ALLOC";
     case OP_LDROP:           return "LDROP";
     case OP_SIZEOF:          return "SIZEOF";
+    case OP_RETURN:          return "RETURN";
     default:                 return "UNKNOWN";
     }
 }
@@ -601,7 +602,7 @@ void compile_stmt(Compilation_Unit *compiler) {
         break;
     case TOK_RET:
         compiler->rets.positions[compiler->rets.count++] = compiler->ops.count;
-        make_op(compiler, OP_JMP, -1);
+        make_op(compiler, OP_RETURN, -1);
         break;
     case TOK_WORD: {
         Hash_Entry *entry = hashmap_get(&compiler->symbols, tok->start, tok->len);

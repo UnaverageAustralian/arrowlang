@@ -41,6 +41,7 @@ typedef enum {
     OP_START,  OP_END,
     OP_IF,     OP_ELSE,
     OP_ELSEIF, OP_SIZEOF,
+    OP_RETURN,
 } Opcode;
 
 typedef enum {

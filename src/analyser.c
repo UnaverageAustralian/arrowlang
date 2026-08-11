@@ -489,6 +489,7 @@ void type_check_op(Analyser *analyser) {
         }
         break;
     }
+    case OP_RETURN:
     case OP_RET: {
         Function func = *analyser->func;
         if (!check_operand_count(analyser, func.return_types.count)) break;
@@ -500,6 +501,12 @@ void type_check_op(Analyser *analyser) {
                 expected_types_error(analyser, "Return types don't match expected return types", func.return_types);
                 break;
             }
+        }
+
+        if (op->opcode == OP_RETURN) {
+            op->opcode = OP_JMP;
+            analyser->stack.count -= func.return_types.count;
+            break;
         }
 
         analyser->stack.count = 0;
