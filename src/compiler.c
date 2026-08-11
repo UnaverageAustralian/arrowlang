@@ -107,6 +107,7 @@ char *opcode_spelling(Opcode opcode) {
     case OP_INDEX_STORE:     return "INDEX_STORE";
     case OP_ALLOC:           return "ALLOC";
     case OP_LDROP:           return "LDROP";
+    case OP_SIZEOF:          return "SIZEOF";
     default:                 return "UNKNOWN";
     }
 }
@@ -653,6 +654,12 @@ void compile_stmt(Compilation_Unit *compiler) {
     }
     case TOK_ALLOC: {
         Op *op = make_op(compiler, OP_ALLOC, 0);
+        lexer_next(compiler->lexer);
+        get_type(compiler, &op->types[0]);
+        break;
+    }
+    case TOK_SIZEOF: {
+        Op *op = make_op(compiler, OP_SIZEOF, 0);
         lexer_next(compiler->lexer);
         get_type(compiler, &op->types[0]);
         break;

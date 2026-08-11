@@ -18,6 +18,11 @@ Operators are written in reverse Polish notation, like all other stack languages
  // STACK: [ 2 | 3 ] -> [ 5 ] -> [ 5 | 5 ] -> [ 25 ]
 ```
 
+There is also the `neg` operation, which negates the top value on the stack.
+```
+ 2 neg // -2
+```
+
 ## Bit operations
 
 Arrowlang's bit operators are: `&`/`and`, `|`/`or`, `^`/`xor`, `<<`/`shl`, `>>`/`shr`,
@@ -63,10 +68,6 @@ Arrowlang's bit operators are: `&`/`and`, `|`/`or`, `^`/`xor`, `<<`/`shl`, `>>`/
  2 3 9 rot     // STACK: [ 2 | 3 | 9 ] -> [ 3 | 9 | 2 ]
  2 3 9 rotn    // STACK: [ 2 | 3 | 9 ] -> [ 9 | 2 | 3 ]
 ```
-
-## Other operations
-
-There is also a `neg` operation, which negates the top value on the stack.
 
 ## Conditionals
 
@@ -159,6 +160,11 @@ You can convert between types just by putting in the type's name:
  255u8 1 + i64 io::print // Prints 0
 ```
 
+You can do `sizeof` followed by a type to push the size of that type.
+```
+ sizeof i32 // 4
+```
+
 ## Structs
 
 Structs are declared with `struct` followed by a name, and end with `end`. Structs contain fields which can be accessed with `#` followed by the field's name (this operation does not drop the struct), and can be initialised with values by putting in their name:
@@ -197,12 +203,6 @@ There is also a variant of the `#` operation which does drop the struct, the `.`
      #foo.x      // 2
      drop #foo.y // 3
  $
-```
-
-The `alloc` operation allocates a struct on the stack and zero-initialises it:
-```
- alloc Foo
- #x // 0
 ```
 
 You can also declare anonymous structs:
@@ -284,6 +284,12 @@ The `+@` operation takes in an index and pushes the value at that index from the
 ```
 
 The `=>` operation stores a value into the pointer, and the `+=>` operation takes in an index and stores a value into the pointer plus the index.
+
+The `alloc` operation allocates an element of the given type behind the stack, zeros it out, then pushes a pointer to it.
+```
+ alloc i32 // Allocates an i32 behind the stack
+ 3 =>      // Stores 3 into the allocated element
+```
 
 ## List of Operations
 
@@ -369,3 +375,4 @@ The `=>` operation stores a value into the pointer, and the `+=>` operation take
 | `+@`                    | `( ptr[T] Integer -> ptr[T] T )`                |
 | `=>`                    | `( ptr[T] T -> ptr[T] )`                        |
 | `+=>`                   | `( ptr[T] T Integer -> ptr[T] )`                |
+| `sizeof <type>`         | `( -> Integer )`                                |

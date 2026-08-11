@@ -31,7 +31,7 @@ static const char *keywords[] = {
     "rotn",    "else",
     "then",    "elseif",
     "const",   "alloc",
-    "ldrop",
+    "ldrop",   "sizeof",
 
     "i8",      "u8",
     "i16",     "u16",
@@ -776,6 +776,11 @@ char *tok_spelling(Token_Type type) {
     case TOK_STORE:      return "STORE";
     case TOK_AT:         return "AT";
     case TOK_ADD_AT:     return "ADD_AT";
+    case TOK_ADD_STORE:  return "ADD_STORE";
+    case TOK_DOT_AT:     return "DOT_AT";
+    case TOK_STRUCT:     return "STRUCT";
+    case TOK_ALLOC:      return "ALLOC";
+    case TOK_SIZEOF:     return "SIZEOF";
     case TOK_INT_LIT:    return "INT_LIT";
     case TOK_REAL_LIT:   return "REAL_LIT";
     case TOK_STR_LIT:    return "STR_LIT";

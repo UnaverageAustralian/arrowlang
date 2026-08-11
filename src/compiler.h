@@ -40,7 +40,7 @@ typedef enum {
     // For the analyser
     OP_START,  OP_END,
     OP_IF,     OP_ELSE,
-    OP_ELSEIF,
+    OP_ELSEIF, OP_SIZEOF,
 } Opcode;
 
 typedef enum {

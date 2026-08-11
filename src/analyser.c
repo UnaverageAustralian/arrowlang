@@ -884,6 +884,13 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, ptr);
         break;
     }
+    case OP_SIZEOF:
+        op->opcode = OP_PUSH;
+        op->operand = type_size(op->types[0]);
+        op->types[0] = BASIC_TYPE(TYPE_INT);
+
+        DA_APPEND(&analyser->stack, op->types[0]);
+        break;
     case OP_LABEL: break;
     case OP_START:
         type_check_block(analyser);
