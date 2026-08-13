@@ -67,7 +67,9 @@ typedef enum {
     TOK_NUMBER,
 
     TOK_EOF,
-    TOK_LAST = TOK_EOF,
+
+    TOK_FIRST_WORD = TOK_MOD,
+    TOK_LAST       = TOK_EOF,
 } Token_Type;
 
 typedef struct {
@@ -94,8 +96,7 @@ typedef struct {
 void init_lexer(Lexer *lexer, const char *src, const char *file_path);
 void lexer_next(Lexer *lexer);
 
-char *tok_spelling(Token_Type type);
-char *err_tok_spelling(Token_Type type);
+const char *tok_spelling(Token_Type type);
 void print_token(Token token);
 
 #endif // ARROW_LEXER_H

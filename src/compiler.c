@@ -219,9 +219,13 @@ inline Unresolved_Symbol *make_unresolved(Compilation_Unit *compiler, Unresolved
 
 static inline int expect(Compilation_Unit *compiler, Token_Type type) {
     lexer_next(compiler->lexer);
+    if (compiler->lexer->prev.type == TOK_ERROR) {
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "%.*s\n", compiler->lexer->prev.len, compiler->lexer->prev.start);
+    }
     if (compiler->lexer->prev.type != type) {
         compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Expected %s, got %s\n", err_tok_spelling(type), err_tok_spelling(compiler->lexer->prev.type));
+        COMPILER_EPRINTF(LEVEL_ERR, "Expected %s, got %s\n", tok_spelling(type), tok_spelling(compiler->lexer->prev.type));
         return 0;
     }
     return 1;
@@ -438,6 +442,7 @@ void get_type(Compilation_Unit *compiler, Type *type) {
         Symbol *sym = (Symbol *)entry->val;
         if (sym->type == STYPE_MODULE) {
             entry = get_entry_in_module(compiler, entry);
+            if (!entry) break;
             sym = (Symbol *)entry->val;
         }
 
@@ -470,7 +475,7 @@ void get_type(Compilation_Unit *compiler, Type *type) {
     }
     default:
         compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Expected type, got %s\n", err_tok_spelling(compiler->lexer->prev.type));
+        COMPILER_EPRINTF(LEVEL_ERR, "Expected type, got %s\n", tok_spelling(compiler->lexer->prev.type));
         *type = BASIC_TYPE(TYPE_VOID);
         break;
     }
@@ -678,7 +683,7 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_RBRACKET:
     case TOK_SCOPE:
         compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Lone %s\n", err_tok_spelling(tok->type));
+        COMPILER_EPRINTF(LEVEL_ERR, "Lone %s\n", tok_spelling(tok->type));
         return;
     case TOK_IMPORT:
         compiler->global->had_error = 1;
@@ -1041,7 +1046,7 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
             hashmap_add(&unit.symbols, entry->key, entry->key_len, module);
         }
         else {
-            eprintf(unit.lexer->file_path, unit.lexer->prev.loc, LEVEL_ERR, "Expected word or string, got %s\n", err_tok_spelling(lexer.prev.type));
+            eprintf(unit.lexer->file_path, unit.lexer->prev.loc, LEVEL_ERR, "Expected word or string, got %s\n", tok_spelling(lexer.prev.type));
         }
     }
 

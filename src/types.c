@@ -91,17 +91,23 @@ int type_alignment(Type type) {
         return type_size(type);
 }
 
-Field *get_first_leaf_field(Struct structure) {
-    Field *result = &structure.fields.items[0];
+Field *get_nth_leaf_field(Struct structure, size_t n) {
+    Field *result = structure.fields.items;
+    for (size_t i = 0; i < n; i++) {
+        if (result >= structure.fields.items + structure.fields.count)
+            return NULL;
+
+        if (IS_ADVANCED(result->type) && result->type.advanced->structure.fields.count < n-i) {
+            result = &result->type.advanced->structure.fields.items[i];
+            continue;
+        }
+        else if (IS_ADVANCED(structure.fields.items[i].type)) {
+            i += result->type.advanced->structure.fields.count;
+        }
+        result++;
+    }
     while (result->type.kind == TYPE_STRUCT)
         result = &result->type.advanced->structure.fields.items[0];
-    return result;
-}
-
-Field *get_last_leaf_field(Struct structure) {
-    Field *result = &structure.fields.items[structure.fields.count-1];
-    while (result->type.kind == TYPE_STRUCT)
-        result = &result->type.advanced->structure.fields.items[result->type.advanced->structure.fields.count-1];
     return result;
 }
 

@@ -11,7 +11,6 @@ typedef struct {
     Ops *ops;
     unsigned pos;
     int allocated;
-    int depth;
     int had_error;
 } Generator;
 

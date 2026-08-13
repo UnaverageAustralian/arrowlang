@@ -8,8 +8,31 @@
 #include "lexer.h"
 #include "utils.h"
 
-#define NUM_KEYWORDS TOK_LAST - TOK_MOD
-static const char *keywords[] = {
+#define NUM_KEYWORDS TOK_LAST - TOK_FIRST_WORD
+static const char *tok_spellings[] = {
+    "invalid token",
+
+    "integer literal",
+    "real literal",
+    "character literal",
+    "string literal",
+
+    "word",
+
+    "'+'",       "'-'",
+    "'*'",       "'/'",
+    "';'",       "'!'",
+    "'{'",       "'}'",
+    "'@'",       "'$'",
+    "'->'",      "'('",
+    "')'",       "'::'",
+    "'E$'",      "'C$'",
+    "'#'",       "'>#'",
+    "'.'",       "':'",
+    "'['",       "']'",
+    "'=>'",      "'+@'",
+    "'+=>'",     "'.@'",
+
     "mod",     "and",
     "or",      "xor",
     "shl",     "shr",
@@ -43,6 +66,8 @@ static const char *keywords[] = {
 
     "Integer", "Real",
     "Number",
+
+    "end of file",
 };
 
 void init_lexer(Lexer *lexer, const char *src, const char *file_path) {
@@ -319,7 +344,7 @@ void lex_word(Lexer *lexer) {
     }
 
     for (int i = 0; i < NUM_KEYWORDS; i++) {
-        if (strcmp(buf, keywords[i]) == 0) {
+        if (strcmp(buf, tok_spellings[i + TOK_FIRST_WORD]) == 0) {
             make_token(lexer, i + TOK_MOD);
             return;
         }
@@ -380,15 +405,15 @@ void lex_string_literal(Lexer *lexer) {
         buf[i] = lex_char(lexer);
         c = peek(lexer, 0);
     }
-    if (c) skip(lexer, 1);
-
-    if (i >= 256) {
-        make_err_token(lexer, "String literal is too long");
-        return;
-    }
+    if (c && c != '\n') skip(lexer, 1);
 
     if (!c || c == '\n') {
         make_err_token(lexer, "Unterminated string");
+        return;
+    }
+
+    if (i >= 256) {
+        make_err_token(lexer, "String literal is too long");
         return;
     }
 
@@ -413,15 +438,15 @@ void lex_char_literal(Lexer *lexer) {
         c = peek(lexer, 0);
         i++;
     }
-    if (c) skip(lexer, 1);
-
-    if (i != 1) {
-        make_err_token(lexer, "Character literals must have only 1 character");
-        return;
-    }
+    if (c && c != '\n') skip(lexer, 1);
 
     if (!c || c == '\n') {
         make_err_token(lexer, "Unterminated character literal");
+        return;
+    }
+
+    if (i != 1) {
+        make_err_token(lexer, "Character literals must have only 1 character");
         return;
     }
 
@@ -436,13 +461,18 @@ void single_line_comment(Lexer *lexer) {
     while (c && c != '\n')
         c = skip(lexer, 1);
     if (c) skip(lexer, 1);
+
+    lexer->loc.pos = 1;
     lexer->loc.line++;
 }
 
 void multi_line_comment(Lexer *lexer) {
     char c = skip(lexer, 2);
     while (c && (c != '*' || peek(lexer, 1) != '/') ) {
-        if (c == '\n') lexer->loc.line++;
+        if (c == '\n') {
+            lexer->loc.pos = 1;
+            lexer->loc.line++;
+        }
         c = skip(lexer, 1);
     }
     if (c) skip(lexer, 2);
@@ -712,134 +742,8 @@ void lexer_next(Lexer *lexer) {
     }
 }
 
-char *tok_spelling(Token_Type type) {
-    switch (type) {
-    case TOK_ADD:        return "ADD";
-    case TOK_SUB:        return "SUB";
-    case TOK_MUL:        return "MUL";
-    case TOK_DIV:        return "DIV";
-    case TOK_MOD:        return "MOD";
-    case TOK_AND:        return "AND";
-    case TOK_OR:         return "OR";
-    case TOK_XOR:        return "XOR";
-    case TOK_SHL:        return "SHL";
-    case TOK_SHR:        return "SHR";
-    case TOK_ROL:        return "ROL";
-    case TOK_ROR:        return "ROR";
-    case TOK_NOT:        return "NOT";
-    case TOK_EQ:         return "EQ";
-    case TOK_LT:         return "LT";
-    case TOK_LTEQ:       return "LTEQ";
-    case TOK_GT:         return "GT";
-    case TOK_GTEQ:       return "GTEQ";
-    case TOK_NEQ:        return "NEQ";
-    case TOK_LNOT:       return "LNOT";
-    case TOK_DUP:        return "DUP";
-    case TOK_OVER:       return "OVER";
-    case TOK_DUP2:       return "DUP2";
-    case TOK_DROP:       return "DROP";
-    case TOK_SWAP:       return "SWAP";
-    case TOK_OVER2:      return "OVER2";
-    case TOK_SWAP2:      return "SWAP2";
-    case TOK_NEG:        return "NEG";
-    case TOK_ROT:        return "ROT";
-    case TOK_ROTN:       return "ROTN";
-    case TOK_LDROP:      return "LDROP";
-    case TOK_IF:         return "IF";
-    case TOK_ELSE:       return "ELSE";
-    case TOK_COLON:      return "COLON";
-    case TOK_WHILE:      return "WHILE";
-    case TOK_LBRACE:     return "LBRACE";
-    case TOK_RBRACE:     return "RBRACE";
-    case TOK_LBRACKET:   return "LBRACKET";
-    case TOK_RBRACKET:   return "RBRACKET";
-    case TOK_LOOP:       return "LOOP";
-    case TOK_END:        return "END";
-    case TOK_BRK:        return "BRK";
-    case TOK_CONTINUE:   return "CONTINUE";
-    case TOK_SEMICOLON:  return "SEMICOLON";
-    case TOK_FUNC:       return "FUNC";
-    case TOK_LPAREN:     return "LPAREN";
-    case TOK_RPAREN:     return "RPAREN";
-    case TOK_ARROW:      return "ARROW";
-    case TOK_RET:        return "RET";
-    case TOK_EXT_FUNC:   return "EXT_FUNC";
-    case TOK_C_FUNC:     return "C_FUNC";
-    case TOK_IMPORT:     return "IMPORT";
-    case TOK_SCOPE:      return "SCOPE";
-    case TOK_HASH:       return "HASH";
-    case TOK_ARROW_HASH: return "ARROW_HASH";
-    case TOK_THEN:       return "THEN";
-    case TOK_ELSEIF:     return "ELSEIF";
-    case TOK_CONST:      return "CONST";
-    case TOK_DOT:        return "DOT";
-    case TOK_STORE:      return "STORE";
-    case TOK_AT:         return "AT";
-    case TOK_ADD_AT:     return "ADD_AT";
-    case TOK_ADD_STORE:  return "ADD_STORE";
-    case TOK_DOT_AT:     return "DOT_AT";
-    case TOK_STRUCT:     return "STRUCT";
-    case TOK_ALLOC:      return "ALLOC";
-    case TOK_SIZEOF:     return "SIZEOF";
-    case TOK_INT_LIT:    return "INT_LIT";
-    case TOK_REAL_LIT:   return "REAL_LIT";
-    case TOK_STR_LIT:    return "STR_LIT";
-    case TOK_CHAR_LIT:   return "CHAR_LIT";
-    case TOK_I8:         return "I8";
-    case TOK_CHAR:       return "CHAR";
-    case TOK_U8:         return "U8";
-    case TOK_I16:        return "I16";
-    case TOK_U16:        return "U16";
-    case TOK_I32:        return "I32";
-    case TOK_U32:        return "U32";
-    case TOK_I64:        return "I64";
-    case TOK_U64:        return "U64";
-    case TOK_F32:        return "F32";
-    case TOK_F64:        return "F64";
-    case TOK_STR:        return "STR";
-    case TOK_PTR:        return "PTR";
-    case TOK_WORD:       return "WORD";
-    case TOK_EOF:        return "EOF";
-    default:             return "UNKNOWN";
-    }
-}
-
-char *err_tok_spelling(Token_Type type) {
-    switch (type) {
-    case TOK_IF:         return "if";
-    case TOK_ELSE:       return "else";
-    case TOK_WHILE:      return "while";
-    case TOK_LBRACE:     return "left brace";
-    case TOK_RBRACE:     return "right brace";
-    case TOK_LOOP:       return "loop";
-    case TOK_END:        return "end";
-    case TOK_COLON:      return "colon";
-    case TOK_SEMICOLON:  return "semicolon";
-    case TOK_FUNC:       return "function character";
-    case TOK_LPAREN:     return "left parenthesis";
-    case TOK_RPAREN:     return "right parenthesis";
-    case TOK_LBRACKET:   return "left square bracket";
-    case TOK_RBRACKET:   return "right square bracket";
-    case TOK_ARROW:      return "arrow";
-    case TOK_EXT_FUNC:   return "external function";
-    case TOK_C_FUNC:     return "C function";
-    case TOK_IMPORT:     return "import";
-    case TOK_SCOPE:      return "scope";
-    case TOK_THEN:       return "then";
-    case TOK_ELSEIF:     return "elseif";
-    case TOK_INT_LIT:    return "integer literal";
-    case TOK_REAL_LIT:   return "real literal";
-    case TOK_STR_LIT:    return "string literal";
-    case TOK_CHAR_LIT:   return "character literal";
-    case TOK_STR:        return "string";
-    case TOK_WORD:       return "word";
-    case TOK_CONST:      return "const";
-    case TOK_EOF:        return "end of file";
-    default:
-        if (type >= TOK_I8 && type <= TOK_NUMBER)
-            return "type";
-        return "operation";
-    }
+const char *tok_spelling(Token_Type type) {
+    return tok_spellings[type];
 }
 
 void print_token(Token token) {

@@ -82,7 +82,7 @@ void check_expected_types(Analyser *analyser) {
         EPRINTF_AT_OP(op, LEVEL_ERR, "Blocks cannot change the state of the stack, expected types: [ ");
 
         for (size_t j = analyser->expected_types_start; j < analyser->expected_types.count; j++)
-            fprintf(stderr, "%s ", type_spelling(analyser->expected_types.items[j]));
+            fprintf(stderr, "%s ", type_spelling(analyser->expected_types.items[analyser->expected_types.count-1-j]));
 
         fprintf(stderr, "], actual types: [ ");
         for (size_t j = analyser->block_start; j < analyser->stack.count; j++)
