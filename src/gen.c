@@ -199,7 +199,7 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
             int needed_fparams = first_is_float + last_is_float;
 
             int size = param->advanced->structure.size;
-            if (size <= 16 && fparams >= needed_fparams && iparams >= size/8 - needed_fparams) {
+            if (size <= 16 && fparams + needed_fparams < 8 && iparams + (ALIGN(size, 8)/8 - needed_fparams) < 6) {
                 if (first_is_float) {
                     sb_appendf(&gen->sb, "    movsd (%%rax), %%xmm%d\n", fparams);
                     fparams++;
