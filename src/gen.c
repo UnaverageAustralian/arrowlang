@@ -169,53 +169,22 @@ void duplicate_struct(Generator *gen, Struct a) {
 void generate_ccall(Generator *gen, Hash_Entry *entry) {
     Function func = ((Symbol *)entry->val)->as.func;
 
+    int extra_arg = 0;
+
     int iparams = 0;
     int fparams = 0;
 
-    for (size_t i = 0; i < func.param_types.count; i++) {
-        Type *param = &func.param_types.items[i];
-        if (IS_ADVANCED(*param) && param->advanced->structure.size <= 16) {
-            Field *first = get_nth_leaf_field(param->advanced->structure, 0);
-            Field *second = get_nth_leaf_field(param->advanced->structure, 1);
-
-            Field *second_last = get_nth_leaf_field(param->advanced->structure, param->advanced->structure.fields.count-2);
-            Field *last = get_nth_leaf_field(param->advanced->structure, param->advanced->structure.fields.count-1);
-
-            if (first->type.kind == TYPE_F64 || (first->type.kind == TYPE_F32 && (!second || second->type.kind == TYPE_F32)))
-                fparams++;
-            else
-                iparams++;
-
-            if (last->offset - first->offset >= 8 && (last->type.kind == TYPE_F64
-                || (last->type.kind == TYPE_F32 && (second_last->type.kind == TYPE_F32 || param->advanced->structure.size % 8 != 0))))
-                fparams++;
-            else if (last->offset - first->offset >= 8)
-                iparams++;
-        }
-        else if (IS_REAL(*param)) {
-            fparams++;
-        }
-        else if (!IS_ADVANCED(*param)) {
-            iparams++;
-        }
-
-        if (fparams > 8)
-            fparams = 8;
-        if (iparams > 6)
-            iparams = 6;
-    }
-
-    int start_arg = 0;
     if (func.return_types.count == 1 && IS_ADVANCED(func.return_types.items[0]) && func.return_types.items[0].advanced->structure.size > 16) {
-        start_arg = 1;
+        iparams++;
+        extra_arg = 1;
         sb_appendf(&gen->sb, "    leaq %d(%%rbp), %%rdi\n", gen->allocated - gen->func.max_allocated);
     }
 
     int extra_depth = 0;
-    for (int i = func.param_types.count-1; i >= 0; i--) {
+    for (size_t i = 0; i < func.param_types.count; i++) {
         Type *param = &func.param_types.items[i];
         if (IS_ADVANCED(*param)) {
-            sb_appendf(&gen->sb, "    popq %%rax\n");
+            sb_appendf(&gen->sb, "    movq %d(%%rsp), %%rax\n", (func.param_types.count - i)*8 - 8);
 
             Field *first = get_nth_leaf_field(param->advanced->structure, 0);
             Field *second = get_nth_leaf_field(param->advanced->structure, 1);
@@ -232,21 +201,21 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
             int size = param->advanced->structure.size;
             if (size <= 16 && fparams >= needed_fparams && iparams >= size/8 - needed_fparams) {
                 if (first_is_float) {
-                    sb_appendf(&gen->sb, "    movsd (%%rax), %%xmm%d\n", fparams - 1);
-                    fparams--;
+                    sb_appendf(&gen->sb, "    movsd (%%rax), %%xmm%d\n", fparams);
+                    fparams++;
                 }
                 else {
-                    sb_appendf(&gen->sb, "    movq (%%rax), %s\n", arg_regs[iparams - 1 + start_arg]);
-                    iparams--;
+                    sb_appendf(&gen->sb, "    movq (%%rax), %s\n", arg_regs[iparams]);
+                    iparams++;
                 }
 
                 if (last_is_float) {
-                    sb_appendf(&gen->sb, "    movsd 8(%%rax), %%xmm%d\n", fparams - 1);
-                    fparams--;
+                    sb_appendf(&gen->sb, "    movsd 8(%%rax), %%xmm%d\n", fparams);
+                    fparams++;
                 }
                 else if (last->offset - first->offset >= 8) {
-                    sb_appendf(&gen->sb, "    movq 8(%%rax), %s\n", arg_regs[iparams - 1 + start_arg]);
-                    iparams--;
+                    sb_appendf(&gen->sb, "    movq 8(%%rax), %s\n", arg_regs[iparams]);
+                    iparams++;
                 }
             }
             else {
@@ -258,14 +227,13 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
                 }
             }
         }
-        else if (IS_REAL(*param) && fparams >= 0) {
-            sb_appendf(&gen->sb, "    movsd (%%rsp), %%xmm%d\n", fparams-1);
-            sb_appendf(&gen->sb, "    addq $8, %%rsp\n");
-            fparams--;
+        else if (IS_REAL(*param) && fparams < 8) {
+            sb_appendf(&gen->sb, "    movsd %d(%%rsp), %%xmm%d\n", (func.param_types.count - i)*8 - 8, fparams);
+            fparams++;
         }
-        else if (iparams >= 0) {
-            sb_appendf(&gen->sb, "    popq %s\n", arg_regs[iparams - 1 + start_arg]);
-            iparams--;
+        else if (iparams < 6) {
+            sb_appendf(&gen->sb, "    movq %d(%%rsp), %s\n", (func.param_types.count - i)*8 - 8, arg_regs[iparams]);
+            iparams++;
         }
     }
 
@@ -273,10 +241,10 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
     sb_appendf(&gen->sb, "    and $0xFFF0, %%sp\n");
     sb_appendf(&gen->sb, "    call \"%.*s\"\n", func.extern_name.len, func.extern_name.str);
     sb_appendf(&gen->sb, "    movq %%rbx, %%rsp\n");
-    if (extra_depth > 0)
-        sb_appendf(&gen->sb, "    addq $%d, %%rsp\n", extra_depth);
+    if (func.param_types.count > 0)
+        sb_appendf(&gen->sb, "    addq $%d, %%rsp\n", func.param_types.count*8 + extra_depth);
 
-    if (start_arg == 1) {
+    if (extra_arg) {
         sb_appendf(&gen->sb, "    leaq %d(%%rbp), %%rax\n", gen->allocated - gen->func.max_allocated);
         sb_appendf(&gen->sb, "    pushq %%rax\n");
         gen->allocated += func.return_types.items[0].advanced->structure.size;
@@ -681,7 +649,7 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             sb_appendf(&gen.sb, "    subq $%d, %%rsp\n", gen.func.max_allocated);
 
             for (size_t i = 0; i < gen.func.param_types.count; i++) {
-                sb_appendf(&gen.sb, "    pushq %zu(%%rbp)\n", (gen.func.param_types.count-i-1)*8 + 16);
+                sb_appendf(&gen.sb, "    pushq %zu(%%rbp)\n", (gen.func.param_types.count-i-1)*8 + 24);
                 if (IS_ADVANCED(gen.func.param_types.items[i]))
                     duplicate_struct(&gen, gen.func.param_types.items[i].advanced->structure);
             }
