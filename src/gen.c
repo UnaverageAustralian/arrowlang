@@ -173,6 +173,37 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
 
     int iparams = 0;
     int fparams = 0;
+    int sparams = 0;
+
+    for (size_t i = 0; i < func.param_types.count; i++) {
+        Type *param = &func.param_types.items[i];
+        if (IS_ADVANCED(*param) && param->advanced->structure.size <= 16) {
+            int first_is_float = first_long_is_float(param->advanced->structure);
+            int last_is_float = last_long_is_float(param->advanced->structure);
+
+            if (first_is_float)
+                fparams++;
+            else
+                iparams++;
+
+            if (last_is_float)
+                fparams++;
+            else
+                iparams++;
+        }
+        else if (IS_REAL(*param)) {
+            fparams++;
+        }
+        else if (!IS_ADVANCED(*param)) {
+            iparams++;
+        }
+        else {
+            sparams++;
+        }
+    }
+
+    iparams = 0;
+    fparams = 0;
 
     if (func.return_types.count == 1 && IS_ADVANCED(func.return_types.items[0]) && func.return_types.items[0].advanced->structure.size > 16) {
         iparams++;
@@ -180,22 +211,18 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
         sb_appendf(&gen->sb, "    leaq %d(%%rbp), %%rdi\n", gen->allocated - gen->func.max_allocated);
     }
 
-    int extra_depth = 0;
+    sb_appendf(&gen->sb, "    movq %%rsp, %%rbx\n");
+    sb_appendf(&gen->sb, "    and $0xFFF0, %%sp\n");
+    if (sparams & 1)
+        sb_appendf(&gen->sb, "    subq $8, %%rsp\n");
+
     for (size_t i = 0; i < func.param_types.count; i++) {
         Type *param = &func.param_types.items[i];
         if (IS_ADVANCED(*param)) {
-            sb_appendf(&gen->sb, "    movq %d(%%rsp), %%rax\n", (func.param_types.count - i)*8 - 8);
+            sb_appendf(&gen->sb, "    movq %d(%%rbx), %%rax\n", (func.param_types.count - i)*8 - 8);
 
-            Field *first = get_nth_leaf_field(param->advanced->structure, 0);
-            Field *second = get_nth_leaf_field(param->advanced->structure, 1);
-
-            Field *second_last = get_nth_leaf_field(param->advanced->structure, param->advanced->structure.fields.count-2);
-            Field *last = get_nth_leaf_field(param->advanced->structure, param->advanced->structure.fields.count-1);
-
-            int first_is_float = first->type.kind == TYPE_F64 || (first->type.kind == TYPE_F32 && (!second || second->type.kind == TYPE_F32));
-            int last_is_float = last->offset - first->offset >= 8 && (last->type.kind == TYPE_F64
-                                || (last->type.kind == TYPE_F32 && (second_last->type.kind == TYPE_F32 || param->advanced->structure.size % 8 != 0)));
-
+            int first_is_float = first_long_is_float(param->advanced->structure);
+            int last_is_float = last_long_is_float(param->advanced->structure);
             int needed_fparams = first_is_float + last_is_float;
 
             int size = param->advanced->structure.size;
@@ -213,13 +240,12 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
                     sb_appendf(&gen->sb, "    movsd 8(%%rax), %%xmm%d\n", fparams);
                     fparams++;
                 }
-                else if (last->offset - first->offset >= 8) {
+                else {
                     sb_appendf(&gen->sb, "    movq 8(%%rax), %s\n", arg_regs[iparams]);
                     iparams++;
                 }
             }
             else {
-                extra_depth += ALIGN(param->advanced->structure.size, 8);
                 sb_appendf(&gen->sb, "    subq $%d, %%rsp\n", ALIGN(param->advanced->structure.size, 8));
                 for (int i = 0; i < param->advanced->structure.size; i += 8) {
                     sb_appendf(&gen->sb, "    movq %d(%%rax), %%r11\n", i);
@@ -228,21 +254,19 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
             }
         }
         else if (IS_REAL(*param) && fparams < 8) {
-            sb_appendf(&gen->sb, "    movsd %d(%%rsp), %%xmm%d\n", (func.param_types.count - i)*8 - 8, fparams);
+            sb_appendf(&gen->sb, "    movsd %d(%%rbx), %%xmm%d\n", (func.param_types.count - i)*8 - 8, fparams);
             fparams++;
         }
         else if (iparams < 6) {
-            sb_appendf(&gen->sb, "    movq %d(%%rsp), %s\n", (func.param_types.count - i)*8 - 8, arg_regs[iparams]);
+            sb_appendf(&gen->sb, "    movq %d(%%rbx), %s\n", (func.param_types.count - i)*8 - 8, arg_regs[iparams]);
             iparams++;
         }
     }
 
-    sb_appendf(&gen->sb, "    movq %%rsp, %%rbx\n");
-    sb_appendf(&gen->sb, "    and $0xFFF0, %%sp\n");
     sb_appendf(&gen->sb, "    call \"%.*s\"\n", func.extern_name.len, func.extern_name.str);
     sb_appendf(&gen->sb, "    movq %%rbx, %%rsp\n");
     if (func.param_types.count > 0)
-        sb_appendf(&gen->sb, "    addq $%d, %%rsp\n", func.param_types.count*8 + extra_depth);
+        sb_appendf(&gen->sb, "    addq $%d, %%rsp\n", func.param_types.count*8);
 
     if (extra_arg) {
         sb_appendf(&gen->sb, "    leaq %d(%%rbp), %%rax\n", gen->allocated - gen->func.max_allocated);
@@ -254,13 +278,10 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
         Struct structure = func.return_types.items[0].advanced->structure;
         if (structure.size > 16) return;
 
-        Field *first = get_nth_leaf_field(structure, 0);
-        Field *second = get_nth_leaf_field(structure, 1);
+        int first_is_float = first_long_is_float(structure);
+        int last_is_float = last_long_is_float(structure);
 
-        Field *second_last = get_nth_leaf_field(structure, structure.fields.count-2);
-        Field *last = get_nth_leaf_field(structure, structure.fields.count-1);
-
-        if (first->type.kind == TYPE_F64 || (first->type.kind == TYPE_F32 && (!second || second->type.kind == TYPE_F32))) {
+        if (first_is_float) {
             sb_appendf(&gen->sb, "    subq $8, %%rsp\n");
             sb_appendf(&gen->sb, "    movsd %%xmm0, (%%rsp)\n");
         }
@@ -268,14 +289,12 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
             sb_appendf(&gen->sb, "    movq %%rax, %d(%%rbp)\n", gen->allocated - gen->func.max_allocated);
         }
 
-        if (last->offset - first->offset >= 8 && (last->type.kind == TYPE_F64
-            || (last->type.kind == TYPE_F32 && (second_last->type.kind == TYPE_F32 || structure.size % 8 != 0)))) {
+        if (last_is_float) {
             sb_appendf(&gen->sb, "    subq $8, %%rsp\n");
-            sb_appendf(&gen->sb, "    movsd %%xmm%d, (%%rsp)\n", first->type.kind == TYPE_F64 ? 1 : 0);
+            sb_appendf(&gen->sb, "    movsd %%xmm%d, (%%rsp)\n", first_is_float ? 1 : 0);
         }
-        else if (last->offset - first->offset >= 8) {
-            sb_appendf(&gen->sb, "    movq %s, %d(%%rbp)\n", first->type.kind == TYPE_F64 ? "%rax" : "%rdx",
-                       gen->allocated - gen->func.max_allocated + 8);
+        else {
+            sb_appendf(&gen->sb, "    movq %s, %d(%%rbp)\n", first_is_float ? "%rax" : "%rdx", gen->allocated - gen->func.max_allocated + 8);
         }
 
         gen->allocated += structure.size;

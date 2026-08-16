@@ -91,24 +91,36 @@ int type_alignment(Type type) {
         return type_size(type);
 }
 
-Field *get_nth_leaf_field(Struct structure, size_t n) {
-    Field *result = structure.fields.items;
-    for (size_t i = 0; i < n; i++) {
-        if (result >= structure.fields.items + structure.fields.count)
-            return NULL;
+int first_long_is_float(Struct structure) {
+    Field *first = structure.fields.items;
+    Field *second = first + 1;
 
-        if (IS_ADVANCED(result->type) && result->type.advanced->structure.fields.count < n-i) {
-            result = &result->type.advanced->structure.fields.items[i];
-            continue;
-        }
-        else if (IS_ADVANCED(structure.fields.items[i].type)) {
-            i += result->type.advanced->structure.fields.count;
-        }
-        result++;
+    while (IS_ADVANCED(first->type)) {
+        Struct *struc = &first->type.advanced->structure;
+        if (struc->fields.count > 1)
+            second = struc->fields.items + 1;
+        first = struc->fields.items;
     }
-    while (result->type.kind == TYPE_STRUCT)
-        result = &result->type.advanced->structure.fields.items[0];
-    return result;
+    while (IS_ADVANCED(second->type))
+        second = second->type.advanced->structure.fields.items;
+
+    return first->type.kind == TYPE_F64 || (first->type.kind == TYPE_F32 && second->type.kind == TYPE_F32);
+}
+
+int last_long_is_float(Struct structure) {
+    Field *last = &structure.fields.items[structure.fields.count - 1];
+    Field *second_last = last - 1;
+
+    while (IS_ADVANCED(last->type)) {
+        Struct *struc = &last->type.advanced->structure;
+        if (struc->fields.count > 1)
+            second_last = &struc->fields.items[struc->fields.count - 2];
+        last = &struc->fields.items[struc->fields.count - 1];
+    }
+    while (IS_ADVANCED(second_last->type))
+        second_last = second_last->type.advanced->structure.fields.items;
+
+    return structure.size > 8 && (last->type.kind == TYPE_F64 || (last->type.kind == TYPE_F32 && second_last->type.kind == TYPE_F32));
 }
 
 int struct_fields_equal(Struct a, Struct b) {

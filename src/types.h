@@ -84,7 +84,8 @@ int typeid(Type type);
 int types_compatible(Type a, Type b);
 int types_equal(Type a, Type b);
 
-Field *get_nth_leaf_field(Struct structure, size_t n);
+int first_long_is_float(Struct structure);
+int last_long_is_float(Struct structure);
 
 Type deref_type(Type ptr);
 
