@@ -16,7 +16,7 @@
 #define COMPILER_EPRINTF(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->prev.loc, level, __VA_ARGS__); 
 #define COMPILER_EPRINTF_AT_CUR(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->cur.loc, level, __VA_ARGS__);
 
-inline String_View strip_file_path(const char *path) {
+String_View strip_file_path(const char *path) {
     String_View stripped = { .len = 0, .str = path };
     while (*path != '\0') {
         if (*path == '/' || *path == '\\')
@@ -175,17 +175,18 @@ void print_ops(Ops *ops) {
     }
 }
 
-inline Hash_Entry *add_symbol(Compilation_Unit *compiler, Symbol *sym) {
+Hash_Entry *add_symbol(Compilation_Unit *compiler, Symbol *sym) {
     Hash_Entry *entry = hashmap_add(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
     hashmap_add(&compiler->module.symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
     if (!entry) {
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Redefinition of a symbol\n");
+        return hashmap_get(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len);
     }
     return entry;
 }
 
-static inline Op *make_op(Compilation_Unit *compiler, Opcode opcode, uint64_t operand) {
+static Op *make_op(Compilation_Unit *compiler, Opcode opcode, uint64_t operand) {
     Op op = {
         .opcode = opcode,
         .operand = operand,
@@ -196,7 +197,7 @@ static inline Op *make_op(Compilation_Unit *compiler, Opcode opcode, uint64_t op
     return &compiler->ops.items[compiler->ops.count-1];
 }
 
-inline Op *make_op_at_cur(Compilation_Unit *compiler, Opcode opcode, uint64_t operand) {
+Op *make_op_at_cur(Compilation_Unit *compiler, Opcode opcode, uint64_t operand) {
     Op op = {
         .opcode = opcode,
         .operand = operand,
@@ -207,7 +208,7 @@ inline Op *make_op_at_cur(Compilation_Unit *compiler, Opcode opcode, uint64_t op
     return &compiler->ops.items[compiler->ops.count-1];
 }
 
-inline Unresolved_Symbol *make_unresolved(Compilation_Unit *compiler, Unresolved_Type type) {
+Unresolved_Symbol *make_unresolved(Compilation_Unit *compiler, Unresolved_Type type) {
     Unresolved_Symbol sym = {
         .name = { .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start },
         .loc = compiler->lexer->prev.loc,
@@ -217,7 +218,7 @@ inline Unresolved_Symbol *make_unresolved(Compilation_Unit *compiler, Unresolved
     return &compiler->unresolved.items[compiler->unresolved.count-1];
 }
 
-static inline int expect(Compilation_Unit *compiler, Token_Type type) {
+static int expect(Compilation_Unit *compiler, Token_Type type) {
     lexer_next(compiler->lexer);
     if (compiler->lexer->prev.type == TOK_ERROR) {
         compiler->global->had_error = 1;
@@ -504,6 +505,7 @@ void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
     }
     case STYPE_MODULE: {
         entry = get_entry_in_module(compiler, entry);
+        if (!entry) return;
         compile_entry(compiler, entry);
         break;
     }
@@ -590,7 +592,7 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_BRK:
         if (!compiler->is_in_loop) {
             compiler->global->had_error = 1;
-            COMPILER_EPRINTF(LEVEL_ERR, "Brk can only be in loops\n");
+            COMPILER_EPRINTF(LEVEL_ERR, "Break can only be in loops\n");
             return;
         }
         compiler->brks.positions[compiler->brks.count++] = compiler->ops.count;
@@ -676,6 +678,7 @@ void compile_stmt(Compilation_Unit *compiler) {
         return;
     case TOK_COLON:
     case TOK_SEMICOLON:
+    case TOK_ELSE:
     case TOK_END:
     case TOK_RBRACE:
     case TOK_RPAREN:
@@ -745,7 +748,7 @@ Hash_Entry *compile_function_signature(Compilation_Unit *compiler) {
 
 void compile_function(Compilation_Unit *compiler) {
     Hash_Entry *entry = compile_function_signature(compiler);
-    if (compiler->lexer->prev.type == TOK_EOF) return;
+    if (!entry || compiler->lexer->prev.type == TOK_EOF) return;
 
     make_op(compiler, OP_FUNC, (int64_t)entry);
 

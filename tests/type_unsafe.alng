@@ -1,0 +1,28 @@
+struct Foo
+    x : i32
+end
+
+$func ( i64 i64 i64 i64 -> ) $
+
+$main ( -> u8 )
+    3 +
+    "h" ~
+    drop drop
+
+    if 1 2 then
+        5 #x
+    end
+    Foo 6 >#y
+    while loop
+        5
+    end
+
+    1.0 func
+    1.0 2.0 3.0 4.0 func
+
+    1 Foo i64
+    1.0 Foo ptr[i64]
+
+    1.0 ptr[i64] @@
+    1 ptr[i64] 5.3 +@
+$

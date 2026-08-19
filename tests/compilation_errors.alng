@@ -1,0 +1,15 @@
+import io
+
+import "not_a_module"
+
+$function()$
+
+$main ( function -> cardboard )
+    else
+        import
+        break continue
+    end
+    io::eat_salad
+$
+
+$function()$

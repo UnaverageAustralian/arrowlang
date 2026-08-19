@@ -331,17 +331,24 @@ void lex_number(Lexer *lexer) {
 }
 
 void lex_word(Lexer *lexer) {
+    int had_error = 0;
     char buf[256] = {0};
 
     char c = peek(lexer, 0);
     for (int i = 0; isalnum(c) || c == '_'; i++) {
-        if (i >= 255) {
+        if (i >= 255 && !had_error) {
             make_err_token(lexer, "Identifier is too long");
-            return;
+            c = skip(lexer, 1);
+            continue;
+        }
+        else if (i >= 255) {
+            c = skip(lexer, 1);
+            continue;
         }
         buf[i] = c;
         c = skip(lexer, 1);
     }
+    if (had_error) return;
 
     for (int i = 0; i < NUM_KEYWORDS; i++) {
         if (strcmp(buf, tok_spellings[i + TOK_FIRST_WORD]) == 0) {
@@ -736,7 +743,7 @@ void lexer_next(Lexer *lexer) {
         }
         else {
             skip(lexer, 1);
-            make_err_token(lexer, "Unknown character");
+            make_err_token(lexer, "Invalid character");
         }
         break;
     }
