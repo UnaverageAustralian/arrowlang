@@ -898,7 +898,19 @@ void type_check_op(Analyser *analyser) {
 
         DA_APPEND(&analyser->stack, op->types[0]);
         break;
-    case OP_LABEL: break;
+    case OP_PUSH_GLOBAL: {
+        Type ptr = (Type){
+            .kind = TYPE_PTR,
+            .deref_kind = op->types[0].deref_kind == TYPE_VOID ? op->types[0].kind : op->types[0].deref_kind,
+            .ptr_depth = op->types[0].ptr_depth + 1,
+            .advanced = op->types[0].advanced
+        };
+        DA_APPEND(&analyser->stack, ptr);
+        break;
+    }
+    case OP_GLOBAL:
+    case OP_LABEL:
+        break;
     case OP_START:
         type_check_block(analyser);
         return;

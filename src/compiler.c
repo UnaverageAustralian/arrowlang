@@ -16,6 +16,43 @@
 #define COMPILER_EPRINTF(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->prev.loc, level, __VA_ARGS__); 
 #define COMPILER_EPRINTF_AT_CUR(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->cur.loc, level, __VA_ARGS__);
 
+const char *opcodes[] = {
+    "NOP",
+    "PUSH",      "ADD",
+    "SUB",       "MUL",
+    "DIV",       "MOD",
+    "AND",       "OR",
+    "XOR",       "SHL",
+    "SHR",       "ROL",
+    "ROR",       "NOT",
+    "DUP",       "OVER",
+    "DUP2",      "DROP",
+    "SWAP",      "OVER2",
+    "SWAP2",     "NEG",
+    "ABS",       "EQ",
+    "LT",        "LTEQ",
+    "GT",        "GTEQ",
+    "JMPF",      "JMP",
+    "LABEL",     "LNOT",
+    "FUNC",      "RET",
+    "CALL",      "STR",
+    "ROT",       "CONVERT",
+    "CCALL",     "ROTN",
+    "NEQ",       "UNKNOWN",
+    "ACCESS",    "STORE",
+    "INIT",      "ACCESS_DROP",
+    "PTR_STORE", "PTR_ACCESS",
+    "INDEX",     "INDEX_STORE",
+    "ALLOC",     "PTR_ACCESS_DROP",
+    "LDROP",     "PUSH_GLOBAL",
+    "GLOBAL",
+
+    "START",     "END",
+    "IF",        "ELSE",
+    "ELSEIF",    "SIZEOF",
+    "RETURN",
+};
+
 String_View strip_file_path(const char *path) {
     String_View stripped = { .len = 0, .str = path };
     while (*path != '\0') {
@@ -48,73 +85,12 @@ void init_compilation_unit(Compilation_Unit *unit, Lexer *lexer, Compiler *globa
     unit->module.symbols = (Hashmap){0};
 }
 
-char *opcode_spelling(Opcode opcode) {
-    switch (opcode) {
-    case OP_NOP:             return "NOP";
-    case OP_PUSH:            return "PUSH";
-    case OP_JMPF:            return "JMPF";
-    case OP_JMP:             return "JMP";
-    case OP_LABEL:           return "LABEL";
-    case OP_FUNC:            return "FUNC";
-    case OP_CALL:            return "CALL";
-    case OP_STR:             return "STR";
-    case OP_ADD:             return "ADD";
-    case OP_SUB:             return "SUB";
-    case OP_MUL:             return "MUL";
-    case OP_DIV:             return "DIV";
-    case OP_MOD:             return "MOD";
-    case OP_AND:             return "AND";
-    case OP_OR:              return "OR";
-    case OP_XOR:             return "XOR";
-    case OP_SHL:             return "SHL";
-    case OP_SHR:             return "SHR";
-    case OP_ROL:             return "ROL";
-    case OP_ROR:             return "ROR";
-    case OP_NOT:             return "NOT";
-    case OP_DUP:             return "DUP";
-    case OP_OVER:            return "OVER";
-    case OP_DUP2:            return "DUP2";
-    case OP_DROP:            return "DROP";
-    case OP_SWAP:            return "SWAP";
-    case OP_OVER2:           return "OVER";
-    case OP_SWAP2:           return "SWAP2";
-    case OP_NEG:             return "NEG";
-    case OP_EQ:              return "EQ";
-    case OP_LT:              return "LT";
-    case OP_LTEQ:            return "LTEQ";
-    case OP_GT:              return "GT";
-    case OP_GTEQ:            return "GTEQ";
-    case OP_NEQ:             return "NEQ";
-    case OP_LNOT:            return "LNOT";
-    case OP_ROT:             return "ROT";
-    case OP_ROTN:            return "ROTN";
-    case OP_RET:             return "RET";
-    case OP_CONVERT:         return "CONVERT";
-    case OP_CCALL:           return "CCALL";
-    case OP_START:           return "START";
-    case OP_END:             return "END";
-    case OP_IF:              return "IF";
-    case OP_ELSE:            return "ELSE";
-    case OP_ELSEIF:          return "ELSEIF";
-    case OP_INIT:            return "INIT";
-    case OP_ACCESS:          return "ACCESS";
-    case OP_STORE:           return "STORE";
-    case OP_ACCESS_DROP:     return "ACCESS_DROP";
-    case OP_PTR_STORE:       return "PTR_STORE";
-    case OP_PTR_ACCESS:      return "PTR_ACCESS";
-    case OP_PTR_ACCESS_DROP: return "PTR_ACCESS_DROP";
-    case OP_INDEX:           return "INDEX";
-    case OP_INDEX_STORE:     return "INDEX_STORE";
-    case OP_ALLOC:           return "ALLOC";
-    case OP_LDROP:           return "LDROP";
-    case OP_SIZEOF:          return "SIZEOF";
-    case OP_RETURN:          return "RETURN";
-    default:                 return "UNKNOWN";
-    }
+const char *opcode_spelling(Opcode opcode) {
+    return opcodes[opcode];
 }
 
 void print_op(Op *op) {
-    printf("%s", opcode_spelling(op->opcode));
+    printf("%s", opcodes[op->opcode]);
 
     switch (op->opcode) {
     case OP_JMPF:
@@ -155,6 +131,12 @@ void print_op(Op *op) {
     case OP_ACCESS: {
         String_View *sv = (String_View *)op->operand;
         printf(" %.*s", sv->len, sv->str);
+        break;
+    }
+    case OP_PUSH_GLOBAL:
+    case OP_GLOBAL: {
+        Global *global = (Global *)op->operand;
+        printf(" %.*s::%.*s", global->module_name.len, global->module_name.str, global->name.len, global->name.str);
         break;
     }
     default:
@@ -514,6 +496,11 @@ void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
         op->types[0] = sym->as.constant.type;
         break;
     }
+    case STYPE_GLOBAL: {
+        Op *op = make_op(compiler, OP_PUSH_GLOBAL, (uint64_t)&sym->as.global);
+        op->types[0] = sym->as.global.type;
+        break;
+    }
     }
 }
 
@@ -868,6 +855,26 @@ void compile_const(Compilation_Unit *compiler) {
     }
 }
 
+void compile_global(Compilation_Unit *compiler) {
+    lexer_next(compiler->lexer);
+    expect(compiler, TOK_WORD);
+    if (compiler->lexer->prev.type == TOK_EOF) return;
+
+    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
+    sym->type = STYPE_GLOBAL;
+    add_symbol(compiler, sym);
+
+    sym->as.global.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
+    sym->as.global.module_name = compiler->module.name;
+
+    make_op(compiler, OP_GLOBAL, (uint64_t)&sym->as.global);
+
+    expect(compiler, TOK_COLON);
+    lexer_next(compiler->lexer);
+
+    get_type(compiler, &sym->as.global.type);
+}
+
 void compile_decls(Compilation_Unit *compiler) {
     for (; ;) {
         switch (compiler->lexer->cur.type) {
@@ -885,6 +892,9 @@ void compile_decls(Compilation_Unit *compiler) {
             continue;
         case TOK_CONST:
             compile_const(compiler);
+            continue;
+        case TOK_GLOBAL:
+            compile_global(compiler);
             continue;
         default: break;
         }
@@ -964,7 +974,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
             switch (sym->type) {
             case STYPE_FUNC:
                 op->opcode = sym->as.func.is_c_func ? OP_CCALL : OP_CALL;
-                op->operand = (int64_t)entry;
+                op->operand = (uint64_t)entry;
                 break;
             case STYPE_TYPE:
                 op->opcode = OP_INIT;
@@ -978,6 +988,11 @@ void resolve_symbols(Compilation_Unit *compiler) {
             case STYPE_MODULE:
                 compiler->global->had_error = 1;
                 COMPILER_EPRINTF(LEVEL_ERR, "Unreachable. Please report this as a bug.");
+                break;
+            case STYPE_GLOBAL:
+                op->opcode = OP_PUSH_GLOBAL;
+                op->operand = (uint64_t)entry;
+                op->types[0] = sym->as.global.type;
                 break;
             }
             break;
@@ -1063,7 +1078,7 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
 
         if (!global->had_error && !global->options.print_ir) {
             Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
-            char *output_asm = generate_x86_64_linux(&unit.ops, obj_name, main != NULL && main->key != NULL);
+            char *output_asm = generate_x86_64(&unit.ops, obj_name, main != NULL && main->key != NULL);
             if (!output_asm) global->had_error = 1;
 
             DA_APPEND(&global->cleanup, output_asm);

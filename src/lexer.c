@@ -55,6 +55,7 @@ static const char *tok_spellings[] = {
     "then",    "elseif",
     "const",   "alloc",
     "ldrop",   "sizeof",
+    "global",
 
     "i8",      "u8",
     "i16",     "u16",

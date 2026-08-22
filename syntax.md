@@ -291,6 +291,16 @@ The `alloc` operation allocates an element of the given type behind the stack, z
  3 =>      // Stores 3 into the allocated element
 ```
 
+## Globals
+
+Globals are declared with `global`. Pushing them pushes a pointer to them so you can use pointer operations on them.
+```
+ global x : u64
+
+ x 10 =>
+ x.@ // 10
+```
+
 ## List of Operations
 
 `Integer` = any integer type

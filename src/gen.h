@@ -7,6 +7,7 @@
 typedef struct {
     String_Builder sb;
     String_Array strs;
+    Globals globals;
     Function func;
     Ops *ops;
     unsigned pos;
@@ -14,6 +15,6 @@ typedef struct {
     int had_error;
 } Generator;
 
-char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start);
+char *generate_x86_64(Ops *ops, char *output_file, int gen_start);
 
 #endif // ARROW_GEN_H

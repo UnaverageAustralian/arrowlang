@@ -311,7 +311,7 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
     }
 }
 
-char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
+char *generate_x86_64(Ops *ops, char *output_file, int gen_start) {
     Generator gen;
     init_generator(&gen, ops);
 
@@ -885,6 +885,16 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
             gen.allocated += size;
             break;
         }
+        case OP_PUSH_GLOBAL: {
+            Global *global = (Global *)op->operand;
+            sb_appendf(&gen.sb, "    pushq $\"%.*s::%.*s\"\n", global->module_name.len, global->module_name.str, global->name.len, global->name.str);
+            break;
+        }
+        case OP_GLOBAL: {
+            Global *global = (Global *)op->operand;
+            DA_APPEND(&gen.globals, *global);
+            break;
+        }
         case OP_NOP: break;
         default:
             GEN_EPRINTF(op, LEVEL_ERR, "Unimplemented instruction: %s\n", opcode_spelling(op->opcode));
@@ -902,6 +912,15 @@ char *generate_x86_64_linux(Ops *ops, char *output_file, int gen_start) {
         for (size_t j = 0; gen.strs.items[i][j] != '\0'; j++)
             sb_appendf(&gen.sb, "\\%o", gen.strs.items[i][j]);
         sb_appendf(&gen.sb, "\"\n");
+    }
+
+    if (gen.globals.count > 0)
+        sb_appendf(&gen.sb, ".section .bss\n");
+
+    for (size_t i = 0; i < gen.globals.count; i++) {
+        Global global = gen.globals.items[i];
+        sb_appendf(&gen.sb, "\"%.*s::%.*s\": .zero %d\n", global.module_name.len, global.module_name.str,
+                   global.name.len, global.name.str, type_size(global.type));
     }
 
     if (gen.had_error) {

@@ -9,33 +9,34 @@
 
 typedef enum {
     OP_NOP,
-    OP_PUSH,       OP_ADD,
-    OP_SUB,        OP_MUL,
-    OP_DIV,        OP_MOD,
-    OP_AND,        OP_OR,
-    OP_XOR,        OP_SHL,
-    OP_SHR,        OP_ROL,
-    OP_ROR,        OP_NOT,
-    OP_DUP,        OP_OVER,
-    OP_DUP2,       OP_DROP,
-    OP_SWAP,       OP_OVER2,
-    OP_SWAP2,      OP_NEG,
-    OP_ABS,        OP_EQ,
-    OP_LT,         OP_LTEQ,
-    OP_GT,         OP_GTEQ,
-    OP_JMPF,       OP_JMP,
-    OP_LABEL,      OP_LNOT,
-    OP_FUNC,       OP_RET,
-    OP_CALL,       OP_STR,
-    OP_ROT,        OP_CONVERT,
-    OP_CCALL,      OP_ROTN,
-    OP_NEQ,        OP_UNKNOWN,
-    OP_ACCESS,     OP_STORE,
-    OP_INIT,       OP_ACCESS_DROP,
-    OP_PTR_STORE,  OP_PTR_ACCESS,
-    OP_INDEX,      OP_INDEX_STORE,
-    OP_ALLOC,      OP_PTR_ACCESS_DROP,
-    OP_LDROP,
+    OP_PUSH,      OP_ADD,
+    OP_SUB,       OP_MUL,
+    OP_DIV,       OP_MOD,
+    OP_AND,       OP_OR,
+    OP_XOR,       OP_SHL,
+    OP_SHR,       OP_ROL,
+    OP_ROR,       OP_NOT,
+    OP_DUP,       OP_OVER,
+    OP_DUP2,      OP_DROP,
+    OP_SWAP,      OP_OVER2,
+    OP_SWAP2,     OP_NEG,
+    OP_ABS,       OP_EQ,
+    OP_LT,        OP_LTEQ,
+    OP_GT,        OP_GTEQ,
+    OP_JMPF,      OP_JMP,
+    OP_LABEL,     OP_LNOT,
+    OP_FUNC,      OP_RET,
+    OP_CALL,      OP_STR,
+    OP_ROT,       OP_CONVERT,
+    OP_CCALL,     OP_ROTN,
+    OP_NEQ,       OP_UNKNOWN,
+    OP_ACCESS,    OP_STORE,
+    OP_INIT,      OP_ACCESS_DROP,
+    OP_PTR_STORE, OP_PTR_ACCESS,
+    OP_INDEX,     OP_INDEX_STORE,
+    OP_ALLOC,     OP_PTR_ACCESS_DROP,
+    OP_LDROP,     OP_PUSH_GLOBAL,
+    OP_GLOBAL,
 
     // For the analyser
     OP_START,  OP_END,
@@ -45,8 +46,9 @@ typedef enum {
 } Opcode;
 
 typedef enum {
-    STYPE_FUNC, STYPE_MODULE,
-    STYPE_TYPE, STYPE_CONST,
+    STYPE_FUNC,   STYPE_MODULE,
+    STYPE_TYPE,   STYPE_CONST,
+    STYPE_GLOBAL,
 } Symbol_Type;
 
 typedef enum {
@@ -129,12 +131,25 @@ typedef struct {
 } Constant;
 
 typedef struct {
+    String_View name;
+    String_View module_name;
+    Type type;
+} Global;
+
+typedef struct {
+    size_t count;
+    size_t capacity;
+    Global *items;
+} Globals;
+
+typedef struct {
     Symbol_Type type;
     union {
         Function func;
         Module module;
         Advanced_Type *type;
         Constant constant;
+        Global global;
     } as;
 } Symbol;
 
@@ -162,6 +177,6 @@ typedef struct {
 } Compilation_Unit;
 
 void compile(Compiler_Options options);
-char *opcode_spelling(Opcode opcode);
+const char *opcode_spelling(Opcode opcode);
 
 #endif // ARROW_COMPILER_H

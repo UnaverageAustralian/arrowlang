@@ -54,6 +54,7 @@ typedef enum {
     TOK_THEN,      TOK_ELSEIF,
     TOK_CONST,     TOK_ALLOC,
     TOK_LDROP,     TOK_SIZEOF,
+    TOK_GLOBAL,
     // Types
     TOK_I8,        TOK_U8,
     TOK_I16,       TOK_U16,
