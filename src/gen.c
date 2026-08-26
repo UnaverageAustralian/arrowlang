@@ -263,7 +263,7 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
         }
     }
 
-    sb_appendf(&gen->sb, "    call \"%.*s\"\n", func.extern_name.len, func.extern_name.str);
+    sb_appendf(&gen->sb, "    call \"%.*s\"\n", SV_ARG(func.extern_name));
     sb_appendf(&gen->sb, "    movq %%rbx, %%rsp\n");
     if (func.param_types.count > 0)
         sb_appendf(&gen->sb, "    addq $%d, %%rsp\n", func.param_types.count*8);
@@ -653,14 +653,12 @@ char *generate_x86_64(Ops *ops, char *output_file, int gen_start) {
             gen.func = ((Symbol *)func_entry->val)->as.func;
 
             if (gen.func.module_name.str == NULL) {
-                sb_appendf(&gen.sb, ".globl \"%.*s\"\n", gen.func.extern_name.len, gen.func.extern_name.str);
-                sb_appendf(&gen.sb, "\"%.*s\":\n", gen.func.extern_name.len, gen.func.extern_name.str);
+                sb_appendf(&gen.sb, ".globl \"%.*s\"\n", SV_ARG(gen.func.extern_name));
+                sb_appendf(&gen.sb, "\"%.*s\":\n", SV_ARG(gen.func.extern_name));
             }
             else {
-                sb_appendf(&gen.sb, ".globl \"%.*s::%.*s\"\n", gen.func.module_name.len, gen.func.module_name.str,
-                           gen.func.extern_name.len, gen.func.extern_name.str);
-                sb_appendf(&gen.sb, "\"%.*s::%.*s\":\n", gen.func.module_name.len, gen.func.module_name.str,
-                           gen.func.extern_name.len, gen.func.extern_name.str);
+                sb_appendf(&gen.sb, ".globl \"%.*s::%.*s\"\n", SV_ARG(gen.func.module_name), SV_ARG(gen.func.extern_name));
+                sb_appendf(&gen.sb, "\"%.*s::%.*s\":\n", SV_ARG(gen.func.module_name), SV_ARG(gen.func.extern_name));
             }
             sb_appendf(&gen.sb, "    pushq %%rbp\n");
             sb_appendf(&gen.sb, "    pushq %%rbx\n");
@@ -691,9 +689,9 @@ char *generate_x86_64(Ops *ops, char *output_file, int gen_start) {
             Function func = ((Symbol *)entry->val)->as.func;
 
             if (func.module_name.str == NULL)
-                sb_appendf(&gen.sb, "    call \"%.*s\"\n", func.extern_name.len, func.extern_name.str);
+                sb_appendf(&gen.sb, "    call \"%.*s\"\n", SV_ARG(func.extern_name));
             else
-                sb_appendf(&gen.sb, "    call \"%.*s::%.*s\"\n", func.module_name.len, func.module_name.str, func.extern_name.len, func.extern_name.str);
+                sb_appendf(&gen.sb, "    call \"%.*s::%.*s\"\n", SV_ARG(func.module_name), SV_ARG(func.extern_name));
 
             for (int64_t i = func.return_types.count-1; i >= 0; i--) {
                 sb_appendf(&gen.sb, "    pushq %zu(%%rax)\n", i*8);
@@ -887,7 +885,7 @@ char *generate_x86_64(Ops *ops, char *output_file, int gen_start) {
         }
         case OP_PUSH_GLOBAL: {
             Global *global = (Global *)op->operand;
-            sb_appendf(&gen.sb, "    pushq $\"%.*s::%.*s\"\n", global->module_name.len, global->module_name.str, global->name.len, global->name.str);
+            sb_appendf(&gen.sb, "    pushq $\"%.*s::%.*s\"\n", SV_ARG(global->module_name), SV_ARG(global->name));
             break;
         }
         case OP_GLOBAL: {
@@ -919,8 +917,7 @@ char *generate_x86_64(Ops *ops, char *output_file, int gen_start) {
 
     for (size_t i = 0; i < gen.globals.count; i++) {
         Global global = gen.globals.items[i];
-        sb_appendf(&gen.sb, "\"%.*s::%.*s\": .zero %d\n", global.module_name.len, global.module_name.str,
-                   global.name.len, global.name.str, type_size(global.type));
+        sb_appendf(&gen.sb, "\"%.*s::%.*s\": .zero %d\n", SV_ARG(global.module_name), SV_ARG(global.name), type_size(global.type));
     }
 
     if (gen.had_error) {

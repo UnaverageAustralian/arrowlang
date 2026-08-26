@@ -22,7 +22,7 @@
         (a)->items[(a)->count++] = (i); \
     } while (0)
 
-#define ARENA_DA_APPEND(arena, a, i)                                                  \
+#define ARENA_DA_EXPAND(arena, a, n)                                                  \
     do {                                                                              \
         if ((a)->capacity == 0) {                                                     \
             (a)->items = arena_calloc(arena, INITIAL_CAPACITY * sizeof(*(a)->items)); \
@@ -32,10 +32,17 @@
             arena_calloc(arena, (a)->capacity * sizeof(*(a)->items));                 \
             (a)->capacity *= 2;                                                       \
         }                                                                             \
-        (a)->items[(a)->count++] = (i);                                               \
+    } while (0)
+
+#define ARENA_DA_APPEND(arena, a, i)             \
+    do {                                         \
+        ARENA_DA_EXPAND(arena, a, (a)->count+1); \
+        (a)->items[(a)->count++] = (i);          \
     } while (0)
 
 #define ALIGN(a, b) ((a) + ((b) - 1) - (((a) - 1) & ((b) - 1)))
+
+#define SV_ARG(sv) (sv).len, (sv).str
 
 typedef enum {
     LEVEL_NOTE,

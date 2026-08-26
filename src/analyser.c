@@ -28,7 +28,7 @@ static inline Type pop(Analyser *analyser) {
     return analyser->stack.items[--analyser->stack.count];
 }
 
-inline int check_operand_count(Analyser *analyser, size_t expected) {
+int check_operand_count(Analyser *analyser, size_t expected) {
     Op *op = &analyser->ops->items[analyser->pos];
     if (analyser->stack.count < expected) {
         analyser->had_error = 1;
@@ -39,7 +39,7 @@ inline int check_operand_count(Analyser *analyser, size_t expected) {
     return 1;
 }
 
-inline void make_conversion_op(Analyser *analyser, Type greater, Type lesser, int operand) {
+void make_conversion_op(Analyser *analyser, Type greater, Type lesser, int operand) {
     Op cur = analyser->ops->items[analyser->pos];
     greater = greater.kind == TYPE_PTR ? BASIC_TYPE(TYPE_U64) : greater;
     lesser = lesser.kind == TYPE_PTR ? BASIC_TYPE(TYPE_U64) : lesser;
@@ -270,10 +270,89 @@ int binop_operands_valid(Op *op, Type a, Type b) {
     return valid;
 }
 
-static inline void allocate(Analyser *analyser, int size) {
+static void allocate(Analyser *analyser, int size) {
     analyser->allocated += size;
     if (analyser->allocated > analyser->max_allocated)
         analyser->max_allocated = analyser->allocated;
+}
+
+void type_check_call(Analyser *analyser, Function func) {
+    int had_error = 0;
+    for (size_t i = 0; i < func.param_types.count; i++) {
+        Type arg = peek(analyser, func.param_types.count - i);
+        Type param = func.param_types.items[i];
+
+        if (!types_compatible(arg, param) && !had_error) {
+            had_error = 1;
+            continue;
+        }
+
+        if (!types_equal(arg, param)) {
+            arg.kind = arg.kind == TYPE_INT ? TYPE_I64 : arg.kind == TYPE_REAL ? TYPE_F64 : arg.kind;
+            make_conversion_op(analyser, func.param_types.items[i], arg, (func.param_types.count-i-1)*8);
+        }
+    }
+
+    if (had_error) {
+        expected_types_error(analyser, "Argument types don't match function parameters", func.param_types);
+        return;
+    }
+
+    analyser->stack.count -= func.param_types.count;
+    for (size_t i = 0; i < func.return_types.count; i++) {
+        Type return_type = func.return_types.items[i];
+        DA_APPEND(&analyser->stack, return_type);
+
+        if (return_type.kind == TYPE_STRUCT)
+            allocate(analyser, return_type.advanced->structure.size);
+    }
+}
+
+void enter_func(Analyser *analyser) {
+    Op *op = &analyser->ops->items[analyser->pos];
+    Hash_Entry *func_entry = (Hash_Entry *)op->operand;
+    analyser->func = &((Symbol *)func_entry->val)->as.func;
+
+    for (size_t i = 0; i < analyser->func->param_types.count; i++) {
+        Type param = analyser->func->param_types.items[i];
+        DA_APPEND(&analyser->stack, param);
+
+        if (param.kind == TYPE_STRUCT)
+            allocate(analyser, param.advanced->structure.size);
+    }
+}
+
+void exit_func(Analyser *analyser) {
+    Function func = *analyser->func;
+    if (!check_operand_count(analyser, func.return_types.count)) return;
+
+    for (size_t i = 0; i < func.return_types.count; i++) {
+        Type a = peek(analyser, func.return_types.count - i);
+
+        if (!types_compatible(a, func.return_types.items[i])) {
+            expected_types_error(analyser, "Return types don't match expected return types", func.return_types);
+            break;
+        }
+    }
+    analyser->stack.count = 0;
+    analyser->allocated = 0;
+}
+
+void type_check_macro(Analyser *analyser) {
+    enter_func(analyser);
+
+    int macro_start = analyser->dst.count;
+    analyser->pos++;
+    while (analyser->ops->items[analyser->pos].opcode != OP_END)
+        type_check_op(analyser);
+
+    DA_EXPAND(analyser->ops, analyser->macro_start + analyser->dst.count - macro_start);
+    memcpy(analyser->ops->items + analyser->macro_start, analyser->dst.items + macro_start, (analyser->dst.count - macro_start) * sizeof(Op));
+    analyser->macro_start += analyser->dst.count - macro_start;
+    analyser->dst.count = macro_start;
+
+    exit_func(analyser);
+    analyser->pos++;
 }
 
 void type_check_op(Analyser *analyser) {
@@ -477,44 +556,21 @@ void type_check_op(Analyser *analyser) {
         if (op[1].opcode != OP_ELSE && op[1].opcode != OP_END && op[1].opcode != OP_ELSEIF)
             check_expected_types(analyser);
         break;
-    case OP_FUNC: {
-        Hash_Entry *func_entry = (Hash_Entry *)op->operand;
-        analyser->func = &((Symbol *)func_entry->val)->as.func;
-        for (size_t i = 0; i < analyser->func->param_types.count; i++) {
-            Type param = analyser->func->param_types.items[i];
-            DA_APPEND(&analyser->stack, param);
-
-            if (param.kind == TYPE_STRUCT)
-                allocate(analyser, param.advanced->structure.size);
-        }
+    case OP_FUNC:
+        enter_func(analyser);
         break;
-    }
     case OP_RETURN:
-    case OP_RET: {
-        Function func = *analyser->func;
-        if (!check_operand_count(analyser, func.return_types.count)) break;
-
-        for (size_t i = 0; i < func.return_types.count; i++) {
-            Type a = peek(analyser, func.return_types.count - i);
-
-            if (!types_compatible(a, func.return_types.items[i])) {
-                expected_types_error(analyser, "Return types don't match expected return types", func.return_types);
-                break;
-            }
-        }
+    case OP_RET:
+        exit_func(analyser);
 
         if (op->opcode == OP_RETURN) {
             op->opcode = OP_JMP;
-            analyser->stack.count -= func.return_types.count;
+            analyser->stack.count -= analyser->func->return_types.count;
             break;
         }
 
-        analyser->stack.count = 0;
-        analyser->allocated = 0;
-
         analyser->func->max_allocated = ALIGN(analyser->max_allocated, 16);
         break;
-    }
     case OP_LNOT: {
         if (!check_operand_count(analyser, 1)) break;
         Type a = pop(analyser);
@@ -534,35 +590,7 @@ void type_check_op(Analyser *analyser) {
         Function func = ((Symbol *)((Hash_Entry *)op->operand)->val)->as.func;
         if (!check_operand_count(analyser, func.param_types.count)) break;
 
-        int had_error = 0;
-        for (size_t i = 0; i < func.param_types.count; i++) {
-            Type arg = peek(analyser, func.param_types.count - i);
-            Type param = func.param_types.items[i];
-
-            if (!types_compatible(arg, param) && !had_error) {
-                had_error = 1;
-                continue;
-            }
-
-            if (!types_equal(arg, param)) {
-                arg.kind = arg.kind == TYPE_INT ? TYPE_I64 : arg.kind == TYPE_REAL ? TYPE_F64 : arg.kind;
-                make_conversion_op(analyser, func.param_types.items[i], arg, (func.param_types.count-i-1)*8);
-            }
-        }
-
-        if (had_error) {
-            expected_types_error(analyser, "Argument types don't match function parameters", func.param_types);
-            break;
-        }
-
-        analyser->stack.count -= func.param_types.count;
-        for (size_t i = 0; i < func.return_types.count; i++) {
-            Type return_type = func.return_types.items[i];
-            DA_APPEND(&analyser->stack, return_type);
-
-            if (return_type.kind == TYPE_STRUCT)
-                allocate(analyser, return_type.advanced->structure.size);
-        }
+        type_check_call(analyser, func);
         break;
     }
     case OP_STR:
@@ -694,7 +722,7 @@ void type_check_op(Analyser *analyser) {
         Field *field = find_field(&structure, sv);
         if (!field) {
             analyser->had_error = 1;
-            EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", structure.name.len, structure.name.str, sv->len, sv->str);
+            EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", SV_ARG(structure.name), sv->len, sv->str);
             break;
         }
 
@@ -724,7 +752,7 @@ void type_check_op(Analyser *analyser) {
         Field *field = find_field(&structure, sv);
         if (!field) {
             analyser->had_error = 1;
-            EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", structure.name.len, structure.name.str, sv->len, sv->str);
+            EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", SV_ARG(structure.name), sv->len, sv->str);
             break;
         }
 
@@ -755,7 +783,7 @@ void type_check_op(Analyser *analyser) {
         Field *field = find_field(&structure, sv);
         if (!field) {
             analyser->had_error = 1;
-            EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", structure.name.len, structure.name.str, sv->len, sv->str);
+            EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", SV_ARG(structure.name), sv->len, sv->str);
             break;
         }
         if (!types_compatible(item, field->type)) {
@@ -908,6 +936,22 @@ void type_check_op(Analyser *analyser) {
         DA_APPEND(&analyser->stack, ptr);
         break;
     }
+    case OP_CALL_MACRO: {
+        Hash_Entry *entry = (Hash_Entry *)op->operand;
+        Function macro = ((Symbol *)entry->val)->as.func;
+
+        type_check_call(analyser, macro);
+
+        DA_EXPAND(&analyser->dst, analyser->dst.count + macro.ops.count);
+        memcpy(analyser->dst.items + analyser->dst.count, macro.ops.items, macro.ops.count * sizeof(Op));
+        analyser->dst.count += macro.ops.count;
+
+        analyser->pos++;
+        return;
+    }
+    case OP_MACRO:
+        type_check_macro(analyser);
+        return;
     case OP_GLOBAL:
     case OP_LABEL:
         break;

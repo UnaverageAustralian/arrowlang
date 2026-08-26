@@ -36,19 +36,19 @@ typedef enum {
     OP_INDEX,     OP_INDEX_STORE,
     OP_ALLOC,     OP_PTR_ACCESS_DROP,
     OP_LDROP,     OP_PUSH_GLOBAL,
-    OP_GLOBAL,
+    OP_GLOBAL,    OP_CALL_MACRO,
 
     // For the analyser
     OP_START,  OP_END,
     OP_IF,     OP_ELSE,
     OP_ELSEIF, OP_SIZEOF,
-    OP_RETURN,
+    OP_RETURN, OP_MACRO,
 } Opcode;
 
 typedef enum {
     STYPE_FUNC,   STYPE_MODULE,
     STYPE_TYPE,   STYPE_CONST,
-    STYPE_GLOBAL,
+    STYPE_GLOBAL, STYPE_MACRO,
 } Symbol_Type;
 
 typedef enum {
@@ -117,12 +117,18 @@ typedef struct {
 } Module;
 
 typedef struct {
-    String_View extern_name;
-    String_View module_name;
     Types param_types;
     Types return_types;
+    union {
+        struct {
+            String_View extern_name;
+            String_View module_name;
+        };
+        Ops ops;
+    };
     int max_allocated;
     uint8_t is_c_func;
+    uint8_t is_macro;
 } Function;
 
 typedef struct {

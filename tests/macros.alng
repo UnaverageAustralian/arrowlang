@@ -1,0 +1,24 @@
+import errors
+
+struct Foo
+    x : i32
+    y : i32
+end
+
+macro FIVE ( -> i64 )
+    5
+end
+
+macro INIT_FOO ( -> Foo )
+    0 0 Foo
+end
+
+$main ( -> u8 )
+    FIVE 5 = "FIVE = 5" errors::assert
+
+    INIT_FOO
+    #x 0 = "#x = 0" errors::assert rot | swap
+    #y 0 = "#y = 0" errors::assert rot | swap
+
+    0
+$

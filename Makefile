@@ -1,6 +1,6 @@
 .PHONY: all clean
 
-CFLAGS := -Wall -Wextra -Wno-format -std=c99 -pedantic -lm -O
+CFLAGS := -Wall -Wextra -Wno-format -std=c11 -pedantic -lm -O
 
 SRC = $(wildcard src/*.c)
 
