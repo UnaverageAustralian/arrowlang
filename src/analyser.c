@@ -303,9 +303,12 @@ void type_check_call(Analyser *analyser, Function func) {
         Type return_type = func.return_types.items[i];
         DA_APPEND(&analyser->stack, return_type);
 
-        if (return_type.kind == TYPE_STRUCT)
+        if (return_type.kind == TYPE_STRUCT && !func.is_macro)
             allocate(analyser, return_type.advanced->structure.size);
     }
+
+    if (func.is_macro)
+        allocate(analyser, func.max_allocated);
 }
 
 void enter_func(Analyser *analyser) {
