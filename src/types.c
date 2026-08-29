@@ -27,6 +27,7 @@ char *type_spelling(Type type) {
             sb_appendf(&sb, "]");
         return sb.items;
     }
+    case TYPE_UNION:
     case TYPE_STRUCT: {
         if (type.advanced->structure.name.len == 0)
             return "anon_struct";
@@ -56,6 +57,7 @@ int type_size(Type type) {
     case TYPE_I64:
     case TYPE_U64:
         return 8;
+    case TYPE_UNION:
     case TYPE_STRUCT:
         return type.advanced->structure.size;
     default:
@@ -133,15 +135,25 @@ int struct_fields_equal(Struct a, Struct b) {
 }
 
 int types_compatible(Type a, Type b) {
-    if (IS_INTEGER(a))
-        return IS_INTEGER(b);
-    if (IS_REAL(a))
-        return IS_REAL(b);
+    if (a.kind == TYPE_UNION || b.kind == TYPE_UNION) {
+        Struct structure = a.kind == TYPE_UNION ? a.advanced->structure : b.advanced->structure;
+        for (size_t i = 0; i < structure.fields.count; i++)
+            if (types_compatible(structure.fields.items[i].type, a.kind == TYPE_UNION ? b : a))
+                return 1;
+        return 0;
+    }
+
+    if (a.kind == TYPE_INT || b.kind == TYPE_INT)
+        return IS_INTEGER(a.kind == TYPE_INT ? b : a);
+    if (a.kind == TYPE_REAL || b.kind == TYPE_REAL)
+        return IS_REAL(a.kind == TYPE_REAL ? b : a);
 
     if (a.kind != b.kind) return 0;
     if (a.kind == TYPE_PTR)
         return types_equal(deref_type(a), deref_type(b));
-    return struct_fields_equal(a.advanced->structure, a.advanced->structure);
+    if (a.kind == TYPE_STRUCT)
+        return struct_fields_equal(a.advanced->structure, a.advanced->structure);
+    return 1;
 }
 
 int types_equal(Type a, Type b) {
@@ -149,7 +161,7 @@ int types_equal(Type a, Type b) {
 
     if (a.kind == TYPE_PTR)
         return types_equal(deref_type(a), deref_type(b));
-    if (a.kind == TYPE_STRUCT)
+    if (IS_ADVANCED(a))
         return struct_fields_equal(a.advanced->structure, b.advanced->structure);
     return 1;
 }

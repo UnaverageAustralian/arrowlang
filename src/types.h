@@ -15,14 +15,15 @@
 #define IS_ADVANCED(type) ((type).kind >= TYPE_STRUCT)
 
 typedef enum {
-    TYPE_VOID, TYPE_I8,
-    TYPE_CHAR, TYPE_U8,
-    TYPE_I16,  TYPE_U16,
-    TYPE_I32,  TYPE_U32,
-    TYPE_I64,  TYPE_U64,
-    TYPE_INT,  TYPE_F32,
-    TYPE_F64,  TYPE_REAL,
-    TYPE_PTR,  TYPE_STRUCT,
+    TYPE_VOID,  TYPE_I8,
+    TYPE_CHAR,  TYPE_U8,
+    TYPE_I16,   TYPE_U16,
+    TYPE_I32,   TYPE_U32,
+    TYPE_I64,   TYPE_U64,
+    TYPE_INT,   TYPE_F32,
+    TYPE_F64,   TYPE_REAL,
+    TYPE_PTR,   TYPE_STRUCT,
+    TYPE_UNION,
 } Type_Kind;
 
 typedef enum {
@@ -47,6 +48,7 @@ typedef struct {
 
 typedef struct {
     Struct structure;
+    Type_Kind kind;
     Resolve_Status resolve_status;
     Loc loc;
 } Advanced_Type;

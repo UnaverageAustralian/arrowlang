@@ -858,15 +858,24 @@ char *generate_x86_64(Ops *ops, char *output_file, int gen_start) {
                 sb_appendf(&gen.sb, "    mov%c %s, (%%rdi)\n", size_sufs[type_size(op->types[0])], rdx[type_size(op->types[0])]);
             }
             break;
+        case OP_ALLOC_STORE:
         case OP_ALLOC: {
             int size = type_size(op->types[0]);
 
             sb_appendf(&gen.sb, "    leaq %d(%%rbp), %%rdi\n", gen.allocated - gen.func.max_allocated);
-            sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
+            if (op->opcode == OP_ALLOC)
+                sb_appendf(&gen.sb, "    xorq %%rax, %%rax\n");
+            else
+                sb_appendf(&gen.sb, "    popq %%rax\n");
+
             for (int i = 0; i < size - (size & 7); i += 8)
                 sb_appendf(&gen.sb, "    movq %%rax, %d(%%rdi)\n", i);
 
-            if ((size & 7) == 0) break;
+            if ((size & 7) == 0) {
+                sb_appendf(&gen.sb, "    pushq %%rdi\n");
+                gen.allocated += size;
+                break;
+            }
 
             uint64_t c = 8;
             while ((size & c) == 0)

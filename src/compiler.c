@@ -18,39 +18,40 @@
 
 const char *opcodes[] = {
     "NOP",
-    "PUSH",      "ADD",
-    "SUB",       "MUL",
-    "DIV",       "MOD",
-    "AND",       "OR",
-    "XOR",       "SHL",
-    "SHR",       "ROL",
-    "ROR",       "NOT",
-    "DUP",       "OVER",
-    "DUP2",      "DROP",
-    "SWAP",      "OVER2",
-    "SWAP2",     "NEG",
-    "ABS",       "EQ",
-    "LT",        "LTEQ",
-    "GT",        "GTEQ",
-    "JMPF",      "JMP",
-    "LABEL",     "LNOT",
-    "FUNC",      "RET",
-    "CALL",      "STR",
-    "ROT",       "CONVERT",
-    "CCALL",     "ROTN",
-    "NEQ",       "UNKNOWN",
-    "ACCESS",    "STORE",
-    "INIT",      "ACCESS_DROP",
-    "PTR_STORE", "PTR_ACCESS",
-    "INDEX",     "INDEX_STORE",
-    "ALLOC",     "PTR_ACCESS_DROP",
-    "LDROP",     "PUSH_GLOBAL",
-    "GLOBAL",    "CALL_MACRO",
+    "PUSH",        "ADD",
+    "SUB",         "MUL",
+    "DIV",         "MOD",
+    "AND",         "OR",
+    "XOR",         "SHL",
+    "SHR",         "ROL",
+    "ROR",         "NOT",
+    "DUP",         "OVER",
+    "DUP2",        "DROP",
+    "SWAP",        "OVER2",
+    "SWAP2",       "NEG",
+    "ABS",         "EQ",
+    "LT",          "LTEQ",
+    "GT",          "GTEQ",
+    "JMPF",        "JMP",
+    "LABEL",       "LNOT",
+    "FUNC",        "RET",
+    "CALL",        "STR",
+    "ROT",         "CONVERT",
+    "CCALL",       "ROTN",
+    "NEQ",         "UNKNOWN",
+    "ACCESS",      "STORE",
+    "INIT",        "ACCESS_DROP",
+    "PTR_STORE",   "PTR_ACCESS",
+    "INDEX",       "INDEX_STORE",
+    "ALLOC",       "PTR_ACCESS_DROP",
+    "LDROP",       "PUSH_GLOBAL",
+    "GLOBAL",      "CALL_MACRO",
+    "ALLOC_STORE",
 
-    "START",     "END",
-    "IF",        "ELSE",
-    "ELSEIF",    "SIZEOF",
-    "RETURN",    "MACRO",
+    "START",  "END",
+    "IF",     "ELSE",
+    "ELSEIF", "SIZEOF",
+    "RETURN", "MACRO",
 };
 
 String_View strip_file_path(const char *path) {
@@ -446,6 +447,11 @@ void get_type(Compilation_Unit *compiler, Type *type) {
     }
     case TOK_STRUCT:
         *type = ADVANCED_TYPE(TYPE_STRUCT, compile_anonymous_struct(compiler));
+        type->advanced->kind = TYPE_STRUCT;
+        break;
+    case TOK_UNION:
+        *type = ADVANCED_TYPE(TYPE_UNION, compile_anonymous_struct(compiler));
+        type->advanced->kind = TYPE_UNION;
         break;
     case TOK_PTR: {
         expect(compiler, TOK_LBRACKET);
@@ -487,7 +493,7 @@ void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
         break;
     case STYPE_TYPE: {
         Op *op = make_op(compiler, OP_INIT, 0);
-        op->types[0] = ADVANCED_TYPE(TYPE_STRUCT, sym->as.type);
+        op->types[0] = ADVANCED_TYPE(sym->as.type->kind, sym->as.type);
         break;
     }
     case STYPE_MODULE: {
@@ -616,6 +622,14 @@ void compile_stmt(Compilation_Unit *compiler) {
         Op *op = make_op(compiler, OP_INIT, 0);
         op->types[0].kind = TYPE_STRUCT;
         op->types[0].advanced = compile_anonymous_struct(compiler);
+        op->types[0].advanced->kind = TYPE_STRUCT;
+        break;
+    }
+    case TOK_UNION: {
+        Op *op = make_op(compiler, OP_INIT, 0);
+        op->types[0].kind = TYPE_UNION;
+        op->types[0].advanced = compile_anonymous_struct(compiler);
+        op->types[0].advanced->kind = TYPE_UNION;
         break;
     }
     case TOK_I8:
@@ -817,7 +831,7 @@ void compile_struct_fields(Compilation_Unit *compiler, Struct *structure) {
     expect(compiler, TOK_END);
 }
 
-void compile_struct(Compilation_Unit *compiler) {
+void compile_struct(Compilation_Unit *compiler, Type_Kind type) {
     lexer_next(compiler->lexer);
     expect(compiler, TOK_WORD);
     if (compiler->lexer->prev.type == TOK_EOF) return;
@@ -830,6 +844,7 @@ void compile_struct(Compilation_Unit *compiler) {
     sym->as.type = &compiler->types.items[compiler->types.count-1];
     sym->as.type->loc = compiler->lexer->prev.loc;
 
+    sym->as.type->kind = type;
     sym->as.type->structure.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
 
     compile_struct_fields(compiler, &sym->as.type->structure);
@@ -933,7 +948,10 @@ void compile_decls(Compilation_Unit *compiler) {
             compile_external_function(compiler, 1);
             continue;
         case TOK_STRUCT:
-            compile_struct(compiler);
+            compile_struct(compiler, TYPE_STRUCT);
+            continue;
+        case TOK_UNION:
+            compile_struct(compiler, TYPE_UNION);
             continue;
         case TOK_CONST:
             compile_const(compiler);
@@ -972,6 +990,7 @@ int resolve_type(Compilation_Unit *compiler, Advanced_Type *type) {
     type->resolve_status = STATUS_RESOLVING;
 
     int offset = 0;
+    int largest_size = 0;
     int alignment = 0;
 
     for (size_t i = 0; i < type->structure.fields.count; i++) {
@@ -983,14 +1002,19 @@ int resolve_type(Compilation_Unit *compiler, Advanced_Type *type) {
         if (field_alignment > alignment)
             alignment = field_alignment;
 
+        int size = type_size(field->type);
+        if (size > largest_size)
+            largest_size = size;
+
         offset = ALIGN(offset, field_alignment);
         field->offset = offset;
 
-        offset += type_size(field->type);
+        if (type->kind == TYPE_STRUCT)
+            offset += size;
     }
 
     type->structure.alignment = alignment;
-    type->structure.size = offset;
+    type->structure.size = MAX(offset, largest_size);
     type->resolve_status = STATUS_RESOLVED;
 
     return 1;

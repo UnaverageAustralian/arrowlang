@@ -358,6 +358,55 @@ void type_check_macro(Analyser *analyser) {
     analyser->pos++;
 }
 
+void type_check_conversion(Analyser *analyser) {
+    Op *op = &analyser->ops->items[analyser->pos];
+
+    if (!check_operand_count(analyser, 1)) return;
+    Type a = pop(analyser);
+
+    if (a.kind == TYPE_STRUCT && IS_NUMBER(op->types[1])) {
+        analyser->had_error = 1;
+        EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct to a number\n");
+        return;
+    }
+    if (a.kind == TYPE_STRUCT && !types_equal(a, deref_type(op->types[1]))) {
+        analyser->had_error = 1;
+        EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct into a pointer to a different type\n");
+        return;
+    }
+
+    if (a.kind == TYPE_UNION) {
+        op->opcode = OP_PTR_ACCESS_DROP;
+
+        if (!types_compatible(a, op->types[1])) {
+            analyser->had_error = 1;
+            EPRINTF_AT_OP(op, LEVEL_ERR, "Union does not contain destination type\n");
+            return;
+        }
+        op->types[0] = op->types[1];
+    }
+
+    if (op->types[1].kind == TYPE_PTR && IS_REAL(a)) {
+        analyser->had_error = 1;
+        EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a real to a pointer\n");
+        return;
+    }
+
+    if (IS_NUMBER(a))
+        op->types[0].kind = a.kind == TYPE_INT ? TYPE_I64 : a.kind == TYPE_REAL ? TYPE_F64 : a.kind;
+    DA_APPEND(&analyser->stack, op->types[1]);
+
+    if (a.kind == TYPE_PTR)
+        op->types[0] = BASIC_TYPE(TYPE_U64);
+    if (op->types[1].kind == TYPE_PTR)
+        op->types[1] = BASIC_TYPE(TYPE_U64);
+
+    if (a.kind == TYPE_STRUCT) {
+        analyser->pos++;
+        return;
+    }
+}
+
 void type_check_op(Analyser *analyser) {
     Op *op = &analyser->ops->items[analyser->pos];
     switch (op->opcode) {
@@ -631,42 +680,38 @@ void type_check_op(Analyser *analyser) {
 
         DA_APPEND(&analyser->stack, a);
         break;
-    case OP_CONVERT: {
-        if (!check_operand_count(analyser, 1)) break;
-        Type a = pop(analyser);
-
-        if (a.kind == TYPE_STRUCT && IS_NUMBER(op->types[1])) {
-            analyser->had_error = 1;
-            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct to a number\n");
-            break;
-        }
-        if (a.kind == TYPE_STRUCT && !types_equal(a, deref_type(op->types[1]))) {
-            analyser->had_error = 1;
-            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a struct into a pointer to a different type\n");
-            break;
-        }
-
-        if (op->types[1].kind == TYPE_PTR && IS_REAL(a)) {
-            analyser->had_error = 1;
-            EPRINTF_AT_OP(op, LEVEL_ERR, "Cannot convert a real to a pointer\n");
-            break;
-        }
-
-        op->types[0].kind = a.kind == TYPE_INT ? TYPE_I64 : a.kind == TYPE_REAL ? TYPE_F64 : a.kind;
-        DA_APPEND(&analyser->stack, op->types[1]);
-
-        if (a.kind == TYPE_PTR)
-            op->types[0] = BASIC_TYPE(TYPE_U64);
-        if (op->types[1].kind == TYPE_PTR)
-            op->types[1] = BASIC_TYPE(TYPE_U64);
-
-        if (a.kind == TYPE_STRUCT) {
-            analyser->pos++;
-            return;
-        }
+    case OP_CONVERT:
+        type_check_conversion(analyser);
         break;
-    }
     case OP_INIT: {
+        if (op->types[0].kind == TYPE_UNION) {
+            if (!check_operand_count(analyser, 1)) break;
+
+            Type a = pop(analyser);
+            Type b = {0};
+
+            Struct structure = op->types[0].advanced->structure;
+            for (size_t i = 0; i < structure.fields.count; i++)
+                if (types_compatible(structure.fields.items[i].type, a))
+                    b = structure.fields.items[i].type;
+            if (b.kind == TYPE_VOID) {
+                analyser->had_error = 1;
+                EPRINTF_AT_OP(op, LEVEL_ERR, "Union does not contain type\n");
+            }
+
+            if (!types_equal(a, b)) {
+                a.kind = a.kind == TYPE_INT ? TYPE_I64 : a.kind == TYPE_REAL ? TYPE_F64 : a.kind;
+                make_conversion_op(analyser, b, a, 0);
+            }
+
+            op->opcode = OP_ALLOC_STORE;
+            op->types[1] = a;
+            allocate(analyser, op->types[0].advanced->structure.size);
+
+            DA_APPEND(&analyser->stack, op->types[0]);
+            break;
+        }
+
         Fields fields = op->types[0].advanced->structure.fields;
         if (!check_operand_count(analyser, fields.count)) break;
 
@@ -713,7 +758,7 @@ void type_check_op(Analyser *analyser) {
         if (src.kind == TYPE_PTR)
             src = deref_type(src);
 
-        if (src.kind != TYPE_STRUCT) {
+        if (!IS_ADVANCED(src)) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source is not a struct\n");
             break;
@@ -743,7 +788,7 @@ void type_check_op(Analyser *analyser) {
         if (src.kind == TYPE_PTR)
             src = deref_type(src);
 
-        if (src.kind != TYPE_STRUCT) {
+        if (!IS_ADVANCED(src)) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source is not a struct\n");
             break;
@@ -774,7 +819,7 @@ void type_check_op(Analyser *analyser) {
         if (dest.kind == TYPE_PTR)
             dest = deref_type(dest);
 
-        if (dest.kind != TYPE_STRUCT) {
+        if (!IS_ADVANCED(dest)) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Destination is not a struct\n");
             break;

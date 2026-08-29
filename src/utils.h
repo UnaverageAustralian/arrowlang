@@ -41,6 +41,7 @@
     } while (0)
 
 #define ALIGN(a, b) ((a) + ((b) - 1) - (((a) - 1) & ((b) - 1)))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #define SV_ARG(sv) (sv).len, (sv).str
 
