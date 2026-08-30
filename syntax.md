@@ -215,6 +215,18 @@ You can also declare anonymous structs:
  #x // 4
 ```
 
+### Unions
+
+Unions are like structs, except every field overlaps each other at the start. They can be directly converted into the type of one of their fields and vice versa.
+```
+ union Foo
+     x : i32
+     y : f32
+ end
+
+ 2 Foo f32
+```
+
 ## Groupings
 
 Groupings are started with `(` and ended with `)`. Groupings only serve to make code more readable and don't change its behaviour.
@@ -299,6 +311,17 @@ Globals are declared with `global`. Pushing them pushes a pointer to them so you
 
  x 10 =>
  x.@ // 10
+```
+
+## Macros
+
+Macros act as inline functions, and are declared with `macro`. They have a signature, like functions.
+```
+ macro FOO ( u8 -> u8 u8 u8 )
+     dup dup
+ end
+
+ 5 FOO // [ 5 | 5 | 5 ]
 ```
 
 ## List of Operations
