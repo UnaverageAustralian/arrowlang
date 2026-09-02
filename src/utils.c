@@ -196,7 +196,7 @@ char *open_file(char *path) {
 
     if (fseek(f, 0, SEEK_END) == -1) return NULL;
 
-    long long length = ftell(f);
+    ssize_t length = ftell(f);
     if (length == -1) return NULL;
     rewind(f);
 

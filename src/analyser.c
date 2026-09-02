@@ -401,10 +401,8 @@ void type_check_conversion(Analyser *analyser) {
     if (op->types[1].kind == TYPE_PTR)
         op->types[1] = BASIC_TYPE(TYPE_U64);
 
-    if (a.kind == TYPE_STRUCT) {
-        analyser->pos++;
-        return;
-    }
+    if (a.kind == TYPE_STRUCT)
+        op->opcode = OP_NOP;
 }
 
 void type_check_op(Analyser *analyser) {
@@ -682,6 +680,10 @@ void type_check_op(Analyser *analyser) {
         break;
     case OP_CONVERT:
         type_check_conversion(analyser);
+        if (op->opcode == OP_NOP) {
+            analyser->pos++;
+            return;
+        }
         break;
     case OP_INIT: {
         if (op->types[0].kind == TYPE_UNION) {

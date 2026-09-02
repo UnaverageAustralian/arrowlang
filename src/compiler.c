@@ -1088,7 +1088,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
     }
 }
 
-Symbol *compile_module(Compiler *global, const char *src, const char *file_path) {
+Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
     Lexer lexer;
     init_lexer(&lexer, src, file_path);
 
@@ -1096,7 +1096,11 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
     init_compilation_unit(&unit, &lexer, global);
 
     Hash_Entry *entry = hashmap_get(&global->modules, unit.module.name.str, unit.module.name.len);
-    if (entry && entry->key) return (Symbol *)entry->val;
+    if (entry && entry->key) {
+        global->had_error = 1;
+        eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Module is recursive\n");
+        return (Symbol *)entry->val;
+    }
 
     char *obj_name = arena_calloc(&global->arena, unit.module.name.len + 3);
     snprintf(obj_name, unit.module.name.len + 3, "%.*s.o", SV_ARG(unit.module.name));
@@ -1109,6 +1113,12 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
     if (lexer.cur.type == TOK_EOF)
         eprintf(lexer.file_path, lexer.cur.loc, LEVEL_WARN, "Empty file\n");
 
+    Symbol *module_sym = arena_calloc(&global->arena, sizeof(Symbol));
+    module_sym->type = STYPE_MODULE;
+
+    hashmap_add(&global->modules, unit.module.name.str, unit.module.name.len, module_sym);
+
+    module_sym->as.module.status = STATUS_UNRESOLVED;
     while (lexer.cur.type == TOK_IMPORT) {
         lexer_next(&lexer);
 
@@ -1120,7 +1130,7 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
 
             char *contents = open_file(path);
             if (!contents) {
-                fprintf(stderr, "\x1b[31mERROR:\x1b[0m Could not read file %s for module %.*s: %s\n",
+                eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Could not read file %s for module %.*s: %s\n",
                         path, lexer.prev.len, lexer.prev.start, strerror(errno));
                 exit(1);
             }
@@ -1130,13 +1140,35 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
         }
         else if (lexer.prev.type == TOK_STR_LIT) {
             Hash_Entry *entry = hashmap_get(&global->modules, lexer.prev.start, lexer.prev.len);
-            if (!entry || !entry->key) {
+
+            Symbol *module = (entry && entry->key) ? (Symbol *)entry->val : NULL;
+            while (!module) {
+                assert(!entry || !entry->key);
+
+                global->file++;
+                if (global->file >= global->options.input_file_count) {
+                    global->had_error = 1;
+                    eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Module does not exist\n");
+                    break;
+                }
+
+                char *input_file_path = global->options.input_files[global->file];
+                char *contents = open_file(input_file_path);
+
+                if (!contents) {
+                    eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Could not read file %s for module %.*s: %s\n",
+                            input_file_path, lexer.prev.len, lexer.prev.start, strerror(errno));
+                    exit(1);
+                }
+                module = compile_module(global, contents, input_file_path);
+            }
+            if (!module) continue;
+
+            if (module->as.module.status == STATUS_UNRESOLVED) {
                 global->had_error = 1;
-                eprintf(unit.lexer->file_path, unit.lexer->prev.loc, LEVEL_ERR, "Unresolved module %.*s\n", lexer.prev.len, lexer.prev.start);
+                eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Module is recursive\n");
                 continue;
             }
-
-            Symbol *module = (Symbol *)entry->val;
             hashmap_add(&unit.symbols, entry->key, entry->key_len, module);
         }
         else {
@@ -1148,6 +1180,9 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
 
     resolve_symbols(&unit);
     resolve_types(&unit);
+
+    module_sym->as.module = unit.module;
+    module_sym->as.module.status = STATUS_RESOLVED;
 
     if (!global->had_error && !global->options.debug) {
         global->had_error = type_check(&unit.ops);
@@ -1169,12 +1204,6 @@ Symbol *compile_module(Compiler *global, const char *src, const char *file_path)
 
     if (global->options.debug || global->options.print_ir)
         print_ops(&unit.ops);
-
-    Symbol *module_sym = arena_calloc(&global->arena, sizeof(Symbol));
-    module_sym->type = STYPE_MODULE;
-    module_sym->as.module = unit.module;
-
-    hashmap_add(&global->modules, unit.module.name.str, unit.module.name.len, module_sym);
 
     free(unit.ops.items);
     free(unit.symbols.entries);
@@ -1203,13 +1232,14 @@ void compile(Compiler_Options options) {
     Compiler compiler;
     init_compiler(&compiler, options);
 
-    for (int i = 0; options.input_files[i] != NULL && i < options.input_file_count; i++) {
-        char *contents = open_file(options.input_files[i]);
+    while (options.input_files[compiler.file] != NULL && compiler.file < options.input_file_count) {
+        char *contents = open_file(options.input_files[compiler.file]);
         if (!contents) {
             fprintf(stderr, "\x1b[31mERROR:\x1b[0m Could not read file: %s\n", strerror(errno));
             exit(1);
         }
-        compile_module(&compiler, contents, options.input_files[i]);
+        compile_module(&compiler, contents, options.input_files[compiler.file]);
+        compiler.file++;
     }
 
     Hash_Entry *io = hashmap_get(&compiler.modules, "io", 2);

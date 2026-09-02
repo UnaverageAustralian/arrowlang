@@ -114,6 +114,7 @@ typedef struct {
     String_View path;
     String_View name;
     Hashmap symbols;
+    Resolve_Status status;
     uint8_t has_ext_funcs;
 } Module;
 
@@ -165,6 +166,7 @@ typedef struct {
     Compiler_Options options;
     Hashmap modules;
     String_Array cleanup;
+    int file;
     uint8_t had_error;
 } Compiler;
 
