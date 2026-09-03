@@ -1,0 +1,11 @@
+module funcs
+
+$subdiv ( f32 f32 -> ptr[f32] )
+    swap over - swap /
+    alloc f32 swap =>
+$
+
+$addmul ( f32 f32 -> ptr[f32] )
+    swap over + *
+    alloc f32 swap =>
+$

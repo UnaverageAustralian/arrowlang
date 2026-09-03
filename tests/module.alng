@@ -1,0 +1,14 @@
+module test
+
+import errors
+
+import "funcs"
+
+$verify ( -> u8 )
+    2.0 3.0 funcs::addmul .@ 15.0 = "2.0 +* 3.0 = 15.0" errors::assert
+    6.0 3.0 funcs::subdiv .@ 1.0  = "6.0 -/ 3.0 = 1.0"  errors::assert |
+$
+
+$main ( -> u8 )
+    verify
+$

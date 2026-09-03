@@ -44,6 +44,8 @@ typedef enum {
     OP_IF,     OP_ELSE,
     OP_ELSEIF, OP_SIZEOF,
     OP_RETURN, OP_MACRO,
+
+    OP_LAST = OP_MACRO
 } Opcode;
 
 typedef enum {

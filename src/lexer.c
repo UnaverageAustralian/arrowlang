@@ -56,7 +56,7 @@ static const char *tok_spellings[] = {
     "const",   "alloc",
     "ldrop",   "sizeof",
     "global",  "union",
-    "drop",
+    "drop",    "module",
 
     "i8",      "u8",
     "i16",     "u16",
@@ -71,6 +71,7 @@ static const char *tok_spellings[] = {
 
     "end of file",
 };
+static_assert(sizeof(tok_spellings)/sizeof(const char *)-1 == TOK_LAST, "Update tok_spellings in lexer");
 
 void init_lexer(Lexer *lexer, const char *src, const char *file_path) {
     lexer->prev = (Token){0};

@@ -63,11 +63,14 @@ const char *opcodes[] = {
     "ELSEIF", "SIZEOF",
     "RETURN", "MACRO",
 };
+static_assert(sizeof(opcodes)/sizeof(const char *)-1 == OP_LAST, "Update opcodes table in compiler");
 
 Opcode tok_to_opcode[] = {
-    OP_NOP,         OP_PUSH,
+    OP_NOP,
     OP_PUSH,        OP_PUSH,
-    OP_STR,         OP_NOP,
+    OP_PUSH,        OP_STR,
+    OP_NOP,
+
     OP_ADD,         OP_SUB,
     OP_MUL,         OP_DIV,
     OP_NOP,         OP_LNOT,
@@ -89,20 +92,23 @@ Opcode tok_to_opcode[] = {
     OP_LT,          OP_LTEQ,
     OP_GT,          OP_GTEQ,
     OP_EQ,          OP_NEQ,
-    OP_NOP,         OP_DUP,
-    OP_OVER,        OP_DUP2,
-    OP_OVER2,       OP_SWAP2,
+    OP_NOP,
+
+    OP_DUP,         OP_OVER,
+    OP_DUP2,        OP_OVER2,
+    OP_SWAP2,       OP_NOP,
     OP_NOP,         OP_NOP,
-    OP_NOP,         OP_JMP,
-    OP_JMP,         OP_NOP,
-    OP_INIT,        OP_NOP,
-    OP_NEG,         OP_RETURN,
-    OP_ROT,         OP_ROTN,
+    OP_JMP,         OP_JMP,
+    OP_NOP,         OP_INIT,
+    OP_NOP,         OP_NEG,
+    OP_RETURN,      OP_ROT,
+    OP_ROTN,        OP_NOP,
     OP_NOP,         OP_NOP,
-    OP_NOP,         OP_NOP,
-    OP_ALLOC,       OP_LDROP,
-    OP_SIZEOF,      OP_NOP,
-    OP_INIT,        OP_DROP,
+    OP_NOP,         OP_ALLOC,
+    OP_LDROP,       OP_SIZEOF,
+    OP_NOP,         OP_INIT,
+    OP_DROP,        OP_NOP,
+
     OP_CONVERT,     OP_CONVERT,
     OP_CONVERT,     OP_CONVERT,
     OP_CONVERT,     OP_CONVERT,
@@ -113,6 +119,7 @@ Opcode tok_to_opcode[] = {
     OP_NOP,         OP_NOP,
     OP_NOP,
 };
+static_assert(sizeof(tok_to_opcode)/sizeof(Opcode)-1 == TOK_LAST, "Update tok_to_opcode table in compiler");
 
 String_View strip_file_path(const char *path) {
     String_View stripped = { .len = 0, .str = path };
@@ -1077,12 +1084,17 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
         DA_APPEND(&global->cleanup, obj_name);
 
     lexer_next(&lexer);
-    if (lexer.cur.type == TOK_EOF)
+    if (lexer.cur.type == TOK_EOF) {
         eprintf(lexer.file_path, lexer.cur.loc, LEVEL_WARN, "Empty file\n");
+    }
+    else if (lexer.cur.type == TOK_MODULE) {
+        lexer_next(&lexer);
+        expect(&unit, TOK_WORD);
+        unit.module.name = (String_View){ .len = lexer.prev.len, .str = lexer.prev.start };
+    }
 
     Symbol *module_sym = arena_calloc(&global->arena, sizeof(Symbol));
     module_sym->type = STYPE_MODULE;
-
     hashmap_add(&global->modules, unit.module.name.str, unit.module.name.len, module_sym);
 
     module_sym->as.module.status = STATUS_UNRESOLVED;

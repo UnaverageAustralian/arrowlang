@@ -45,6 +45,10 @@
 
 #define SV_ARG(sv) (sv).len, (sv).str
 
+#ifndef static_assert
+#define static_assert _Static_assert
+#endif
+
 typedef enum {
     LEVEL_NOTE,
     LEVEL_WARN,
