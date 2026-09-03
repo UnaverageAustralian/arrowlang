@@ -35,11 +35,11 @@ typedef enum {
     TOK_OR,        TOK_XOR,
     TOK_SHL,       TOK_SHR,
     TOK_ROL,       TOK_ROR,
-    TOK_NOT,       TOK_DROP,
-    TOK_SWAP,      TOK_LT,
-    TOK_LTEQ,      TOK_GT,
-    TOK_GTEQ,      TOK_EQ,
-    TOK_NEQ,       TOK_IF,
+    TOK_NOT,       TOK_SWAP,
+    TOK_LT,        TOK_LTEQ,
+    TOK_GT,        TOK_GTEQ,
+    TOK_EQ,        TOK_NEQ,
+    TOK_IF,
 
     // Words
     TOK_DUP,       TOK_OVER,
@@ -55,6 +55,7 @@ typedef enum {
     TOK_CONST,     TOK_ALLOC,
     TOK_LDROP,     TOK_SIZEOF,
     TOK_GLOBAL,    TOK_UNION,
+    TOK_DROP,
     // Types
     TOK_I8,        TOK_U8,
     TOK_I16,       TOK_U16,

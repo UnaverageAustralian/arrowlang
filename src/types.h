@@ -6,8 +6,15 @@
 #include "utils.h"
 
 #define BASIC_TYPE(type) (Type){ .kind = type }
-#define PTR_TYPE(type) (Type){ .kind = TYPE_PTR, .ptr_depth = 1, .deref_kind = type }
 #define ADVANCED_TYPE(type_kind, type) (Type){ .kind = type_kind, .advanced = type }
+
+#define PTR_TYPE(type)                                                                  \
+    (Type){                                                                             \
+        .kind = TYPE_PTR,                                                               \
+        .ptr_depth = (type).ptr_depth+1,                                                \
+        .deref_kind = (type).deref_kind == TYPE_VOID ? (type).kind : (type).deref_kind, \
+        .advanced = (type).advanced,                                                    \
+    }
 
 #define IS_INTEGER(type) ((type).kind >= TYPE_I8 && (type).kind <= TYPE_INT)
 #define IS_REAL(type) ((type).kind >= TYPE_F32 && (type).kind <= TYPE_REAL)

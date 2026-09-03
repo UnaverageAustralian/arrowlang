@@ -644,7 +644,7 @@ void type_check_op(Analyser *analyser) {
         break;
     }
     case OP_STR:
-        DA_APPEND(&analyser->stack, PTR_TYPE(TYPE_CHAR));
+        DA_APPEND(&analyser->stack, PTR_TYPE(BASIC_TYPE(TYPE_CHAR)));
         break;
     case OP_ROT: {
         if (!check_operand_count(analyser, 3)) break;
@@ -964,7 +964,7 @@ void type_check_op(Analyser *analyser) {
     }
     case OP_ALLOC: {
         allocate(analyser, type_size(op->types[0]));
-        Type ptr = PTR_TYPE(op->types[0].kind);
+        Type ptr = PTR_TYPE(op->types[0]);
         ptr.advanced = op->types[0].advanced;
         DA_APPEND(&analyser->stack, ptr);
         break;

@@ -16,6 +16,16 @@
 #define COMPILER_EPRINTF(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->prev.loc, level, __VA_ARGS__); 
 #define COMPILER_EPRINTF_AT_CUR(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->cur.loc, level, __VA_ARGS__);
 
+#define START_DECL(sym_type)                                          \
+    do {                                                              \
+        lexer_next(compiler->lexer);                                  \
+        expect(compiler, TOK_WORD);                                   \
+        if (compiler->lexer->prev.type == TOK_EOF) return;            \
+        sym = arena_calloc(&compiler->global->arena, sizeof(Symbol)); \
+        sym->type = sym_type;                                         \
+        add_symbol(compiler, sym);                                    \
+    } while (0)
+
 const char *opcodes[] = {
     "NOP",
     "PUSH",        "ADD",
@@ -52,6 +62,56 @@ const char *opcodes[] = {
     "IF",     "ELSE",
     "ELSEIF", "SIZEOF",
     "RETURN", "MACRO",
+};
+
+Opcode tok_to_opcode[] = {
+    OP_NOP,         OP_PUSH,
+    OP_PUSH,        OP_PUSH,
+    OP_STR,         OP_NOP,
+    OP_ADD,         OP_SUB,
+    OP_MUL,         OP_DIV,
+    OP_NOP,         OP_LNOT,
+    OP_NOP,         OP_NOP,
+    OP_PTR_ACCESS,  OP_NOP,
+    OP_NOP,         OP_NOP,
+    OP_NOP,         OP_NOP,
+    OP_NOP,         OP_NOP,
+    OP_ACCESS,      OP_STORE,
+    OP_ACCESS_DROP, OP_NOP,
+    OP_NOP,         OP_NOP,
+    OP_PTR_STORE,   OP_INDEX,
+    OP_INDEX_STORE, OP_PTR_ACCESS_DROP,
+    OP_MOD,         OP_AND,
+    OP_OR,          OP_XOR,
+    OP_SHL,         OP_SHR,
+    OP_ROL,         OP_ROR,
+    OP_NOT,         OP_SWAP,
+    OP_LT,          OP_LTEQ,
+    OP_GT,          OP_GTEQ,
+    OP_EQ,          OP_NEQ,
+    OP_NOP,         OP_DUP,
+    OP_OVER,        OP_DUP2,
+    OP_OVER2,       OP_SWAP2,
+    OP_NOP,         OP_NOP,
+    OP_NOP,         OP_JMP,
+    OP_JMP,         OP_NOP,
+    OP_NOP,         OP_NOP,
+    OP_NEG,         OP_RETURN,
+    OP_ROT,         OP_ROTN,
+    OP_NOP,         OP_NOP,
+    OP_NOP,         OP_NOP,
+    OP_ALLOC,       OP_LDROP,
+    OP_SIZEOF,      OP_NOP,
+    OP_NOP,         OP_DROP,
+    OP_CONVERT,     OP_CONVERT,
+    OP_CONVERT,     OP_CONVERT,
+    OP_CONVERT,     OP_CONVERT,
+    OP_CONVERT,     OP_CONVERT,
+    OP_CONVERT,     OP_CONVERT,
+    OP_CONVERT,     OP_CONVERT,
+    OP_CONVERT,     OP_NOP,
+    OP_NOP,         OP_NOP,
+    OP_NOP,
 };
 
 String_View strip_file_path(const char *path) {
@@ -131,7 +191,7 @@ void print_op(Op *op) {
     case OP_STORE:
     case OP_ACCESS: {
         String_View *sv = (String_View *)op->operand;
-        printf(" %.*s", sv->len, sv->str);
+        printf(" %.*s", SV_ARG(*sv));
         break;
     }
     case OP_PUSH_GLOBAL:
@@ -241,7 +301,7 @@ void compile_if_stmt(Compilation_Unit *compiler) {
     while (cur->type == TOK_ELSEIF) {
         lexer_next(compiler->lexer);
 
-        ARENA_DA_APPEND(&compiler->global->arena, &elseifs, compiler->ops.count);
+        DA_APPEND(&elseifs, compiler->ops.count);
         make_op(compiler, OP_JMP, 0);
         make_op_at_cur(compiler, OP_ELSEIF, compiler->label_count++);
 
@@ -278,7 +338,9 @@ void compile_if_stmt(Compilation_Unit *compiler) {
 
     for (size_t i = 0; i < elseifs.count; i++)
         compiler->ops.items[elseifs.items[i]].operand = compiler->label_count;
-    compiler->global->arena.allocated -= elseifs.count * sizeof(int);
+
+    if (elseifs.count > 0)
+        free(elseifs.items);
 
     lexer_next(compiler->lexer);
     make_op(compiler, OP_END, compiler->label_count++);
@@ -298,11 +360,7 @@ void compile_while_stmt(Compilation_Unit *compiler) {
     make_op_at_cur(compiler, OP_JMPF, 0);
     make_op_at_cur(compiler, OP_END, compiler->label_count++);
 
-    Token_Type end_type;
-    if (cur->type == TOK_LBRACE)
-        end_type = TOK_RBRACE;
-    else
-        end_type = TOK_END;
+    Token_Type end_type = cur->type == TOK_LBRACE ? TOK_RBRACE : TOK_END;
 
     if (cur->type == TOK_EOF || cur->type == TOK_FUNC) {
         compiler->global->had_error = 1;
@@ -339,11 +397,7 @@ void compile_while_stmt(Compilation_Unit *compiler) {
 void compile_loop_stmt(Compilation_Unit *compiler) {
     compiler->is_in_loop = 1;
 
-    Token_Type end_type;
-    if (compiler->lexer->prev.type == TOK_LBRACE)
-        end_type = TOK_RBRACE;
-    else
-        end_type = TOK_END;
+    Token_Type end_type = compiler->lexer->prev.type == TOK_LBRACE ? TOK_RBRACE : TOK_END;
 
     int loop_label = compiler->label_count;
     make_op(compiler, OP_START, compiler->label_count++);
@@ -408,18 +462,18 @@ Hash_Entry *get_entry_in_module(Compilation_Unit *compiler, Hash_Entry *module) 
 
 void get_type(Compilation_Unit *compiler, Type *type) {
     switch (compiler->lexer->prev.type) {
-    case TOK_I8:   *type = BASIC_TYPE(TYPE_I8);   break;
-    case TOK_CHAR: *type = BASIC_TYPE(TYPE_CHAR); break;
-    case TOK_U8:   *type = BASIC_TYPE(TYPE_U8);   break;
-    case TOK_I16:  *type = BASIC_TYPE(TYPE_I16);  break;
-    case TOK_U16:  *type = BASIC_TYPE(TYPE_U16);  break;
-    case TOK_I32:  *type = BASIC_TYPE(TYPE_I32);  break;
-    case TOK_U32:  *type = BASIC_TYPE(TYPE_U32);  break;
-    case TOK_I64:  *type = BASIC_TYPE(TYPE_I64);  break;
-    case TOK_U64:  *type = BASIC_TYPE(TYPE_U64);  break;
-    case TOK_F32:  *type = BASIC_TYPE(TYPE_F32);  break;
-    case TOK_F64:  *type = BASIC_TYPE(TYPE_F64);  break;
-    case TOK_STR:  *type = PTR_TYPE(TYPE_CHAR);   break;
+    case TOK_I8:   *type = BASIC_TYPE(TYPE_I8);             break;
+    case TOK_CHAR: *type = BASIC_TYPE(TYPE_CHAR);           break;
+    case TOK_U8:   *type = BASIC_TYPE(TYPE_U8);             break;
+    case TOK_I16:  *type = BASIC_TYPE(TYPE_I16);            break;
+    case TOK_U16:  *type = BASIC_TYPE(TYPE_U16);            break;
+    case TOK_I32:  *type = BASIC_TYPE(TYPE_I32);            break;
+    case TOK_U32:  *type = BASIC_TYPE(TYPE_U32);            break;
+    case TOK_I64:  *type = BASIC_TYPE(TYPE_I64);            break;
+    case TOK_U64:  *type = BASIC_TYPE(TYPE_U64);            break;
+    case TOK_F32:  *type = BASIC_TYPE(TYPE_F32);            break;
+    case TOK_F64:  *type = BASIC_TYPE(TYPE_F64);            break;
+    case TOK_STR:  *type = PTR_TYPE(BASIC_TYPE(TYPE_CHAR)); break;
     case TOK_WORD: {
         Hash_Entry *entry = hashmap_get(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len);
         if (!entry || !entry->key) {
@@ -458,11 +512,7 @@ void get_type(Compilation_Unit *compiler, Type *type) {
 
         lexer_next(compiler->lexer);
         get_type(compiler, type);
-
-        type->ptr_depth++;
-        if (type->deref_kind == TYPE_VOID)
-            type->deref_kind = type->kind;
-        type->kind = TYPE_PTR;
+        *type = PTR_TYPE(*type);
 
         expect(compiler, TOK_RBRACKET);
         break;
@@ -523,60 +573,25 @@ void compile_stmt(Compilation_Unit *compiler) {
     lexer_next(compiler->lexer);
 
     Token *tok = &compiler->lexer->prev;
+    if (tok_to_opcode[tok->type] != OP_NOP)
+        make_op(compiler, tok_to_opcode[tok->type], 0);
+    Op *op = &compiler->ops.items[compiler->ops.count-1];
+
     switch (tok->type) {
-    case TOK_INT_LIT: {
-        Op *op = make_op(compiler, OP_PUSH, tok->as.integer);
+    case TOK_INT_LIT:
+        op->operand = tok->as.integer;
         op->types[0] = BASIC_TYPE(TYPE_INT);
         break;
-    }
-    case TOK_REAL_LIT: {
-        Op *op = make_op(compiler, OP_PUSH, tok->as.integer);
+    case TOK_REAL_LIT:
+        op->operand = tok->as.integer;
         op->types[0] = BASIC_TYPE(TYPE_REAL);
         break;
-    }
-    case TOK_CHAR_LIT: {
-        Op *op = make_op(compiler, OP_PUSH, tok->as.integer);
+    case TOK_CHAR_LIT:
+        op->operand = tok->as.integer;
         op->types[0] = BASIC_TYPE(TYPE_CHAR);
         break;
-    }
-    case TOK_ADD:       make_op(compiler, OP_ADD, 0);             break;
-    case TOK_SUB:       make_op(compiler, OP_SUB, 0);             break;
-    case TOK_MUL:       make_op(compiler, OP_MUL, 0);             break;
-    case TOK_DIV:       make_op(compiler, OP_DIV, 0);             break;
-    case TOK_MOD:       make_op(compiler, OP_MOD, 0);             break;
-    case TOK_AND:       make_op(compiler, OP_AND, 0);             break;
-    case TOK_OR:        make_op(compiler, OP_OR, 0);              break;
-    case TOK_XOR:       make_op(compiler, OP_XOR, 0);             break;
-    case TOK_SHL:       make_op(compiler, OP_SHL, 0);             break;
-    case TOK_SHR:       make_op(compiler, OP_SHR, 0);             break;
-    case TOK_ROL:       make_op(compiler, OP_ROL, 0);             break;
-    case TOK_ROR:       make_op(compiler, OP_ROR, 0);             break;
-    case TOK_NOT:       make_op(compiler, OP_NOT, 0);             break;
-    case TOK_DUP:       make_op(compiler, OP_DUP, 0);             break;
-    case TOK_OVER:      make_op(compiler, OP_OVER, 0);            break;
-    case TOK_DUP2:      make_op(compiler, OP_DUP2, 0);            break;
-    case TOK_DROP:      make_op(compiler, OP_DROP, 0);            break;
-    case TOK_SWAP:      make_op(compiler, OP_SWAP, 0);            break;
-    case TOK_OVER2:     make_op(compiler, OP_OVER2, 0);           break;
-    case TOK_SWAP2:     make_op(compiler, OP_SWAP2, 0);           break;
-    case TOK_NEG:       make_op(compiler, OP_NEG, 0);             break;
-    case TOK_EQ:        make_op(compiler, OP_EQ, 0);              break;
-    case TOK_LT:        make_op(compiler, OP_LT, 0);              break;
-    case TOK_LTEQ:      make_op(compiler, OP_LTEQ, 0);            break;
-    case TOK_GT:        make_op(compiler, OP_GT, 0);              break;
-    case TOK_GTEQ:      make_op(compiler, OP_GTEQ, 0);            break;
-    case TOK_NEQ:       make_op(compiler, OP_NEQ, 0);             break;
-    case TOK_LNOT:      make_op(compiler, OP_LNOT, 0);            break;
-    case TOK_ROT:       make_op(compiler, OP_ROT, 0);             break;
-    case TOK_ROTN:      make_op(compiler, OP_ROTN, 0);            break;
-    case TOK_STORE:     make_op(compiler, OP_PTR_STORE, 0);       break;
-    case TOK_AT:        make_op(compiler, OP_PTR_ACCESS, 0);      break;
-    case TOK_ADD_AT:    make_op(compiler, OP_INDEX, 0);           break;
-    case TOK_ADD_STORE: make_op(compiler, OP_INDEX_STORE, 0);     break;
-    case TOK_DOT_AT:    make_op(compiler, OP_PTR_ACCESS_DROP, 0); break;
-    case TOK_LDROP:     make_op(compiler, OP_LDROP, 0);           break;
     case TOK_STR_LIT:
-        make_op(compiler, OP_STR, (int64_t)tok->as.str);
+        op->operand = (int64_t)tok->as.str;
         break;
     case TOK_IF:
         compile_if_stmt(compiler);
@@ -598,7 +613,7 @@ void compile_stmt(Compilation_Unit *compiler) {
             return;
         }
         compiler->brks.positions[compiler->brks.count++] = compiler->ops.count;
-        make_op(compiler, OP_JMP, -1);
+        op->operand = -1;
         break;
     case TOK_CONTINUE:
         if (!compiler->is_in_loop) {
@@ -607,31 +622,27 @@ void compile_stmt(Compilation_Unit *compiler) {
             return;
         }
         compiler->conts.positions[compiler->conts.count++] = compiler->ops.count;
-        make_op(compiler, OP_JMP, -1);
+        op->operand = -1;
         break;
     case TOK_RET:
         compiler->rets.positions[compiler->rets.count++] = compiler->ops.count;
-        make_op(compiler, OP_RETURN, -1);
+        op->operand = -1;
         break;
     case TOK_WORD: {
         Hash_Entry *entry = hashmap_get(&compiler->symbols, tok->start, tok->len);
         compile_entry(compiler, entry);
         break;
     }
-    case TOK_STRUCT: {
-        Op *op = make_op(compiler, OP_INIT, 0);
+    case TOK_STRUCT:
         op->types[0].kind = TYPE_STRUCT;
         op->types[0].advanced = compile_anonymous_struct(compiler);
         op->types[0].advanced->kind = TYPE_STRUCT;
         break;
-    }
-    case TOK_UNION: {
-        Op *op = make_op(compiler, OP_INIT, 0);
+    case TOK_UNION:
         op->types[0].kind = TYPE_UNION;
         op->types[0].advanced = compile_anonymous_struct(compiler);
         op->types[0].advanced->kind = TYPE_UNION;
         break;
-    }
     case TOK_I8:
     case TOK_U8:
     case TOK_CHAR:
@@ -644,44 +655,26 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_F32:
     case TOK_F64:
     case TOK_PTR:
-    case TOK_STR: {
-        Op *op = make_op(compiler, OP_CONVERT, 0);
+    case TOK_STR:
         get_type(compiler, &op->types[1]);
         break;
-    }
-    case TOK_HASH: {
-        if (!expect(compiler, TOK_WORD)) return;
-        String_View *sv = arena_calloc(&compiler->global->arena, sizeof(String_View));
-        *sv = (String_View){ .len = tok->len, .str = tok->start };
-        make_op(compiler, OP_ACCESS, (uint64_t)sv);
-        break;
-    }
-    case TOK_ARROW_HASH: {
-        if (!expect(compiler, TOK_WORD)) return;
-        String_View *sv = arena_calloc(&compiler->global->arena, sizeof(String_View));
-        *sv = (String_View){ .len = tok->len, .str = tok->start };
-        make_op(compiler, OP_STORE, (uint64_t)sv);
-        break;
-    }
+    case TOK_HASH:
+    case TOK_ARROW_HASH:
     case TOK_DOT: {
         if (!expect(compiler, TOK_WORD)) return;
         String_View *sv = arena_calloc(&compiler->global->arena, sizeof(String_View));
         *sv = (String_View){ .len = tok->len, .str = tok->start };
-        make_op(compiler, OP_ACCESS_DROP, (uint64_t)sv);
+        op->operand = (int64_t)sv;
         break;
     }
-    case TOK_ALLOC: {
-        Op *op = make_op(compiler, OP_ALLOC, 0);
+    case TOK_ALLOC:
         lexer_next(compiler->lexer);
         get_type(compiler, &op->types[0]);
         break;
-    }
-    case TOK_SIZEOF: {
-        Op *op = make_op(compiler, OP_SIZEOF, 0);
+    case TOK_SIZEOF:
         lexer_next(compiler->lexer);
         get_type(compiler, &op->types[0]);
         break;
-    }
     case TOK_ERROR:
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "%.*s\n", tok->len, tok->start);
@@ -707,10 +700,7 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_EOF:
         eprintf(__FILE__, (Loc){ .line = __LINE__, .pos = -1 }, LEVEL_ERR, "Invalid token %s reached in compile_stmt\n", tok_spelling(tok->type));
         exit(1);
-    default:
-        compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Unimplemented operation starting with token %s\n", tok_spelling(tok->type));
-        return;
+    default: break;
     }
 }
 
@@ -745,7 +735,6 @@ void compile_signature(Compilation_Unit *compiler, Types *param_types, Types *re
 
 Hash_Entry *compile_function_signature(Compilation_Unit *compiler) {
     lexer_next(compiler->lexer);
-
     expect(compiler, TOK_WORD);
     if (compiler->lexer->prev.type == TOK_EOF) return NULL;
 
@@ -827,19 +816,13 @@ void compile_struct_fields(Compilation_Unit *compiler, Struct *structure) {
 
         get_type(compiler, &structure->fields.items[structure->fields.count-1].type);
     }
-
     expect(compiler, TOK_END);
 }
 
 void compile_struct(Compilation_Unit *compiler, Type_Kind type) {
-    lexer_next(compiler->lexer);
-    expect(compiler, TOK_WORD);
-    if (compiler->lexer->prev.type == TOK_EOF) return;
+    Symbol *sym;
+    START_DECL(STYPE_TYPE);
 
-    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
-    sym->type = STYPE_TYPE;
-
-    add_symbol(compiler, sym);
     DA_APPEND(&compiler->types, (Advanced_Type){0});
     sym->as.type = &compiler->types.items[compiler->types.count-1];
     sym->as.type->loc = compiler->lexer->prev.loc;
@@ -851,13 +834,8 @@ void compile_struct(Compilation_Unit *compiler, Type_Kind type) {
 }
 
 void compile_const(Compilation_Unit *compiler) {
-    lexer_next(compiler->lexer);
-    expect(compiler, TOK_WORD);
-    if (compiler->lexer->prev.type == TOK_EOF) return;
-
-    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
-    sym->type = STYPE_CONST;
-    add_symbol(compiler, sym);
+    Symbol *sym;
+    START_DECL(STYPE_CONST);
 
     lexer_next(compiler->lexer);
     switch (compiler->lexer->prev.type) {
@@ -874,7 +852,7 @@ void compile_const(Compilation_Unit *compiler) {
         sym->as.constant.val = compiler->lexer->prev.as.integer;
         break;
     case TOK_STR_LIT:
-        sym->as.constant.type = PTR_TYPE(TYPE_CHAR);
+        sym->as.constant.type = PTR_TYPE(BASIC_TYPE(TYPE_CHAR));
         sym->as.constant.val = (uint64_t)compiler->lexer->prev.as.str;
         break;
     default:
@@ -885,18 +863,13 @@ void compile_const(Compilation_Unit *compiler) {
 }
 
 void compile_global(Compilation_Unit *compiler) {
-    lexer_next(compiler->lexer);
-    expect(compiler, TOK_WORD);
-    if (compiler->lexer->prev.type == TOK_EOF) return;
-
-    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
-    sym->type = STYPE_GLOBAL;
-    add_symbol(compiler, sym);
+    Symbol *sym;
+    START_DECL(STYPE_GLOBAL);
 
     sym->as.global.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
     sym->as.global.module_name = compiler->module.name;
 
-    make_op(compiler, OP_GLOBAL, (uint64_t)&sym->as.global);
+    make_op(compiler, OP_GLOBAL, (int64_t)&sym->as.global);
 
     expect(compiler, TOK_COLON);
     if (compiler->lexer->prev.type == TOK_EOF) return;
@@ -906,17 +879,12 @@ void compile_global(Compilation_Unit *compiler) {
 }
 
 void compile_macro(Compilation_Unit *compiler) {
-    lexer_next(compiler->lexer);
-    expect(compiler, TOK_WORD);
-    if (compiler->lexer->prev.type == TOK_EOF) return;
-
-    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
-    sym->type = STYPE_MACRO;
-    Hash_Entry *entry = add_symbol(compiler, sym);
+    Symbol *sym;
+    START_DECL(STYPE_MACRO);
 
     compile_signature(compiler, &sym->as.func.param_types, &sym->as.func.return_types);
 
-    make_op(compiler, OP_MACRO, (int64_t)entry);
+    make_op(compiler, OP_MACRO, 0);
     int macro_start = compiler->ops.count;
 
     sym->as.func.ops.items = compiler->ops.items + compiler->ops.count;
@@ -1080,7 +1048,6 @@ void resolve_symbols(Compilation_Unit *compiler) {
                         entry->key_len, entry->key);
                 break;
             }
-
             *unresolved.as.type = ADVANCED_TYPE(TYPE_STRUCT, sym->as.type);
             break;
         }
@@ -1143,8 +1110,6 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
 
             Symbol *module = (entry && entry->key) ? (Symbol *)entry->val : NULL;
             while (!module) {
-                assert(!entry || !entry->key);
-
                 global->file++;
                 if (global->file >= global->options.input_file_count) {
                     global->had_error = 1;
@@ -1153,8 +1118,8 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
                 }
 
                 char *input_file_path = global->options.input_files[global->file];
-                char *contents = open_file(input_file_path);
 
+                char *contents = open_file(input_file_path);
                 if (!contents) {
                     eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Could not read file %s for module %.*s: %s\n",
                             input_file_path, lexer.prev.len, lexer.prev.start, strerror(errno));
@@ -1184,21 +1149,20 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
     module_sym->as.module = unit.module;
     module_sym->as.module.status = STATUS_RESOLVED;
 
-    if (!global->had_error && !global->options.debug) {
+    if (!global->had_error && !global->options.debug)
         global->had_error = type_check(&unit.ops);
 
-        if (!global->had_error && !global->options.print_ir) {
-            Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
-            char *output_asm = generate_x86_64(&unit.ops, obj_name, main != NULL && main->key != NULL);
-            if (!output_asm) global->had_error = 1;
+    if (!global->had_error && !global->options.print_ir) {
+        Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
+        char *output_asm = generate_x86_64(&unit.ops, obj_name, main != NULL && main->key != NULL);
+        if (!output_asm) global->had_error = 1;
 
-            DA_APPEND(&global->cleanup, output_asm);
+        DA_APPEND(&global->cleanup, output_asm);
 
-            if (!global->had_error && !global->options.emit_asm) {
-                Cmd cmd = {0};
-                cmd_append_many(&cmd, 4, "as", "-o", obj_name, output_asm);
-                cmd_exec(&cmd, global->options.verbose);
-            }
+        if (!global->had_error && !global->options.emit_asm) {
+            Cmd cmd = {0};
+            cmd_append_many(&cmd, 4, "as", "-o", obj_name, output_asm);
+            cmd_exec(&cmd, global->options.verbose);
         }
     }
 
