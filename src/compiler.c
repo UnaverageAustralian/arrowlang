@@ -1069,13 +1069,6 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
     Compilation_Unit unit;
     init_compilation_unit(&unit, &lexer, global);
 
-    Hash_Entry *entry = hashmap_get(&global->modules, unit.module.name.str, unit.module.name.len);
-    if (entry && entry->key) {
-        global->had_error = 1;
-        eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Module is recursive\n");
-        return (Symbol *)entry->val;
-    }
-
     char *obj_name = arena_calloc(&global->arena, unit.module.name.len + 3);
     snprintf(obj_name, unit.module.name.len + 3, "%.*s.o", SV_ARG(unit.module.name));
 
@@ -1091,6 +1084,13 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
         lexer_next(&lexer);
         expect(&unit, TOK_WORD);
         unit.module.name = (String_View){ .len = lexer.prev.len, .str = lexer.prev.start };
+    }
+
+    Hash_Entry *entry = hashmap_get(&global->modules, unit.module.name.str, unit.module.name.len);
+    if (entry && entry->key) {
+        global->had_error = 1;
+        eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "A module with that name already exists\n");
+        return (Symbol *)entry->val;
     }
 
     Symbol *module_sym = arena_calloc(&global->arena, sizeof(Symbol));
@@ -1121,6 +1121,12 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
             Hash_Entry *entry = hashmap_get(&global->modules, lexer.prev.start, lexer.prev.len);
 
             Symbol *module = (entry && entry->key) ? (Symbol *)entry->val : NULL;
+            if (module && module->as.module.status == STATUS_UNRESOLVED) {
+                global->had_error = 1;
+                eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Module is recursive\n");
+                continue;
+            }
+
             while (!module) {
                 global->file++;
                 if (global->file >= global->options.input_file_count) {
@@ -1140,12 +1146,6 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
                 module = compile_module(global, contents, input_file_path);
             }
             if (!module) continue;
-
-            if (module->as.module.status == STATUS_UNRESOLVED) {
-                global->had_error = 1;
-                eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Module is recursive\n");
-                continue;
-            }
             hashmap_add(&unit.symbols, entry->key, entry->key_len, module);
         }
         else {
