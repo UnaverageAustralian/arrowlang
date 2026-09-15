@@ -1,15 +1,15 @@
-import errors
+import std::errors
 
 $main ( -> u8 )
-    if 2 3 <  then 1 else 0 end 1 = "2 < 3"     errors::assert
-    if 2 3 >  then 1 else 0 end 0 = "!(2 > 3)"  errors::assert |
-    if 3 2 >  then 1 else 0 end 1 = "3 > 2"     errors::assert |
-    if 3 2 =  then 1 else 0 end 0 = "3 != 2"    errors::assert |
-    if 3 3 =  then 1 else 0 end 1 = "3 = 3"     errors::assert |
-    if 3 3 >  then 1 else 0 end 0 = "!(3 > 3)"  errors::assert |
-    if 3 3 >= then 1 else 0 end 1 = "3 >= 3"    errors::assert |
-    if 3 3 <  then 1 else 0 end 0 = "!(3 < 3)"  errors::assert |
-    if 3 3 <= then 1 else 0 end 1 = "3 <= 3"    errors::assert |
-    if 3 3 != then 1 else 0 end 0 = "!(3 != 3)" errors::assert |
-    if 3 4 != then 1 else 0 end 1 = "3 != 4"    errors::assert |
+    if 2 3 <  then 1 else 0 end 1 = "2 < 3"     std::errors::assert
+    if 2 3 >  then 1 else 0 end 0 = "!(2 > 3)"  std::errors::assert |
+    if 3 2 >  then 1 else 0 end 1 = "3 > 2"     std::errors::assert |
+    if 3 2 =  then 1 else 0 end 0 = "3 != 2"    std::errors::assert |
+    if 3 3 =  then 1 else 0 end 1 = "3 = 3"     std::errors::assert |
+    if 3 3 >  then 1 else 0 end 0 = "!(3 > 3)"  std::errors::assert |
+    if 3 3 >= then 1 else 0 end 1 = "3 >= 3"    std::errors::assert |
+    if 3 3 <  then 1 else 0 end 0 = "!(3 < 3)"  std::errors::assert |
+    if 3 3 <= then 1 else 0 end 1 = "3 <= 3"    std::errors::assert |
+    if 3 3 != then 1 else 0 end 0 = "!(3 != 3)" std::errors::assert |
+    if 3 4 != then 1 else 0 end 1 = "3 != 4"    std::errors::assert |
 $

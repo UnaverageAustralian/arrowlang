@@ -1,9 +1,9 @@
-import errors
+import std::errors
 
 $foo ( -> i64 )
     2 return 3
 $
 
 $main ( -> u8 )
-    foo 2 = "foo = 2" errors::assert
+    foo 2 = "foo = 2" std::errors::assert
 $

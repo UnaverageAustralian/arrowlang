@@ -1,4 +1,4 @@
-import errors
+import std::errors
 
 struct Foo
     a : f32
@@ -7,19 +7,19 @@ struct Foo
 end
 
 $main ( -> u8 )
-    (sizeof i8)   1 = "sizeof i8 = 1"   errors::assert
-    (sizeof char) 1 = "sizeof char = 1" errors::assert |
-    (sizeof u8)   1 = "sizeof u8 = 1"   errors::assert |
-    (sizeof i16)  2 = "sizeof i16 = 2"  errors::assert |
-    (sizeof u16)  2 = "sizeof u16 = 2"  errors::assert |
-    (sizeof i32)  4 = "sizeof i32 = 4"  errors::assert |
-    (sizeof u32)  4 = "sizeof u32 = 4"  errors::assert |
-    (sizeof i64)  8 = "sizeof i64 = 8"  errors::assert |
-    (sizeof u64)  8 = "sizeof u64 = 8"  errors::assert |
-    (sizeof f32)  4 = "sizeof f32 = 4"  errors::assert |
-    (sizeof f64)  8 = "sizeof f64 = 4"  errors::assert |
-    (sizeof str)  8 = "sizeof str = 8"  errors::assert |
-    (sizeof Foo) 12 = "sizeof Foo = 12" errors::assert |
+    (sizeof i8)   1 = "sizeof i8 = 1"   std::errors::assert
+    (sizeof char) 1 = "sizeof char = 1" std::errors::assert |
+    (sizeof u8)   1 = "sizeof u8 = 1"   std::errors::assert |
+    (sizeof i16)  2 = "sizeof i16 = 2"  std::errors::assert |
+    (sizeof u16)  2 = "sizeof u16 = 2"  std::errors::assert |
+    (sizeof i32)  4 = "sizeof i32 = 4"  std::errors::assert |
+    (sizeof u32)  4 = "sizeof u32 = 4"  std::errors::assert |
+    (sizeof i64)  8 = "sizeof i64 = 8"  std::errors::assert |
+    (sizeof u64)  8 = "sizeof u64 = 8"  std::errors::assert |
+    (sizeof f32)  4 = "sizeof f32 = 4"  std::errors::assert |
+    (sizeof f64)  8 = "sizeof f64 = 4"  std::errors::assert |
+    (sizeof str)  8 = "sizeof str = 8"  std::errors::assert |
+    (sizeof Foo) 12 = "sizeof Foo = 12" std::errors::assert |
 
-    (sizeof ptr[u8]) 8 = "sizeof ptr[u8] = 8" errors::assert |
+    (sizeof ptr[u8]) 8 = "sizeof ptr[u8] = 8" std::errors::assert |
 $

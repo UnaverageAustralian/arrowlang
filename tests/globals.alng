@@ -1,4 +1,4 @@
-import errors
+import std::errors
 
 struct Foo
     x : i32
@@ -10,15 +10,15 @@ global foo : Foo
 
 $main ( -> u8 )
     x 10 => drop
-    x.@ 10 = "x = 10" errors::assert
+    x.@ 10 = "x = 10" std::errors::assert
     x 20 => drop
-    x.@ 20 = "x = 20" errors::assert |
+    x.@ 20 = "x = 20" std::errors::assert |
 
     foo (200 400 Foo) => drop
-    foo.x 200 = "foo.x = 200" errors::assert |
-    foo.y 400 = "foo.y = 400" errors::assert |
+    foo.x 200 = "foo.x = 200" std::errors::assert |
+    foo.y 400 = "foo.y = 400" std::errors::assert |
 
     foo (600 800 Foo) => drop
-    foo.x 600 = "foo.x = 600" errors::assert |
-    foo.y 800 = "foo.y = 800" errors::assert |
+    foo.x 600 = "foo.x = 600" std::errors::assert |
+    foo.y 800 = "foo.y = 800" std::errors::assert |
 $

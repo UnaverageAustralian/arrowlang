@@ -1,9 +1,9 @@
-import errors
+import std::errors
 
 $addmul ( i64 i64 -> i64 )
     swap over + *
 $
 
 $main ( -> u8 )
-    2 3 addmul 15 = "2 3 addmul = 15" errors::assert
+    2 3 addmul 15 = "2 3 addmul = 15" std::errors::assert
 $

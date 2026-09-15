@@ -1,4 +1,4 @@
-import errors
+import std::errors
 
 const X 10
 const Y 20
@@ -7,10 +7,10 @@ const PI 3.14
 const HELLO_WORLD "Hello, World!"
 
 $main ( -> u8 )
-    X  10   = "X = 10"    errors::assert
-    Y  20   = "Y = 20"    errors::assert |
-    E  0x45 = "E = 0x45"  errors::assert |
-    PI 3.14 = "PI = 3.14" errors::assert |
+    X  10   = "X = 10"    std::errors::assert
+    Y  20   = "Y = 20"    std::errors::assert |
+    E  0x45 = "E = 0x45"  std::errors::assert |
+    PI 3.14 = "PI = 3.14" std::errors::assert |
 
-    HELLO_WORLD 1+ .@ 'e' = "HELLO_WORLD 1+ .@ = 'e'" errors::assert |
+    HELLO_WORLD 1+ .@ 'e' = "HELLO_WORLD 1+ .@ = 'e'" std::errors::assert |
 $

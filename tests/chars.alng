@@ -1,6 +1,6 @@
-import errors
+import std::errors
 
 $main ( -> u8 )
-    '!' 33 = "'!' = 33" errors::assert
-    '?' 63 = "'?' = 63" errors::assert
+    '!' 33 = "'!' = 33" std::errors::assert
+    '?' 63 = "'?' = 63" std::errors::assert
 $

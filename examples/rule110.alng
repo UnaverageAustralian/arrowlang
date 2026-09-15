@@ -1,4 +1,4 @@
-import io
+import std::io
 
 $main ( -> u8 )
     1
@@ -6,13 +6,13 @@ $main ( -> u8 )
         swap
         63 while dup 0 >= loop
             if dup2 >> 1 & then
-                '#' io::printc
+                '#' std::io::printc
             else
-                '.' io::printc
+                '.' std::io::printc
             end
             1-
         end drop
-        10 io::printc
+        10 std::io::printc
 
         0 62 while dup -1 >= loop
             rot dup2 swap >>> 7 &

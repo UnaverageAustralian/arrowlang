@@ -1,4 +1,4 @@
-import errors
+import std::errors
 
 union Foo
     x : i32
@@ -6,14 +6,14 @@ union Foo
 end
 
 $main ( -> u8 )
-    2          Foo f32 2.802596928649634e-45 = "2 Foo f32 = 2.802596928649634e-45" errors::assert
-    0x40000000 Foo f32 2.0 =                   "0x40000000 Foo f32 = 2.0"          errors::assert |
-    2.0        Foo i32 0x40000000 =            "2.0 Foo i32 = 0x40000000"          errors::assert |
+    2          Foo f32 2.802596928649634e-45 = "2 Foo f32 = 2.802596928649634e-45" std::errors::assert
+    0x40000000 Foo f32 2.0 =                   "0x40000000 Foo f32 = 2.0"          std::errors::assert |
+    2.0        Foo i32 0x40000000 =            "2.0 Foo i32 = 0x40000000"          std::errors::assert |
 
     255 union
         x : i8
         y : u64
     end
-    #x -1  = "255 union ... end #x = -1"  errors::assert rot | swap
-    .y 255 = "255 union ... end #y = 255" errors::assert |
+    #x -1  = "255 union ... end #x = -1"  std::errors::assert rot | swap
+    .y 255 = "255 union ... end #y = 255" std::errors::assert |
 $

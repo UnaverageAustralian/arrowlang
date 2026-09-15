@@ -1,33 +1,33 @@
-import errors
+import std::errors
 
 $main ( -> u8 )
     2 3 dup
     3 =
     swap 3 = and
     swap 2 = and
-    "2 3 dup = [ 2 3 3 ]" errors::assert
+    "2 3 dup = [ 2 3 3 ]" std::errors::assert
 
     2 3 swap
     2 =
     swap 3 = and
-    "2 3 swap = [ 3 2 ]" errors::assert |
+    "2 3 swap = [ 3 2 ]" std::errors::assert |
 
     2 3 over
     2 =
     swap 3 = and
     swap 2 = and
-    "2 3 over = [ 2 3 2 ]" errors::assert |
+    "2 3 over = [ 2 3 2 ]" std::errors::assert |
 
     2 3 dup2
     3 =
     swap 2 = and
     swap 3 = and
     swap 2 = and
-    "2 3 dup2 = [ 2 3 2 3 ]" errors::assert |
+    "2 3 dup2 = [ 2 3 2 3 ]" std::errors::assert |
 
     2 3 drop
     2 =
-    "2 3 drop = [ 2 ]" errors::assert |
+    "2 3 drop = [ 2 ]" std::errors::assert |
 
     2 3 9 8 over2
     3 =
@@ -36,29 +36,29 @@ $main ( -> u8 )
     swap 9 = and
     swap 3 = and
     swap 2 = and
-    "2 3 9 8 over2 = [ 2 3 9 8 2 3 ]" errors::assert |
+    "2 3 9 8 over2 = [ 2 3 9 8 2 3 ]" std::errors::assert |
 
     2 3 9 8 swap2
     3 =
     swap 2 = and
     swap 8 = and
     swap 9 = and
-    "2 3 9 8 swap2 = [ 9 8 2 3 ]" errors::assert |
+    "2 3 9 8 swap2 = [ 9 8 2 3 ]" std::errors::assert |
 
     2 3 9 rot
     2 =
     swap 9 = and
     swap 3 = and
-    "2 3 9 rot = [ 3 9 2 ]" errors::assert |
+    "2 3 9 rot = [ 3 9 2 ]" std::errors::assert |
 
     2 3 9 rotn
     3 =
     swap 2 = and
     swap 9 = and
-    "2 3 9 rotn = [ 9 2 3 ]" errors::assert |
+    "2 3 9 rotn = [ 9 2 3 ]" std::errors::assert |
 
     5 2 3 ldrop
     3 =
     swap 5 = and
-    "5 2 3 ldrop = [ 5 3 ]" errors::assert |
+    "5 2 3 ldrop = [ 5 3 ]" std::errors::assert |
 $

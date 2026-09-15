@@ -1,4 +1,4 @@
-import io
+import std::io
 
 C$sqrt ( f64 -> f64 )
 
@@ -9,6 +9,6 @@ $distance ( f64 f64 f64 f64 -> f64 )
 $
 
 $main ( -> u8 )
-    2.96 -4.15 8.43 -0.43 distance 100.0 * i64 io::println
+    2.96 -4.15 8.43 -0.43 distance 100.0 * i64 std::io::println
     0
 $

@@ -1,4 +1,4 @@
-import errors
+import std::errors
 
 struct Bar
     foo : Foo
@@ -6,21 +6,21 @@ struct Bar
 end
 
 $main ( -> u8 )
-    3.0 2.0 1.0 Foo #x 3.0 = "#x = 3.0" errors::assert
-    swap            #y 2.0 = "#y = 2.0" errors::assert rot |
-    swap            #z 1.0 = "#z = 1.0" errors::assert rot |
+    3.0 2.0 1.0 Foo #x 3.0 = "#x = 3.0" std::errors::assert
+    swap            #y 2.0 = "#y = 2.0" std::errors::assert rot |
+    swap            #z 1.0 = "#z = 1.0" std::errors::assert rot |
 
-    swap 2 Bar #foo.x 3.0 = "#foo.x = 3.0" errors::assert rot |
-    swap       #foo.y 2.0 = "#foo.y = 2.0" errors::assert rot |
-    swap       #foo.z 1.0 = "#foo.z = 1.0" errors::assert rot |
-    swap            #a 2 = "#a = 2"       errors::assert rot |
+    swap 2 Bar #foo.x 3.0 = "#foo.x = 3.0" std::errors::assert rot |
+    swap       #foo.y 2.0 = "#foo.y = 2.0" std::errors::assert rot |
+    swap       #foo.z 1.0 = "#foo.z = 1.0" std::errors::assert rot |
+    swap            #a 2 = "#a = 2"       std::errors::assert rot |
 
     swap 1.0 2.0 3.0 Foo >#foo
-         #foo.x 1.0 = "#foo.x = 1.0" errors::assert rot |
-    swap #foo.y 2.0 = "#foo.y = 2.0" errors::assert rot |
-    swap #foo.z 3.0 = "#foo.z = 3.0" errors::assert rot |
+         #foo.x 1.0 = "#foo.x = 1.0" std::errors::assert rot |
+    swap #foo.y 2.0 = "#foo.y = 2.0" std::errors::assert rot |
+    swap #foo.z 3.0 = "#foo.z = 3.0" std::errors::assert rot |
 
-    alloc Foo .x 0.0 = ".x = 0.0" errors::assert |
+    alloc Foo .x 0.0 = ".x = 0.0" std::errors::assert |
 $
 
 struct Foo
