@@ -112,13 +112,16 @@ typedef struct {
     Unresolved_Symbol *items;
 } Unresolved_Symbols;
 
-typedef struct {
+typedef struct Module Module;
+struct Module {
+    Module *parent;
     String_View path;
     String_View name;
+    String_View full_name;
     Hashmap symbols;
     Resolve_Status status;
     uint8_t has_ext_funcs;
-} Module;
+};
 
 typedef struct {
     Types param_types;
@@ -154,6 +157,7 @@ typedef struct {
 
 typedef struct {
     Symbol_Type type;
+    uint8_t visible;
     union {
         Function func;
         Module module;
@@ -175,9 +179,8 @@ typedef struct {
 typedef struct {
     Ops ops;
     Advanced_Types types;
-    Hashmap symbols;
     Unresolved_Symbols unresolved;
-    Module module;
+    Module *module;
     Compiler *global;
     Lexer *lexer;
     Backpatchees brks;

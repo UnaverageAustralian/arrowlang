@@ -1,15 +1,15 @@
-.globl "io::print"
-"io::print":
+.globl "std::io::print"
+"std::io::print":
     pushq %rbp
     pushq %rbx
     movq %rsp, %rbp
-    movq 16(%rbp), %rax
+    movq 24(%rbp), %rax
     xorq %rcx, %rcx
     movq $10, %rbx
-    cmpq $0, %rax
-    jge .L_positive
-    pushq $45
-    call "io::printc"
+    testq %rax, %rax
+    jns .L_positive
+    pushq $'-
+    call "std::io::printc"
     negq %rax
     movq $10, %rbx
 .L_positive:
@@ -17,31 +17,30 @@
     idivq %rbx
     pushq %rdx
     incq %rcx
-    cmpq $0, %rax
-    jg .L_positive
+    testq %rax, %rax
+    jnz .L_positive
 .L_pop_digit:
     addq $'0, (%rsp)
-    call "io::printc"
+    call "std::io::printc"
     decq %rcx
-    cmpq $0, %rcx
-    jg .L_pop_digit
+    jnz .L_pop_digit
     movq %rbp, %rsp
     popq %rbx
     popq %rbp
     ret $8
 
-.globl "io::prints"
-"io::prints":
+.globl "std::io::prints"
+"std::io::prints":
     pushq %rbp
     pushq %rbx
     movq %rsp, %rbp
-    movq 16(%rbp), %rdi
+    movq 24(%rbp), %rdi
     movq %rdi, %rsi
-    movb $0, %al
+    xorq %rax, %rax
     movq $255, %rcx
     repne scasb
     subq %rsi, %rdi
-    movq %rdi, %rcx
+    movq %rdi, %rbx
     decb %cl
     jnc .L_prints_below_capacity
     movq $1, %rax
@@ -51,6 +50,7 @@
     syscall
     movb $0, (buf)
 .L_prints_below_capacity:
+    movq %rbx, %rcx
     leaq (buf+1), %rdi
     movzbq (buf), %rbx
     addq %rbx, %rdi
@@ -62,12 +62,12 @@
     popq %rbp
     ret $8
 
-.globl "io::printc"
-"io::printc":
+.globl "std::io::printc"
+"std::io::printc":
     pushq %rbp
     pushq %rbx
     movq %rsp, %rbp
-    movq 16(%rbp), %r8
+    movq 24(%rbp), %rbx
     cmpb $255, (buf)
     jb .L_printc_below_capacity
     movq $1, %rax
@@ -77,6 +77,7 @@
     syscall
     movb $0, (buf)
 .L_printc_below_capacity:
+    movq %rbx, %r8
     leaq (buf+1), %rdi
     movzbq (buf), %rbx
     addq %rbx, %rdi
@@ -87,8 +88,8 @@
     popq %rbp
     ret $8
 
-.globl "io::flush"
-"io::flush":
+.globl "std::io::flush"
+"std::io::flush":
     movq $1, %rax
     movq $1, %rdi
     leaq (buf+1), %rsi

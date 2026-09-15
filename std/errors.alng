@@ -1,8 +1,10 @@
-import io
+module std::errors
+
+import std::io
 
 $assert ( u8 str -> u8 )
     if over ! then
-        "Assertion failed: " io::prints
-        dup io::printsln
+        "Assertion failed: " std::io::prints
+        dup std::io::printsln
     end swap !
 $

@@ -1,4 +1,4 @@
-module funcs
+module modules::funcs
 
 $subdiv ( f32 f32 -> ptr[f32] )
     swap over - swap /

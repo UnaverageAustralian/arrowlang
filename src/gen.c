@@ -320,7 +320,7 @@ char *generate_x86_64(Ops *ops, char *output_file, int gen_start) {
         sb_appendf(&gen.sb, "_start:\n");
         sb_appendf(&gen.sb, "    call \"main\"\n");
         sb_appendf(&gen.sb, "    movq (%%rax), %%rbx\n");
-        sb_appendf(&gen.sb, "    call \"io::flush\"\n");
+        sb_appendf(&gen.sb, "    call \"std::io::flush\"\n");
         sb_appendf(&gen.sb, "    movq %%rbx, %%rdi\n");
         sb_appendf(&gen.sb, "    movq $60, %%rax\n");
         sb_appendf(&gen.sb, "    syscall\n");

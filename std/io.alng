@@ -1,3 +1,5 @@
+module std::io
+
 E$printc ( char -> )
 E$prints ( str -> )
 E$print  ( i64 -> )
@@ -5,10 +7,10 @@ E$flush  ( -> )
 
 $printsln ( str -> )
     prints
-    10char printc
+    '\n' printc
 $
 
 $println ( i64 -> )
     print
-    10char printc
+    '\n' printc
 $

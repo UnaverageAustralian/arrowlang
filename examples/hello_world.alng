@@ -1,6 +1,6 @@
-import io
+import std::io
 
 $main ( -> u8 )
-    "Hello, World!" io::printsln
+    "Hello, World!" std::io::printsln
     0
 $

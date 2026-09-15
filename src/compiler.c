@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -23,6 +24,7 @@
         if (compiler->lexer->prev.type == TOK_EOF) return;            \
         sym = arena_calloc(&compiler->global->arena, sizeof(Symbol)); \
         sym->type = sym_type;                                         \
+        sym->visible = 1;                                             \
         add_symbol(compiler, sym);                                    \
     } while (0)
 
@@ -137,20 +139,51 @@ String_View strip_file_path(const char *path) {
     return stripped;
 }
 
+int validate_module_name(Compilation_Unit *compiler) {
+    String_View module_name = compiler->module->name;
+    if (module_name.len == 0) {
+        compiler->global->had_error = 1;
+        eprintf(compiler->lexer->file_path, (Loc){ 0, 0 }, LEVEL_ERR, "Module name cannot be empty\n");
+        return 0;
+    }
+
+    if (isdigit(module_name.str[0])) {
+        compiler->global->had_error = 1;
+        eprintf(compiler->lexer->file_path, (Loc){ 0, 0 }, LEVEL_ERR, "Invalid name for module: %.*s\n", module_name.len, module_name.str);
+        return 0;
+    }
+    for (size_t i = 0; i < module_name.len; i++) {
+        if (!isalnum(module_name.str[i]) && module_name.str[i] != '_') {
+            compiler->global->had_error = 1;
+            eprintf(compiler->lexer->file_path, (Loc){ 0, 0 }, LEVEL_ERR, "Invalid name for module: %.*s\n", module_name.len, module_name.str);
+            return 0;
+        }
+    }
+    return 1;
+}
+
 void init_compiler(Compiler *compiler, Compiler_Options options) {
     *compiler = (Compiler){0};
     compiler->options = options;
     init_arena(&compiler->arena, 2 * 1024 * 1024);
 }
 
-void init_compilation_unit(Compilation_Unit *unit, Lexer *lexer, Compiler *global) {
+Symbol *init_compilation_unit(Compilation_Unit *unit, Lexer *lexer, Compiler *global) {
     *unit = (Compilation_Unit){0};
     unit->lexer = lexer;
     unit->global = global;
 
-    unit->module.name = strip_file_path(lexer->file_path);
-    unit->module.path = (String_View){ .len = unit->module.name.str - lexer->file_path, .str = lexer->file_path, };
-    unit->module.symbols = (Hashmap){0};
+    Symbol *module = arena_calloc(&global->arena, sizeof(Symbol));
+    module->type = STYPE_MODULE;
+    module->visible = 1;
+
+    unit->module = &module->as.module;
+    unit->module->name = strip_file_path(lexer->file_path);
+    unit->module->path = (String_View){ .len = unit->module->name.str - lexer->file_path, .str = lexer->file_path, };
+    unit->module->parent = NULL;
+    unit->module->symbols = (Hashmap){0};
+
+    return module;
 }
 
 const char *opcode_spelling(Opcode opcode) {
@@ -231,12 +264,11 @@ void print_ops(Ops *ops) {
 }
 
 Hash_Entry *add_symbol(Compilation_Unit *compiler, Symbol *sym) {
-    Hash_Entry *entry = hashmap_add(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
-    hashmap_add(&compiler->module.symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
+    Hash_Entry *entry = hashmap_add(&compiler->module->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
     if (!entry) {
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Redefinition of a symbol\n");
-        return hashmap_get(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len);
+        return hashmap_get(&compiler->module->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len);
     }
     return entry;
 }
@@ -447,28 +479,48 @@ Advanced_Type *compile_anonymous_struct(Compilation_Unit *compiler) {
     return &compiler->types.items[compiler->types.count-1];
 }
 
-Hash_Entry *get_entry_in_module(Compilation_Unit *compiler, Hash_Entry *module) {
-    Token *tok = &compiler->lexer->prev;
+Hash_Entry *get_entry_in_module(Compilation_Unit *compiler) {
+    Token *prev = &compiler->lexer->prev;
+    if (prev->type != TOK_WORD) {
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Expected word. Please report this as a bug");
+        return NULL;
+    }
 
-    const char *module_name = tok->start;
-    size_t module_name_len = tok->len;
+    String_View full_name = { .str = prev->start, .len = 0 };
+    while (compiler->lexer->cur.type == TOK_SCOPE) {
+        full_name.len = compiler->lexer->cur.start - full_name.str;
+        lexer_next(compiler->lexer);
+        if (!expect(compiler, TOK_WORD)) return NULL;
+    }
 
-    expect(compiler, TOK_SCOPE);
-    if (compiler->lexer->prev.type == TOK_EOF) return NULL;
+    Hash_Entry *module_entry = hashmap_get(&compiler->module->symbols, full_name.str, full_name.len);
+    if (!module_entry || !module_entry->key) {
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Unknown module %.*s\n", SV_ARG(full_name));
+        return NULL;
+    }
 
-    if (!expect(compiler, TOK_WORD)) return NULL;
-
-    Hash_Entry *entry = hashmap_get(&((Symbol *)module->val)->as.module.symbols, tok->start, tok->len);
+    Symbol *module = (Symbol *)module_entry->val;
+    Hash_Entry *entry = hashmap_get(&module->as.module.symbols, prev->start, prev->len);
     if (!entry || !entry->key) {
         compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Unknown symbol %.*s in module %.*s\n", tok->len, tok->start, module_name_len, module_name);
+        COMPILER_EPRINTF(LEVEL_ERR, "Unknown symbol %.*s in module %.*s\n", prev->len, prev->start, SV_ARG(full_name));
+        return NULL;
+    }
+
+    Symbol *sym = (Symbol *)entry->val;
+    if (!sym->visible) {
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Private symbol %.*s in module %.*s\n", prev->len, prev->start, SV_ARG(full_name));
         return NULL;
     }
     return entry;
 }
 
 void get_type(Compilation_Unit *compiler, Type *type) {
-    switch (compiler->lexer->prev.type) {
+    Token *prev = &compiler->lexer->prev;
+    switch (prev->type) {
     case TOK_I8:   *type = BASIC_TYPE(TYPE_I8);             break;
     case TOK_CHAR: *type = BASIC_TYPE(TYPE_CHAR);           break;
     case TOK_U8:   *type = BASIC_TYPE(TYPE_U8);             break;
@@ -482,20 +534,18 @@ void get_type(Compilation_Unit *compiler, Type *type) {
     case TOK_F64:  *type = BASIC_TYPE(TYPE_F64);            break;
     case TOK_STR:  *type = PTR_TYPE(BASIC_TYPE(TYPE_CHAR)); break;
     case TOK_WORD: {
-        Hash_Entry *entry = hashmap_get(&compiler->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len);
+        Hash_Entry *entry = hashmap_get(&compiler->module->symbols, prev->start, prev->len);
         if (!entry || !entry->key) {
             Unresolved_Symbol *unresolved = make_unresolved(compiler, UTYPE_TYPE);
             unresolved->as.type = type;
             break;
         }
-
-        Symbol *sym = (Symbol *)entry->val;
-        if (sym->type == STYPE_MODULE) {
-            entry = get_entry_in_module(compiler, entry);
+        if (compiler->lexer->cur.type == TOK_SCOPE) {
+            entry = get_entry_in_module(compiler);
             if (!entry) break;
-            sym = (Symbol *)entry->val;
         }
 
+        Symbol *sym = (Symbol *)entry->val;
         if (sym->type != STYPE_TYPE) {
             compiler->global->had_error = 1;
             COMPILER_EPRINTF(LEVEL_ERR, "%.*s is not a structure\n", entry->key_len, entry->key);
@@ -526,14 +576,18 @@ void get_type(Compilation_Unit *compiler, Type *type) {
     }
     default:
         compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Expected type, got %s\n", tok_spelling(compiler->lexer->prev.type));
+        COMPILER_EPRINTF(LEVEL_ERR, "Expected type, got %s\n", tok_spelling(prev->type));
         *type = BASIC_TYPE(TYPE_VOID);
         break;
     }
 }
 
 void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
-    if (!entry || !entry->key) {
+    if (compiler->lexer->cur.type == TOK_SCOPE) {
+        entry = get_entry_in_module(compiler);
+        if (!entry) return;
+    }
+    else if (!entry || !entry->key) {
         Unresolved_Symbol *unresolved = make_unresolved(compiler, UTYPE_OP);
         unresolved->as.op = compiler->ops.count;
         make_op(compiler, OP_UNKNOWN, 0);
@@ -553,12 +607,6 @@ void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
         op->types[0] = ADVANCED_TYPE(sym->as.type->kind, sym->as.type);
         break;
     }
-    case STYPE_MODULE: {
-        entry = get_entry_in_module(compiler, entry);
-        if (!entry) return;
-        compile_entry(compiler, entry);
-        break;
-    }
     case STYPE_CONST: {
         Op *op = make_op(compiler, sym->as.constant.type.ptr_depth > 0 ? OP_STR : OP_PUSH, sym->as.constant.val);
         op->types[0] = sym->as.constant.type;
@@ -573,6 +621,10 @@ void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
         make_op(compiler, OP_CALL_MACRO, (int64_t)entry);
         break;
     }
+    case STYPE_MODULE:
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Expected scope symbol after module name\n");
+        break;
     }
 }
 
@@ -636,7 +688,7 @@ void compile_stmt(Compilation_Unit *compiler) {
         op->operand = -1;
         break;
     case TOK_WORD: {
-        Hash_Entry *entry = hashmap_get(&compiler->symbols, tok->start, tok->len);
+        Hash_Entry *entry = hashmap_get(&compiler->module->symbols, tok->start, tok->len);
         compile_entry(compiler, entry);
         break;
     }
@@ -747,7 +799,8 @@ Hash_Entry *compile_function_signature(Compilation_Unit *compiler) {
 
     Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     sym->type = STYPE_FUNC;
-    sym->as.func.module_name = compiler->module.name;
+    sym->visible = 1;
+    sym->as.func.module_name = compiler->module->full_name;
 
     Hash_Entry *entry = add_symbol(compiler, sym);
     compile_signature(compiler, &sym->as.func.param_types, &sym->as.func.return_types);
@@ -798,11 +851,11 @@ void compile_external_function(Compilation_Unit *compiler, uint8_t is_c_func) {
         func->extern_name = (String_View){ .len = entry->key_len, .str = entry->key };
     }
 
-    if (!compiler->module.has_ext_funcs) {
-        compiler->module.has_ext_funcs = 1;
-        char *extern_path = arena_calloc(&compiler->global->arena, compiler->module.path.len + compiler->module.name.len + 7);
-        snprintf(extern_path, compiler->module.path.len + compiler->module.name.len + 7, "%.*s%.*s_ext.o",
-                 SV_ARG(compiler->module.path), SV_ARG(compiler->module.name));
+    if (!compiler->module->has_ext_funcs) {
+        compiler->module->has_ext_funcs = 1;
+        char *extern_path = arena_calloc(&compiler->global->arena, compiler->module->path.len + compiler->module->name.len + 7);
+        snprintf(extern_path, compiler->module->path.len + compiler->module->name.len + 7, "%.*s%.*s_ext.o",
+                 SV_ARG(compiler->module->path), SV_ARG(compiler->module->name));
         if (access(extern_path, F_OK) == 0)
             DA_APPEND(&compiler->global->options.link_cmd, extern_path);
     }
@@ -874,7 +927,7 @@ void compile_global(Compilation_Unit *compiler) {
     START_DECL(STYPE_GLOBAL);
 
     sym->as.global.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
-    sym->as.global.module_name = compiler->module.name;
+    sym->as.global.module_name = compiler->module->full_name;
 
     make_op(compiler, OP_GLOBAL, (int64_t)&sym->as.global);
 
@@ -942,9 +995,17 @@ void compile_decls(Compilation_Unit *compiler) {
         break;
     }
 
-    Hash_Entry *main = hashmap_get(&compiler->symbols, "main", 4);
-    if (main && main->val)
-        ((Symbol *)main->val)->as.func.module_name = (String_View){0};
+    Hash_Entry *main = hashmap_get(&compiler->module->symbols, "main", 4);
+    if (main && main->val) {
+        Symbol *main_sym = (Symbol *)main->val;
+        if (main_sym->type != STYPE_FUNC) {
+            compiler->global->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "main can only be a function\n");
+        }
+        else {
+            main_sym->as.func.module_name = (String_View){0};
+        }
+    }
 
     if (compiler->lexer->prev.type == TOK_EOF) return;
     if (compiler->lexer->cur.type != TOK_EOF) {
@@ -1006,7 +1067,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
     for (size_t i = 0; i < compiler->unresolved.count; i++) {
         Unresolved_Symbol unresolved = compiler->unresolved.items[i];
 
-        Hash_Entry *entry = hashmap_get(&compiler->symbols, unresolved.name.str, unresolved.name.len);
+        Hash_Entry *entry = hashmap_get(&compiler->module->symbols, unresolved.name.str, unresolved.name.len);
         if (!entry || !entry->key) {
             compiler->global->had_error = 1;
             eprintf(compiler->lexer->file_path, unresolved.loc, LEVEL_ERR, "Unknown symbol %.*s\n", SV_ARG(unresolved.name));
@@ -1062,110 +1123,173 @@ void resolve_symbols(Compilation_Unit *compiler) {
     }
 }
 
+void compile_module_name(Compilation_Unit *compiler) {
+    lexer_next(compiler->lexer);
+    expect(compiler, TOK_WORD);
+
+    Token *prev = &compiler->lexer->prev;
+    const char *full_name = prev->start;
+
+    while (compiler->lexer->cur.type == TOK_SCOPE) {
+        Hashmap *parent_symbols = compiler->module->parent == NULL ? &compiler->global->modules : &compiler->module->parent->symbols;
+        Hash_Entry *entry = hashmap_get(parent_symbols, prev->start, prev->len);
+        if (!entry || !entry->key) {
+            Symbol *module = arena_calloc(&compiler->global->arena, sizeof(Symbol));
+            module->type = STYPE_MODULE;
+            module->as.module.parent = compiler->module->parent;
+            module->as.module.status = STATUS_RESOLVED;
+
+            hashmap_add(parent_symbols, prev->start, prev->len, module);
+        }
+        compiler->module->parent = &((Symbol *)entry->val)->as.module;
+        lexer_next(compiler->lexer);
+        expect(compiler, TOK_WORD);
+    }
+
+    compiler->module->full_name = (String_View){ .len = (prev->start + prev->len) - full_name, .str = full_name };
+    compiler->module->name = (String_View){ .len = prev->len, .str = prev->start };
+}
+
+Symbol *get_module_in_module(Compilation_Unit *compiler, Hashmap **parent) {
+    Token *prev = &compiler->lexer->prev;
+    if (prev->type != TOK_WORD) {
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Expected word. Please report this as a bug\n");
+        return NULL;
+    }
+
+    Hash_Entry *entry;
+    Symbol *sym;
+    for (; ;) {
+        entry = hashmap_get(*parent, prev->start, prev->len);
+        if (!entry || !entry->key)
+            return NULL;
+
+        sym = (Symbol *)entry->val;
+        if (sym->type != STYPE_MODULE) {
+            compiler->global->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "Not a module\n");
+            return sym;
+        }
+        if (compiler->lexer->cur.type != TOK_SCOPE) break;
+
+        *parent = &sym->as.module.symbols;
+
+        lexer_next(compiler->lexer);
+        expect(compiler, TOK_WORD);
+    }
+    return sym;
+}
+
+Symbol *compile_module(Compiler *global, char *src, const char *file_path);
+
+void resolve_imports(Compilation_Unit *compiler) {
+    while (compiler->lexer->cur.type == TOK_IMPORT) {
+        lexer_next(compiler->lexer);
+        expect(compiler, TOK_WORD);
+
+        if (compiler->lexer->prev.len == 3 && strncmp(compiler->lexer->prev.start, "std", 3) == 0) {
+            if (compiler->lexer->cur.type != TOK_SCOPE) {
+                compiler->global->had_error = 1;
+                COMPILER_EPRINTF(LEVEL_ERR, "Cannot import std. Please specify a module in std\n");
+                continue;
+            }
+            lexer_next(compiler->lexer);
+            expect(compiler, TOK_WORD);
+
+            size_t path_len = compiler->lexer->prev.len + compiler->global->options.compiler_dir.len + 11;
+            char *path = arena_calloc(&compiler->global->arena, path_len);
+            snprintf(path, path_len, "%.*s/std/%.*s.alng", SV_ARG(compiler->global->options.compiler_dir), compiler->lexer->prev.len, compiler->lexer->prev.start);
+
+            char *contents = open_file(path);
+            if (!contents) {
+                COMPILER_EPRINTF(LEVEL_ERR, "Could not read file %s: %s\n", path, strerror(errno));
+                exit(1);
+            }
+
+            Symbol *sym = compile_module(compiler->global, contents, path);
+            hashmap_add(&compiler->module->symbols, sym->as.module.full_name.str, sym->as.module.full_name.len, sym);
+            continue;
+        }
+
+        Hashmap *module_symbols = &compiler->global->modules;
+        Symbol *module = get_module_in_module(compiler, &module_symbols);
+        if (module && module->as.module.status == STATUS_UNRESOLVED) {
+            compiler->global->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "Module is recursive\n");
+            continue;
+        }
+
+        while (!module) {
+            compiler->global->file++;
+            if (compiler->global->file >= compiler->global->options.input_file_count) {
+                compiler->global->had_error = 1;
+                COMPILER_EPRINTF(LEVEL_ERR, "Module does not exist\n");
+                break;
+            }
+
+            char *input_file_path = compiler->global->options.input_files[compiler->global->file];
+
+            char *contents = open_file(input_file_path);
+            if (!contents) {
+                COMPILER_EPRINTF(LEVEL_ERR, "Could not read file %s: %s\n", input_file_path, strerror(errno));
+                exit(1);
+            }
+            compile_module(compiler->global, contents, input_file_path);
+
+            module = get_module_in_module(compiler, &module_symbols);
+        }
+        if (!module) continue;
+        hashmap_add(&compiler->module->symbols, module->as.module.full_name.str, module->as.module.full_name.len, module);
+    }
+}
+
 Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
     Lexer lexer;
     init_lexer(&lexer, src, file_path);
 
     Compilation_Unit unit;
-    init_compilation_unit(&unit, &lexer, global);
+    Symbol *module_sym = init_compilation_unit(&unit, &lexer, global);
 
-    char *obj_name = arena_calloc(&global->arena, unit.module.name.len + 3);
-    snprintf(obj_name, unit.module.name.len + 3, "%.*s.o", SV_ARG(unit.module.name));
-
-    DA_APPEND(&global->options.link_cmd, obj_name);
-    if (!global->options.emit_obj)
-        DA_APPEND(&global->cleanup, obj_name);
+    char *obj_name = arena_calloc(&global->arena, unit.module->name.len + 3);
+    snprintf(obj_name, unit.module->name.len + 3, "%.*s.o", SV_ARG(unit.module->name));
 
     lexer_next(&lexer);
-    if (lexer.cur.type == TOK_EOF) {
+    if (lexer.cur.type == TOK_EOF)
         eprintf(lexer.file_path, lexer.cur.loc, LEVEL_WARN, "Empty file\n");
-    }
-    else if (lexer.cur.type == TOK_MODULE) {
-        lexer_next(&lexer);
-        expect(&unit, TOK_WORD);
-        unit.module.name = (String_View){ .len = lexer.prev.len, .str = lexer.prev.start };
-    }
+    else if (lexer.cur.type == TOK_MODULE)
+        compile_module_name(&unit);
+    else if (!validate_module_name(&unit))
+        return NULL;
 
-    Hash_Entry *entry = hashmap_get(&global->modules, unit.module.name.str, unit.module.name.len);
+    Hashmap *parent_symbols = unit.module->parent == NULL ? &global->modules : &unit.module->parent->symbols;
+    Hash_Entry *entry = hashmap_get(parent_symbols, unit.module->name.str, unit.module->name.len);
     if (entry && entry->key) {
         global->had_error = 1;
         eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "A module with that name already exists\n");
         return (Symbol *)entry->val;
     }
 
-    Symbol *module_sym = arena_calloc(&global->arena, sizeof(Symbol));
-    module_sym->type = STYPE_MODULE;
-    hashmap_add(&global->modules, unit.module.name.str, unit.module.name.len, module_sym);
+    DA_APPEND(&global->options.link_cmd, obj_name);
+    if (!global->options.emit_obj)
+        DA_APPEND(&global->cleanup, obj_name);
 
-    module_sym->as.module.status = STATUS_UNRESOLVED;
-    while (lexer.cur.type == TOK_IMPORT) {
-        lexer_next(&lexer);
-
-        lexer_next(&lexer);
-        if (lexer.prev.type == TOK_WORD) {
-            char *path = arena_calloc(&global->arena, lexer.prev.len + global->options.compiler_dir.len + 11);
-            snprintf(path, lexer.prev.len + global->options.compiler_dir.len + 11, "%.*s/std/%.*s.alng",
-                     SV_ARG(global->options.compiler_dir), lexer.prev.len, lexer.prev.start);
-
-            char *contents = open_file(path);
-            if (!contents) {
-                eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Could not read file %s for module %.*s: %s\n",
-                        path, lexer.prev.len, lexer.prev.start, strerror(errno));
-                exit(1);
-            }
-
-            Symbol *sym = compile_module(global, contents, path);
-            hashmap_add(&unit.symbols, sym->as.module.name.str, sym->as.module.name.len, sym);
-        }
-        else if (lexer.prev.type == TOK_STR_LIT) {
-            Hash_Entry *entry = hashmap_get(&global->modules, lexer.prev.start, lexer.prev.len);
-
-            Symbol *module = (entry && entry->key) ? (Symbol *)entry->val : NULL;
-            if (module && module->as.module.status == STATUS_UNRESOLVED) {
-                global->had_error = 1;
-                eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Module is recursive\n");
-                continue;
-            }
-
-            while (!module) {
-                global->file++;
-                if (global->file >= global->options.input_file_count) {
-                    global->had_error = 1;
-                    eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Module does not exist\n");
-                    break;
-                }
-
-                char *input_file_path = global->options.input_files[global->file];
-
-                char *contents = open_file(input_file_path);
-                if (!contents) {
-                    eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "Could not read file %s for module %.*s: %s\n",
-                            input_file_path, lexer.prev.len, lexer.prev.start, strerror(errno));
-                    exit(1);
-                }
-                module = compile_module(global, contents, input_file_path);
-            }
-            if (!module) continue;
-            hashmap_add(&unit.symbols, entry->key, entry->key_len, module);
-        }
-        else {
-            eprintf(unit.lexer->file_path, unit.lexer->prev.loc, LEVEL_ERR, "Expected word or string, got %s\n", tok_spelling(lexer.prev.type));
-        }
-    }
+    entry = hashmap_add(parent_symbols, unit.module->name.str, unit.module->name.len, module_sym);
+    unit.module->status = STATUS_UNRESOLVED;
+    resolve_imports(&unit);
 
     compile_decls(&unit);
 
     resolve_symbols(&unit);
     resolve_types(&unit);
 
-    module_sym->as.module = unit.module;
-    module_sym->as.module.status = STATUS_RESOLVED;
+    unit.module->status = STATUS_RESOLVED;
 
     if (!global->had_error && !global->options.debug)
         global->had_error = type_check(&unit.ops);
 
     if (!global->had_error && !global->options.print_ir) {
-        Hash_Entry *main = hashmap_get(&unit.symbols, "main", 4);
+        Hash_Entry *main = hashmap_get(&unit.module->symbols, "main", 4);
         char *output_asm = generate_x86_64(&unit.ops, obj_name, main != NULL && main->key != NULL);
         if (!output_asm) global->had_error = 1;
 
@@ -1182,8 +1306,6 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
         print_ops(&unit.ops);
 
     free(unit.ops.items);
-    free(unit.symbols.entries);
-
     return module_sym;
 }
 
@@ -1218,11 +1340,15 @@ void compile(Compiler_Options options) {
         compiler.file++;
     }
 
-    Hash_Entry *io = hashmap_get(&compiler.modules, "io", 2);
-    if (!io || !io->key) {
-        char *path = arena_calloc(&compiler.arena, compiler.options.compiler_dir.len + 14);
-        snprintf(path, compiler.options.compiler_dir.len + 14, "%.*s/std/io_ext.o", SV_ARG(compiler.options.compiler_dir));
-        DA_APPEND(&compiler.options.link_cmd, path);
+    Hash_Entry *std = hashmap_get(&compiler.modules, "std", 3);
+    if (std && std->key) {
+        Symbol *std_sym = (Symbol *)std->val;
+        Hash_Entry *io = hashmap_get(&std_sym->as.module.symbols, "io", 2);
+        if (!io || !io->key) {
+            char *path = arena_calloc(&compiler.arena, compiler.options.compiler_dir.len + 14);
+            snprintf(path, compiler.options.compiler_dir.len + 14, "%.*s/std/io_ext.o", SV_ARG(compiler.options.compiler_dir));
+            DA_APPEND(&compiler.options.link_cmd, path);
+        }
     }
 
     if (!compiler.had_error && !compiler.options.emit_asm && !compiler.options.emit_obj && !compiler.options.debug && !compiler.options.print_ir)
