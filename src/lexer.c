@@ -32,6 +32,7 @@ static const char *tok_spellings[] = {
     "'['",       "']'",
     "'=>'",      "'+@'",
     "'+=>'",     "'.@'",
+    "'='",
 
     "mod",     "and",
     "or",      "xor",
@@ -40,8 +41,7 @@ static const char *tok_spellings[] = {
     "not",     "swap",
     "lt",      "lteq",
     "gt",      "gteq",
-    "eq",      "neq",
-    "if",
+    "neq",
 
     "dup",     "over",
     "dup2",    "over2",
@@ -57,6 +57,7 @@ static const char *tok_spellings[] = {
     "ldrop",   "sizeof",
     "global",  "union",
     "drop",    "module",
+    "if",      "eq",
 
     "i8",      "u8",
     "i16",     "u16",
@@ -643,7 +644,7 @@ void lexer_next(Lexer *lexer) {
             make_token(lexer, TOK_STORE);
         }
         else {
-            make_token(lexer, TOK_EQ);
+            make_token(lexer, TOK_EQUALS);
         }
         break;
     case 'E':

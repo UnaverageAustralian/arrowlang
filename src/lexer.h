@@ -29,6 +29,7 @@ typedef enum {
     TOK_LBRACKET,  TOK_RBRACKET,
     TOK_STORE,     TOK_ADD_AT,
     TOK_ADD_STORE, TOK_DOT_AT,
+    TOK_EQUALS,
 
     // Symbols/Words
     TOK_MOD,       TOK_AND,
@@ -38,8 +39,7 @@ typedef enum {
     TOK_NOT,       TOK_SWAP,
     TOK_LT,        TOK_LTEQ,
     TOK_GT,        TOK_GTEQ,
-    TOK_EQ,        TOK_NEQ,
-    TOK_IF,
+    TOK_NEQ,
 
     // Words
     TOK_DUP,       TOK_OVER,
@@ -56,6 +56,7 @@ typedef enum {
     TOK_LDROP,     TOK_SIZEOF,
     TOK_GLOBAL,    TOK_UNION,
     TOK_DROP,      TOK_MODULE,
+    TOK_IF,        TOK_EQ,
     // Types
     TOK_I8,        TOK_U8,
     TOK_I16,       TOK_U16,

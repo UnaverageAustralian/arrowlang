@@ -1,0 +1,7 @@
+module attributes
+
+import modules::funcs
+
+$main ( -> u8 )
+    modules::funcs::private
+$

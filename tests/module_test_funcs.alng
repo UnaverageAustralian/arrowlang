@@ -9,3 +9,8 @@ $addmul ( f32 f32 -> ptr[f32] )
     swap over + *
     alloc f32 swap =>
 $
+
+@(private)
+$private ( -> u8 )
+    2
+$

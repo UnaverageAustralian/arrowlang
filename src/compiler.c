@@ -24,11 +24,11 @@
         if (compiler->lexer->prev.type == TOK_EOF) return;            \
         sym = arena_calloc(&compiler->global->arena, sizeof(Symbol)); \
         sym->type = sym_type;                                         \
-        sym->visible = 1;                                             \
+        sym->attributes = compiler->attributes;                       \
         add_symbol(compiler, sym);                                    \
     } while (0)
 
-const char *opcodes[] = {
+static const char *opcodes[] = {
     "NOP",
     "PUSH",        "ADD",
     "SUB",         "MUL",
@@ -67,7 +67,7 @@ const char *opcodes[] = {
 };
 static_assert(sizeof(opcodes)/sizeof(const char *)-1 == OP_LAST, "Update opcodes table in compiler");
 
-Opcode tok_to_opcode[] = {
+static Opcode tok_to_opcode[] = {
     OP_NOP,
     OP_PUSH,        OP_PUSH,
     OP_PUSH,        OP_STR,
@@ -86,6 +86,8 @@ Opcode tok_to_opcode[] = {
     OP_NOP,         OP_NOP,
     OP_PTR_STORE,   OP_INDEX,
     OP_INDEX_STORE, OP_PTR_ACCESS_DROP,
+    OP_EQ,
+
     OP_MOD,         OP_AND,
     OP_OR,          OP_XOR,
     OP_SHL,         OP_SHR,
@@ -93,8 +95,7 @@ Opcode tok_to_opcode[] = {
     OP_NOT,         OP_SWAP,
     OP_LT,          OP_LTEQ,
     OP_GT,          OP_GTEQ,
-    OP_EQ,          OP_NEQ,
-    OP_NOP,
+    OP_NEQ,
 
     OP_DUP,         OP_OVER,
     OP_DUP2,        OP_OVER2,
@@ -110,6 +111,7 @@ Opcode tok_to_opcode[] = {
     OP_LDROP,       OP_SIZEOF,
     OP_NOP,         OP_INIT,
     OP_DROP,        OP_NOP,
+    OP_NOP,         OP_EQ,
 
     OP_CONVERT,     OP_CONVERT,
     OP_CONVERT,     OP_CONVERT,
@@ -122,6 +124,12 @@ Opcode tok_to_opcode[] = {
     OP_NOP,
 };
 static_assert(sizeof(tok_to_opcode)/sizeof(Opcode)-1 == TOK_LAST, "Update tok_to_opcode table in compiler");
+
+static const char *attributes[] = {
+    "private",
+    "link",
+};
+static_assert(sizeof(attributes)/sizeof(const char *)-1 == ATTR_LAST, "Update attributes table in compiler");
 
 String_View strip_file_path(const char *path) {
     String_View stripped = { .len = 0, .str = path };
@@ -175,7 +183,6 @@ Symbol *init_compilation_unit(Compilation_Unit *unit, Lexer *lexer, Compiler *gl
 
     Symbol *module = arena_calloc(&global->arena, sizeof(Symbol));
     module->type = STYPE_MODULE;
-    module->visible = 1;
 
     unit->module = &module->as.module;
     unit->module->name = strip_file_path(lexer->file_path);
@@ -510,7 +517,7 @@ Hash_Entry *get_entry_in_module(Compilation_Unit *compiler) {
     }
 
     Symbol *sym = (Symbol *)entry->val;
-    if (!sym->visible) {
+    if (sym->attributes.private) {
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Private symbol %.*s in module %.*s\n", prev->len, prev->start, SV_ARG(full_name));
         return NULL;
@@ -799,7 +806,7 @@ Hash_Entry *compile_function_signature(Compilation_Unit *compiler) {
 
     Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     sym->type = STYPE_FUNC;
-    sym->visible = 1;
+    sym->attributes = compiler->attributes;
     sym->as.func.module_name = compiler->module->full_name;
 
     Hash_Entry *entry = add_symbol(compiler, sym);
@@ -849,15 +856,6 @@ void compile_external_function(Compilation_Unit *compiler, uint8_t is_c_func) {
     }
     else {
         func->extern_name = (String_View){ .len = entry->key_len, .str = entry->key };
-    }
-
-    if (!compiler->module->has_ext_funcs) {
-        compiler->module->has_ext_funcs = 1;
-        char *extern_path = arena_calloc(&compiler->global->arena, compiler->module->path.len + compiler->module->name.len + 7);
-        snprintf(extern_path, compiler->module->path.len + compiler->module->name.len + 7, "%.*s%.*s_ext.o",
-                 SV_ARG(compiler->module->path), SV_ARG(compiler->module->name));
-        if (access(extern_path, F_OK) == 0)
-            DA_APPEND(&compiler->global->options.link_cmd, extern_path);
     }
 }
 
@@ -961,9 +959,50 @@ void compile_macro(Compilation_Unit *compiler) {
     }
 }
 
+void compile_attributes(Compilation_Unit *compiler) {
+    lexer_next(compiler->lexer);
+    expect(compiler, TOK_LPAREN);
+    while (compiler->lexer->cur.type == TOK_WORD) {
+        lexer_next(compiler->lexer);
+        Token *prev = &compiler->lexer->prev;
+
+        int i;
+        for (i = 0; i < ATTR_LAST+1; i++)
+            if (strncmp(attributes[i], prev->start, prev->len) == 0)
+                break;
+        if (i == ATTR_LAST+1) {
+            compiler->global->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "%.*s is not an attribute\n", prev->len, prev->start);
+            break;
+        }
+
+        switch (i) {
+        case ATTR_PRIVATE:
+            compiler->attributes.private = 1;
+            break;
+        case ATTR_LINK: {
+            expect(compiler, TOK_EQUALS);
+            expect(compiler, TOK_STR_LIT);
+
+            size_t link_path_len = compiler->module->path.len + strlen(prev->as.str);
+            char *link_path = arena_calloc(&compiler->global->arena, link_path_len+1);
+            snprintf(link_path, link_path_len+1, "%.*s%s", SV_ARG(compiler->module->path), prev->as.str);
+
+            DA_APPEND(&compiler->global->options.link_cmd, link_path);
+            break;
+        }
+        }
+    }
+    expect(compiler, TOK_RPAREN);
+}
+
 void compile_decls(Compilation_Unit *compiler) {
     for (; ;) {
         if (compiler->lexer->prev.type == TOK_EOF) break;
+
+        compiler->attributes = (Attributes){0};
+        while (compiler->lexer->cur.type == TOK_AT)
+            compile_attributes(compiler);
 
         switch (compiler->lexer->cur.type) {
         case TOK_FUNC:

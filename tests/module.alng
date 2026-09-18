@@ -1,11 +1,11 @@
 module modules
 
-import std::std::errors
+import std::errors
 import modules::funcs
 
 $verify ( -> u8 )
-    2.0 3.0 funcs::addmul .@ 15.0 = "2.0 +* 3.0 = 15.0" std::std::errors::assert
-    6.0 3.0 funcs::subdiv .@ 1.0  = "6.0 -/ 3.0 = 1.0"  std::std::errors::assert |
+    2.0 3.0 funcs::addmul .@ 15.0 = "2.0 +* 3.0 = 15.0" std::errors::assert
+    6.0 3.0 funcs::subdiv .@ 1.0  = "6.0 -/ 3.0 = 1.0"  std::errors::assert |
 $
 
 $main ( -> u8 )

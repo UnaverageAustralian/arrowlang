@@ -1,5 +1,7 @@
 module std::io
 
+@(link="io_ext.o")
+
 E$printc ( char -> )
 E$prints ( str -> )
 E$print  ( i64 -> )

@@ -58,6 +58,12 @@ typedef enum {
     UTYPE_OP, UTYPE_TYPE,
 } Unresolved_Type;
 
+typedef enum {
+    ATTR_PRIVATE,
+    ATTR_LINK,
+    ATTR_LAST = ATTR_LINK,
+} Attr_Type;
+
 typedef struct {
     String_View compiler_dir;
     char **input_files;
@@ -120,7 +126,6 @@ struct Module {
     String_View full_name;
     Hashmap symbols;
     Resolve_Status status;
-    uint8_t has_ext_funcs;
 };
 
 typedef struct {
@@ -156,8 +161,12 @@ typedef struct {
 } Globals;
 
 typedef struct {
+    uint8_t private : 1;
+} Attributes;
+
+typedef struct {
     Symbol_Type type;
-    uint8_t visible;
+    Attributes attributes;
     union {
         Function func;
         Module module;
@@ -187,6 +196,7 @@ typedef struct {
     Backpatchees conts;
     Backpatchees rets;
     int label_count;
+    Attributes attributes;
     uint8_t is_in_loop;
 } Compilation_Unit;
 
