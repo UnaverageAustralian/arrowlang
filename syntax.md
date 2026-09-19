@@ -132,19 +132,22 @@ You can return early from a function with `return`.
 
 ## Modules
 
-Modules are imported using `import`. You can either import standard library modules by putting a word after it (`import io`), or a local module by putting a string after it (`import "foo"`).
+Modules are imported using `import`, followed by the module you want to import.
 
-The standard library modules are:
+Every file is a module, by default a module is named after the file that contains it. But, you can change the name given to the module by putting `module` followed by the new name at the start of the file.
+
+Modules can also contain other modules.
+
+All standard library modules are contained within the `std` module, they are:
 `io`     - For input-output functions (but no input yet).
 `errors` - Only has the assert function, which asserts that a condition is true.
 
-Here is an example using the `io` module:
+Here is an example using the `std::io` module:
 ```
- import io
+ import std::io
 
  $main ( -> u8 )
-    71 io::printc // Prints the character G to the io buffer
-    io::flush     // Flushes the io buffer
+    71 std::io::printc // Prints the character 'G'
  $
 ```
 
@@ -229,14 +232,14 @@ Unions are like structs, except every field overlaps each other at the start. Th
 
 ## Groupings
 
-Groupings are started with `(` and ended with `)`. Groupings only serve to make code more readable and don't change its behaviour.
+Groupings are started with `(` and ended with `)`. They only serve to make code more readable and don't change its behaviour.
 ```
  (2 3) + // Same as 2 3 +
 ```
 
 ## Constants
 
-Compile-type constants are declared with `const`. Constants can only be set to integer literals, real literals, or character literals.
+Compile-type constants are declared with `const`. Constants can only be set to literals.
 ```
  const x 10.5
  const y 20.2
