@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "types.h"
 #include "utils.h"
+#include <stdint.h>
 
 #define MAX_BACKPATCHEES 256
 
@@ -59,10 +60,18 @@ typedef enum {
 } Unresolved_Type;
 
 typedef enum {
+    DIR_START, DIR_END,
+    DIR_LINK,
+
+    DIR_LAST = DIR_LINK,
+} Directive_Type;
+
+typedef enum {
     ATTR_PRIVATE,
-    ATTR_LINK,
-    ATTR_LAST = ATTR_LINK,
-} Attr_Type;
+    ATTR_INIT, ATTR_FINI,
+
+    ATTR_LAST = ATTR_FINI,
+} Attribute_Type;
 
 typedef struct {
     String_View compiler_dir;
@@ -160,8 +169,13 @@ typedef struct {
     Global *items;
 } Globals;
 
-typedef struct {
-    uint8_t private : 1;
+typedef union {
+    struct {
+        uint8_t private : 1;
+        uint8_t init : 1;
+        uint8_t fini : 1;
+    };
+    uint64_t value;
 } Attributes;
 
 typedef struct {
@@ -196,7 +210,8 @@ typedef struct {
     Backpatchees conts;
     Backpatchees rets;
     int label_count;
-    Attributes attributes;
+    Attributes global_attrs;
+    Attributes sym_attrs;
     uint8_t is_in_loop;
 } Compilation_Unit;
 

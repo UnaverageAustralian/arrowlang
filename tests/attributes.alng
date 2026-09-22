@@ -2,6 +2,11 @@ module attributes
 
 import modules::funcs
 
+@(fini)
+struct Foo
+    x : i32
+end
+
 $main ( -> u8 )
     modules::funcs::private
 $

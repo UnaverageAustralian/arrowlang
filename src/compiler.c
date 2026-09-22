@@ -17,15 +17,20 @@
 #define COMPILER_EPRINTF(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->prev.loc, level, __VA_ARGS__); 
 #define COMPILER_EPRINTF_AT_CUR(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->cur.loc, level, __VA_ARGS__);
 
-#define START_DECL(sym_type)                                          \
-    do {                                                              \
-        lexer_next(compiler->lexer);                                  \
-        expect(compiler, TOK_WORD);                                   \
-        if (compiler->lexer->prev.type == TOK_EOF) return;            \
-        sym = arena_calloc(&compiler->global->arena, sizeof(Symbol)); \
-        sym->type = sym_type;                                         \
-        sym->attributes = compiler->attributes;                       \
-        add_symbol(compiler, sym);                                    \
+#define START_DECL(sym_type)                                                                                      \
+    do {                                                                                                          \
+        Attributes sym_attrs = (Attributes){ .value = compiler->global_attrs.value | compiler->sym_attrs.value }; \
+        if (sym_attrs.value & ~valid.value) {                                                                     \
+            compiler->global->had_error = 1;                                                                      \
+            COMPILER_EPRINTF(LEVEL_ERR, "Symbol has invalid attributes\n");                                       \
+        }                                                                                                         \
+        lexer_next(compiler->lexer);                                                                              \
+        expect(compiler, TOK_WORD);                                                                               \
+        if (compiler->lexer->prev.type == TOK_EOF) return;                                                        \
+        sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));                                             \
+        sym->type = sym_type;                                                                                     \
+        sym->attributes = sym_attrs;                                                                              \
+        add_symbol(compiler, sym);                                                                                \
     } while (0)
 
 static const char *opcodes[] = {
@@ -125,9 +130,15 @@ static Opcode tok_to_opcode[] = {
 };
 static_assert(sizeof(tok_to_opcode)/sizeof(Opcode)-1 == TOK_LAST, "Update tok_to_opcode table in compiler");
 
+static const char *directives[] = {
+    "start", "end",
+    "link",
+};
+static_assert(sizeof(directives)/sizeof(const char *)-1 == DIR_LAST, "Update attributes table in compiler");
+
 static const char *attributes[] = {
     "private",
-    "link",
+    "init", "fini",
 };
 static_assert(sizeof(attributes)/sizeof(const char *)-1 == ATTR_LAST, "Update attributes table in compiler");
 
@@ -806,7 +817,7 @@ Hash_Entry *compile_function_signature(Compilation_Unit *compiler) {
 
     Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     sym->type = STYPE_FUNC;
-    sym->attributes = compiler->attributes;
+    sym->attributes = (Attributes){ .value = compiler->global_attrs.value | compiler->sym_attrs.value };
     sym->as.func.module_name = compiler->module->full_name;
 
     Hash_Entry *entry = add_symbol(compiler, sym);
@@ -879,6 +890,7 @@ void compile_struct_fields(Compilation_Unit *compiler, Struct *structure) {
 
 void compile_struct(Compilation_Unit *compiler, Type_Kind type) {
     Symbol *sym;
+    Attributes valid = { .private = 1 };
     START_DECL(STYPE_TYPE);
 
     DA_APPEND(&compiler->types, (Advanced_Type){0});
@@ -893,6 +905,7 @@ void compile_struct(Compilation_Unit *compiler, Type_Kind type) {
 
 void compile_const(Compilation_Unit *compiler) {
     Symbol *sym;
+    Attributes valid = { .private = 1 };
     START_DECL(STYPE_CONST);
 
     lexer_next(compiler->lexer);
@@ -922,6 +935,7 @@ void compile_const(Compilation_Unit *compiler) {
 
 void compile_global(Compilation_Unit *compiler) {
     Symbol *sym;
+    Attributes valid = { .private = 1 };
     START_DECL(STYPE_GLOBAL);
 
     sym->as.global.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
@@ -938,6 +952,7 @@ void compile_global(Compilation_Unit *compiler) {
 
 void compile_macro(Compilation_Unit *compiler) {
     Symbol *sym;
+    Attributes valid = { .private = 1 };
     START_DECL(STYPE_MACRO);
 
     compile_signature(compiler, &sym->as.func.param_types, &sym->as.func.return_types);
@@ -959,15 +974,15 @@ void compile_macro(Compilation_Unit *compiler) {
     }
 }
 
-void compile_attributes(Compilation_Unit *compiler) {
-    lexer_next(compiler->lexer);
+void compile_attributes(Compilation_Unit *compiler, Attributes *attrs) {
+    Token *prev = &compiler->lexer->prev;
+
     expect(compiler, TOK_LPAREN);
     while (compiler->lexer->cur.type == TOK_WORD) {
         lexer_next(compiler->lexer);
-        Token *prev = &compiler->lexer->prev;
 
-        int i;
-        for (i = 0; i < ATTR_LAST+1; i++)
+        Attribute_Type i;
+        for (i = 0; i <= ATTR_LAST; i++)
             if (strncmp(attributes[i], prev->start, prev->len) == 0)
                 break;
         if (i == ATTR_LAST+1) {
@@ -978,31 +993,77 @@ void compile_attributes(Compilation_Unit *compiler) {
 
         switch (i) {
         case ATTR_PRIVATE:
-            compiler->attributes.private = 1;
+            if (attrs->private)
+                COMPILER_EPRINTF(LEVEL_WARN, "Symbol is already private\n");
+            attrs->private = 1;
             break;
-        case ATTR_LINK: {
-            expect(compiler, TOK_EQUALS);
-            expect(compiler, TOK_STR_LIT);
-
-            size_t link_path_len = compiler->module->path.len + strlen(prev->as.str);
-            char *link_path = arena_calloc(&compiler->global->arena, link_path_len+1);
-            snprintf(link_path, link_path_len+1, "%.*s%s", SV_ARG(compiler->module->path), prev->as.str);
-
-            DA_APPEND(&compiler->global->options.link_cmd, link_path);
+        case ATTR_INIT:
+            if (attrs->init)
+                COMPILER_EPRINTF(LEVEL_WARN, "Function is already an init function\n");
+            attrs->init = 1;
             break;
-        }
+        case ATTR_FINI:
+            if (attrs->fini)
+                COMPILER_EPRINTF(LEVEL_WARN, "Function is already a final function\n");
+            attrs->fini = 1;
+            break;
         }
     }
     expect(compiler, TOK_RPAREN);
 }
 
+void compile_directive(Compilation_Unit *compiler) {
+    lexer_next(compiler->lexer);
+    Token *prev = &compiler->lexer->prev;
+    if (compiler->lexer->cur.type == TOK_LPAREN) {
+        compile_attributes(compiler, &compiler->sym_attrs);
+        return;
+    }
+    expect(compiler, TOK_WORD);
+
+    Directive_Type i;
+    for (i = 0; i <= DIR_LAST; i++)
+        if (strncmp(directives[i], prev->start, prev->len) == 0)
+            break;
+    if (i == DIR_LAST+1) {
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "%.*s is not a directive\n", prev->len, prev->start);
+        return;
+    }
+
+    switch (i) {
+    case DIR_START:
+        compile_attributes(compiler, &compiler->global_attrs);
+        break;
+    case DIR_END: {
+        Attributes end = {0};
+        compile_attributes(compiler, &end);
+        if (~compiler->global_attrs.value & end.value) {
+            compiler->global->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "Can't end attributes that haven't been started\n");
+        }
+        compiler->global_attrs.value &= ~end.value;
+        break;
+    }
+    case DIR_LINK: {
+        expect(compiler, TOK_LPAREN);
+        expect(compiler, TOK_STR_LIT);
+
+        size_t link_path_len = compiler->module->path.len + strlen(prev->as.str);
+        char *link_path = arena_calloc(&compiler->global->arena, link_path_len+1);
+        snprintf(link_path, link_path_len+1, "%.*s%s", SV_ARG(compiler->module->path), prev->as.str);
+
+        DA_APPEND(&compiler->global->options.link_cmd, link_path);
+
+        expect(compiler, TOK_RPAREN);
+        return;
+    }
+    }
+}
+
 void compile_decls(Compilation_Unit *compiler) {
     for (; ;) {
         if (compiler->lexer->prev.type == TOK_EOF) break;
-
-        compiler->attributes = (Attributes){0};
-        while (compiler->lexer->cur.type == TOK_AT)
-            compile_attributes(compiler);
 
         switch (compiler->lexer->cur.type) {
         case TOK_FUNC:
@@ -1028,6 +1089,9 @@ void compile_decls(Compilation_Unit *compiler) {
             continue;
         case TOK_MACRO:
             compile_macro(compiler);
+            continue;
+        case TOK_AT:
+            compile_directive(compiler);
             continue;
         default: break;
         }
@@ -1377,17 +1441,6 @@ void compile(Compiler_Options options) {
         }
         compile_module(&compiler, contents, options.input_files[compiler.file]);
         compiler.file++;
-    }
-
-    Hash_Entry *std = hashmap_get(&compiler.modules, "std", 3);
-    if (std && std->key) {
-        Symbol *std_sym = (Symbol *)std->val;
-        Hash_Entry *io = hashmap_get(&std_sym->as.module.symbols, "io", 2);
-        if (!io || !io->key) {
-            char *path = arena_calloc(&compiler.arena, compiler.options.compiler_dir.len + 14);
-            snprintf(path, compiler.options.compiler_dir.len + 14, "%.*s/std/io_ext.o", SV_ARG(compiler.options.compiler_dir));
-            DA_APPEND(&compiler.options.link_cmd, path);
-        }
     }
 
     if (!compiler.had_error && !compiler.options.emit_asm && !compiler.options.emit_obj && !compiler.options.debug && !compiler.options.print_ir)
