@@ -191,10 +191,16 @@ typedef struct {
 } Symbol;
 
 typedef struct {
+    String_Builder on_start;
+    String_Builder on_exit;
+} Gen_Info;
+
+typedef struct {
     Arena arena;
     Compiler_Options options;
     Hashmap modules;
     String_Array cleanup;
+    Gen_Info gen_info;
     int file;
     uint8_t had_error;
 } Compiler;

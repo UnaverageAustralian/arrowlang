@@ -311,20 +311,9 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
     }
 }
 
-char *generate_x86_64(Ops *ops, char *output_file, int gen_start) {
+char *generate_x86_64(Ops *ops, Gen_Info *gen_info, char *output_file, int gen_start) {
     Generator gen;
     init_generator(&gen, ops);
-
-    if (gen_start) {
-        sb_appendf(&gen.sb, ".globl _start\n");
-        sb_appendf(&gen.sb, "_start:\n");
-        sb_appendf(&gen.sb, "    call \"main\"\n");
-        sb_appendf(&gen.sb, "    movq (%%rax), %%rbx\n");
-        sb_appendf(&gen.sb, "    call \"std::io::flush\"\n");
-        sb_appendf(&gen.sb, "    movq %%rbx, %%rdi\n");
-        sb_appendf(&gen.sb, "    movq $60, %%rax\n");
-        sb_appendf(&gen.sb, "    syscall\n");
-    }
 
     while (gen.pos < ops->count) {
         Op *op = &ops->items[gen.pos];
@@ -909,6 +898,33 @@ char *generate_x86_64(Ops *ops, char *output_file, int gen_start) {
             break;
         }
         gen.pos++;
+    }
+
+    if (gen_start) {
+        sb_appendf(&gen.sb, ".globl _start\n");
+        sb_appendf(&gen.sb, "_start:\n");
+        if (gen_info->on_start.items)
+            sb_appendf(&gen.sb, "    call \"on_start\"\n");
+        sb_appendf(&gen.sb, "    call \"main\"\n");
+        sb_appendf(&gen.sb, "    movq (%%rax), %%rbx\n");
+        if (gen_info->on_exit.items)
+            sb_appendf(&gen.sb, "    call \"on_exit\"\n");
+        sb_appendf(&gen.sb, "    movq %%rbx, %%rdi\n");
+        sb_appendf(&gen.sb, "    movq $60, %%rax\n");
+        sb_appendf(&gen.sb, "    syscall\n");
+
+        if (gen_info->on_start.items) {
+            sb_appendf(&gen.sb, ".globl on_start\n");
+            sb_appendf(&gen.sb, "on_start:\n");
+            sb_appendf(&gen.sb, "%s\n", gen_info->on_start.items);
+            sb_appendf(&gen.sb, "    ret\n");
+        }
+        if (gen_info->on_exit.items) {
+            sb_appendf(&gen.sb, ".globl on_exit\n");
+            sb_appendf(&gen.sb, "on_exit:\n");
+            sb_appendf(&gen.sb, "%s\n", gen_info->on_exit.items);
+            sb_appendf(&gen.sb, "    ret\n");
+        }
     }
 
     if (gen.strs.count > 0)

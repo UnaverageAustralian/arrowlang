@@ -15,6 +15,6 @@ typedef struct {
     int had_error;
 } Generator;
 
-char *generate_x86_64(Ops *ops, char *output_file, int gen_start);
+char *generate_x86_64(Ops *ops, Gen_Info *gen_info, char *output_file, int gen_start);
 
 #endif // ARROW_GEN_H

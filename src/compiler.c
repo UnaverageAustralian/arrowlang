@@ -17,22 +17,6 @@
 #define COMPILER_EPRINTF(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->prev.loc, level, __VA_ARGS__); 
 #define COMPILER_EPRINTF_AT_CUR(level, ...) eprintf(compiler->lexer->file_path, compiler->lexer->cur.loc, level, __VA_ARGS__);
 
-#define START_DECL(sym_type)                                                                                      \
-    do {                                                                                                          \
-        Attributes sym_attrs = (Attributes){ .value = compiler->global_attrs.value | compiler->sym_attrs.value }; \
-        if (sym_attrs.value & ~valid.value) {                                                                     \
-            compiler->global->had_error = 1;                                                                      \
-            COMPILER_EPRINTF(LEVEL_ERR, "Symbol has invalid attributes\n");                                       \
-        }                                                                                                         \
-        lexer_next(compiler->lexer);                                                                              \
-        expect(compiler, TOK_WORD);                                                                               \
-        if (compiler->lexer->prev.type == TOK_EOF) return;                                                        \
-        sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));                                             \
-        sym->type = sym_type;                                                                                     \
-        sym->attributes = sym_attrs;                                                                              \
-        add_symbol(compiler, sym);                                                                                \
-    } while (0)
-
 static const char *opcodes[] = {
     "NOP",
     "PUSH",        "ADD",
@@ -335,6 +319,24 @@ static int expect(Compilation_Unit *compiler, Token_Type type) {
         return 0;
     }
     return 1;
+}
+
+Hash_Entry *start_decl(Compilation_Unit *compiler, Symbol *sym, Symbol_Type type, Attributes valid) {
+    Attributes sym_attrs = (Attributes){ .value = compiler->global_attrs.value | compiler->sym_attrs.value };
+    if (sym_attrs.value & ~valid.value) {
+        compiler->global->had_error = 1;
+        COMPILER_EPRINTF(LEVEL_ERR, "Symbol has invalid attributes\n");
+    }
+
+    lexer_next(compiler->lexer);
+    expect(compiler, TOK_WORD);
+    if (compiler->lexer->prev.type == TOK_EOF) return NULL;
+
+    sym->type = type;
+    sym->attributes = sym_attrs;
+
+    compiler->sym_attrs = (Attributes){0};
+    return add_symbol(compiler, sym);
 }
 
 void compile_stmt(Compilation_Unit *compiler);
@@ -811,18 +813,25 @@ void compile_signature(Compilation_Unit *compiler, Types *param_types, Types *re
 }
 
 Hash_Entry *compile_function_signature(Compilation_Unit *compiler) {
-    lexer_next(compiler->lexer);
-    expect(compiler, TOK_WORD);
-    if (compiler->lexer->prev.type == TOK_EOF) return NULL;
-
     Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
-    sym->type = STYPE_FUNC;
-    sym->attributes = (Attributes){ .value = compiler->global_attrs.value | compiler->sym_attrs.value };
+    Attributes valid = { .private = 1, .init = 1, .fini = 1 };
+
+    Hash_Entry *entry = start_decl(compiler, sym, STYPE_FUNC, valid);
+    if (!entry) return NULL;
+
     sym->as.func.module_name = compiler->module->full_name;
+    sym->as.func.extern_name = (String_View){ .len = entry->key_len, .str = entry->key };
 
-    Hash_Entry *entry = add_symbol(compiler, sym);
+    if (sym->attributes.init) {
+        sb_appendf(&compiler->global->gen_info.on_start, sym->as.func.module_name.str ? "    call \"%.*s::%.*s\"\n" : "call \"%.*s\"\n",
+                SV_ARG(sym->as.func.module_name), SV_ARG(sym->as.func.extern_name));
+    }
+    if (sym->attributes.fini) {
+        sb_appendf(&compiler->global->gen_info.on_exit, sym->as.func.module_name.str ? "    call \"%.*s::%.*s\"\n" : "call \"%.*s\"\n",
+                SV_ARG(sym->as.func.module_name), SV_ARG(sym->as.func.extern_name));
+    }
+
     compile_signature(compiler, &sym->as.func.param_types, &sym->as.func.return_types);
-
     return entry;
 }
 
@@ -833,10 +842,6 @@ void compile_function(Compilation_Unit *compiler) {
     if (!entry) return;
 
     op->operand = (int64_t)entry;
-
-    Function *func = &((Symbol *)entry->val)->as.func;
-    func->extern_name = (String_View){ .len = entry->key_len, .str = entry->key };
-
     while (compiler->lexer->cur.type != TOK_FUNC && compiler->lexer->cur.type != TOK_EOF)
         compile_stmt(compiler);
 
@@ -889,9 +894,10 @@ void compile_struct_fields(Compilation_Unit *compiler, Struct *structure) {
 }
 
 void compile_struct(Compilation_Unit *compiler, Type_Kind type) {
-    Symbol *sym;
+    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     Attributes valid = { .private = 1 };
-    START_DECL(STYPE_TYPE);
+
+    if (!start_decl(compiler, sym, STYPE_TYPE, valid)) return;
 
     DA_APPEND(&compiler->types, (Advanced_Type){0});
     sym->as.type = &compiler->types.items[compiler->types.count-1];
@@ -904,9 +910,10 @@ void compile_struct(Compilation_Unit *compiler, Type_Kind type) {
 }
 
 void compile_const(Compilation_Unit *compiler) {
-    Symbol *sym;
+    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     Attributes valid = { .private = 1 };
-    START_DECL(STYPE_CONST);
+
+    if (!start_decl(compiler, sym, STYPE_TYPE, valid)) return;
 
     lexer_next(compiler->lexer);
     switch (compiler->lexer->prev.type) {
@@ -934,9 +941,10 @@ void compile_const(Compilation_Unit *compiler) {
 }
 
 void compile_global(Compilation_Unit *compiler) {
-    Symbol *sym;
+    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     Attributes valid = { .private = 1 };
-    START_DECL(STYPE_GLOBAL);
+
+    if (!start_decl(compiler, sym, STYPE_TYPE, valid)) return;
 
     sym->as.global.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
     sym->as.global.module_name = compiler->module->full_name;
@@ -951,9 +959,10 @@ void compile_global(Compilation_Unit *compiler) {
 }
 
 void compile_macro(Compilation_Unit *compiler) {
-    Symbol *sym;
+    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     Attributes valid = { .private = 1 };
-    START_DECL(STYPE_MACRO);
+
+    if (!start_decl(compiler, sym, STYPE_TYPE, valid)) return;
 
     compile_signature(compiler, &sym->as.func.param_types, &sym->as.func.return_types);
 
@@ -1019,7 +1028,7 @@ void compile_directive(Compilation_Unit *compiler) {
         compile_attributes(compiler, &compiler->sym_attrs);
         return;
     }
-    expect(compiler, TOK_WORD);
+    lexer_next(compiler->lexer);
 
     Directive_Type i;
     for (i = 0; i <= DIR_LAST; i++)
@@ -1393,7 +1402,7 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
 
     if (!global->had_error && !global->options.print_ir) {
         Hash_Entry *main = hashmap_get(&unit.module->symbols, "main", 4);
-        char *output_asm = generate_x86_64(&unit.ops, obj_name, main != NULL && main->key != NULL);
+        char *output_asm = generate_x86_64(&unit.ops, &global->gen_info, obj_name, main != NULL && main->key != NULL);
         if (!output_asm) global->had_error = 1;
 
         DA_APPEND(&global->cleanup, output_asm);
