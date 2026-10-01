@@ -111,8 +111,19 @@ typedef struct {
     int positions[MAX_BACKPATCHEES];
 } Backpatchees;
 
+typedef struct Module Module;
+struct Module {
+    Module *parent;
+    String_View path;
+    String_View name;
+    String_View full_name;
+    Hashmap symbols;
+    Resolve_Status status;
+};
+
 typedef struct {
     String_View name;
+    Module *module;
     Loc loc;
     Unresolved_Type type;
     union {
@@ -126,16 +137,6 @@ typedef struct {
     size_t capacity;
     Unresolved_Symbol *items;
 } Unresolved_Symbols;
-
-typedef struct Module Module;
-struct Module {
-    Module *parent;
-    String_View path;
-    String_View name;
-    String_View full_name;
-    Hashmap symbols;
-    Resolve_Status status;
-};
 
 typedef struct {
     Types param_types;
@@ -181,6 +182,7 @@ typedef union {
 typedef struct {
     Symbol_Type type;
     Attributes attributes;
+    Module *module;
     union {
         Function func;
         Module module;

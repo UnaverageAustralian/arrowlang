@@ -101,6 +101,7 @@ static Opcode tok_to_opcode[] = {
     OP_NOP,         OP_INIT,
     OP_DROP,        OP_NOP,
     OP_NOP,         OP_EQ,
+    OP_NOP,
 
     OP_CONVERT,     OP_CONVERT,
     OP_CONVERT,     OP_CONVERT,
@@ -297,16 +298,6 @@ Op *make_op_at_cur(Compilation_Unit *compiler, Opcode opcode, uint64_t operand) 
     return &compiler->ops.items[compiler->ops.count-1];
 }
 
-Unresolved_Symbol *make_unresolved(Compilation_Unit *compiler, Unresolved_Type type) {
-    Unresolved_Symbol sym = {
-        .name = { .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start },
-        .loc = compiler->lexer->prev.loc,
-        .type = type,
-    };
-    DA_APPEND(&compiler->unresolved, sym);
-    return &compiler->unresolved.items[compiler->unresolved.count-1];
-}
-
 static int expect(Compilation_Unit *compiler, Token_Type type) {
     lexer_next(compiler->lexer);
     if (compiler->lexer->prev.type == TOK_ERROR) {
@@ -334,6 +325,7 @@ Hash_Entry *start_decl(Compilation_Unit *compiler, Symbol *sym, Symbol_Type type
 
     sym->type = type;
     sym->attributes = sym_attrs;
+    sym->module = compiler->module;
 
     compiler->sym_attrs = (Attributes){0};
     return add_symbol(compiler, sym);
@@ -499,7 +491,7 @@ Advanced_Type *compile_anonymous_struct(Compilation_Unit *compiler) {
     return &compiler->types.items[compiler->types.count-1];
 }
 
-Hash_Entry *get_entry_in_module(Compilation_Unit *compiler) {
+Module *get_module(Compilation_Unit *compiler) {
     Token *prev = &compiler->lexer->prev;
     if (prev->type != TOK_WORD) {
         compiler->global->had_error = 1;
@@ -522,17 +514,41 @@ Hash_Entry *get_entry_in_module(Compilation_Unit *compiler) {
     }
 
     Symbol *module = (Symbol *)module_entry->val;
-    Hash_Entry *entry = hashmap_get(&module->as.module.symbols, prev->start, prev->len);
+    return &module->as.module;
+}
+
+Unresolved_Symbol *compile_symbol(Compilation_Unit *compiler, Unresolved_Type type) {
+    Token *prev = &compiler->lexer->prev;
+
+    Module *module = NULL;
+    if (compiler->lexer->cur.type == TOK_SCOPE)
+        module = get_module(compiler);
+
+    Unresolved_Symbol unresolved = {
+        .name = { .len = prev->len, .str = prev->start },
+        .module = module,
+        .loc = prev->loc,
+        .type = type,
+    };
+    DA_APPEND(&compiler->unresolved, unresolved);
+    return &compiler->unresolved.items[compiler->unresolved.count-1];
+}
+
+Hash_Entry *get_entry_in_module(Compilation_Unit *compiler) {
+    Token *prev = &compiler->lexer->prev;
+
+    Module *module = get_module(compiler);
+    Hash_Entry *entry = hashmap_get(&module->symbols, prev->start, prev->len);
     if (!entry || !entry->key) {
         compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Unknown symbol %.*s in module %.*s\n", prev->len, prev->start, SV_ARG(full_name));
+        COMPILER_EPRINTF(LEVEL_ERR, "Unknown symbol %.*s in module %.*s\n", prev->len, prev->start, SV_ARG(module->full_name));
         return NULL;
     }
 
     Symbol *sym = (Symbol *)entry->val;
     if (sym->attributes.private) {
         compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Private symbol %.*s in module %.*s\n", prev->len, prev->start, SV_ARG(full_name));
+        COMPILER_EPRINTF(LEVEL_ERR, "Private symbol %.*s in module %.*s\n", prev->len, prev->start, SV_ARG(module->full_name));
         return NULL;
     }
     return entry;
@@ -554,26 +570,9 @@ void get_type(Compilation_Unit *compiler, Type *type) {
     case TOK_F64:  *type = BASIC_TYPE(TYPE_F64);            break;
     case TOK_STR:  *type = PTR_TYPE(BASIC_TYPE(TYPE_CHAR)); break;
     case TOK_WORD: {
-        Hash_Entry *entry = hashmap_get(&compiler->module->symbols, prev->start, prev->len);
-        if (!entry || !entry->key) {
-            Unresolved_Symbol *unresolved = make_unresolved(compiler, UTYPE_TYPE);
-            unresolved->as.type = type;
-            break;
-        }
-        if (compiler->lexer->cur.type == TOK_SCOPE) {
-            entry = get_entry_in_module(compiler);
-            if (!entry) break;
-        }
-
-        Symbol *sym = (Symbol *)entry->val;
-        if (sym->type != STYPE_TYPE) {
-            compiler->global->had_error = 1;
-            COMPILER_EPRINTF(LEVEL_ERR, "%.*s is not a structure\n", entry->key_len, entry->key);
-            *type = BASIC_TYPE(TYPE_VOID);
-            break;
-        }
-
-        *type = ADVANCED_TYPE(TYPE_STRUCT, sym->as.type);
+        Unresolved_Symbol *unresolved = compile_symbol(compiler, UTYPE_TYPE);
+        if (!unresolved) break;
+        unresolved->as.type = type;
         break;
     }
     case TOK_STRUCT:
@@ -598,52 +597,6 @@ void get_type(Compilation_Unit *compiler, Type *type) {
         compiler->global->had_error = 1;
         COMPILER_EPRINTF(LEVEL_ERR, "Expected type, got %s\n", tok_spelling(prev->type));
         *type = BASIC_TYPE(TYPE_VOID);
-        break;
-    }
-}
-
-void compile_entry(Compilation_Unit *compiler, Hash_Entry *entry) {
-    if (compiler->lexer->cur.type == TOK_SCOPE) {
-        entry = get_entry_in_module(compiler);
-        if (!entry) return;
-    }
-    else if (!entry || !entry->key) {
-        Unresolved_Symbol *unresolved = make_unresolved(compiler, UTYPE_OP);
-        unresolved->as.op = compiler->ops.count;
-        make_op(compiler, OP_UNKNOWN, 0);
-        return;
-    }
-
-    Symbol *sym = (Symbol *)entry->val;
-    switch (sym->type) {
-    case STYPE_FUNC:
-        if (sym->as.func.is_c_func)
-            make_op(compiler, OP_CCALL, (int64_t)entry);
-        else
-            make_op(compiler, OP_CALL, (int64_t)entry);
-        break;
-    case STYPE_TYPE: {
-        Op *op = make_op(compiler, OP_INIT, 0);
-        op->types[0] = ADVANCED_TYPE(sym->as.type->kind, sym->as.type);
-        break;
-    }
-    case STYPE_CONST: {
-        Op *op = make_op(compiler, sym->as.constant.type.ptr_depth > 0 ? OP_STR : OP_PUSH, sym->as.constant.val);
-        op->types[0] = sym->as.constant.type;
-        break;
-    }
-    case STYPE_GLOBAL: {
-        Op *op = make_op(compiler, OP_PUSH_GLOBAL, (int64_t)&sym->as.global);
-        op->types[0] = sym->as.global.type;
-        break;
-    }
-    case STYPE_MACRO: {
-        make_op(compiler, OP_CALL_MACRO, (int64_t)entry);
-        break;
-    }
-    case STYPE_MODULE:
-        compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Expected scope symbol after module name\n");
         break;
     }
 }
@@ -708,8 +661,10 @@ void compile_stmt(Compilation_Unit *compiler) {
         op->operand = -1;
         break;
     case TOK_WORD: {
-        Hash_Entry *entry = hashmap_get(&compiler->module->symbols, tok->start, tok->len);
-        compile_entry(compiler, entry);
+        Unresolved_Symbol *unresolved = compile_symbol(compiler, UTYPE_OP);
+        if (!unresolved) break;
+        unresolved->as.op = compiler->ops.count;
+        make_op(compiler, OP_UNKNOWN, 0);
         break;
     }
     case TOK_STRUCT:
@@ -1179,7 +1134,8 @@ void resolve_symbols(Compilation_Unit *compiler) {
     for (size_t i = 0; i < compiler->unresolved.count; i++) {
         Unresolved_Symbol unresolved = compiler->unresolved.items[i];
 
-        Hash_Entry *entry = hashmap_get(&compiler->module->symbols, unresolved.name.str, unresolved.name.len);
+        Hash_Entry *entry = hashmap_get(unresolved.module ? &unresolved.module->symbols : &compiler->module->symbols,
+                unresolved.name.str, unresolved.name.len);
         if (!entry || !entry->key) {
             compiler->global->had_error = 1;
             eprintf(compiler->lexer->file_path, unresolved.loc, LEVEL_ERR, "Unknown symbol %.*s\n", SV_ARG(unresolved.name));
@@ -1207,7 +1163,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
                 break;
             case STYPE_MODULE:
                 compiler->global->had_error = 1;
-                COMPILER_EPRINTF(LEVEL_ERR, "Unreachable. Please report this as a bug.");
+                eprintf(compiler->lexer->file_path, unresolved.loc, LEVEL_ERR, "Unreachable. Please report this as a bug.");
                 break;
             case STYPE_GLOBAL:
                 op->opcode = OP_PUSH_GLOBAL;
@@ -1311,7 +1267,8 @@ void resolve_imports(Compilation_Unit *compiler) {
 
             size_t path_len = compiler->lexer->prev.len + compiler->global->options.compiler_dir.len + 11;
             char *path = arena_calloc(&compiler->global->arena, path_len);
-            snprintf(path, path_len, "%.*s/std/%.*s.alng", SV_ARG(compiler->global->options.compiler_dir), compiler->lexer->prev.len, compiler->lexer->prev.start);
+            snprintf(path, path_len, "%.*s/std/%.*s.alng", SV_ARG(compiler->global->options.compiler_dir), compiler->lexer->prev.len,
+                    compiler->lexer->prev.start);
 
             char *contents = open_file(path);
             if (!contents) {
@@ -1356,6 +1313,23 @@ void resolve_imports(Compilation_Unit *compiler) {
     }
 }
 
+void compile_uses(Compilation_Unit *compiler) {
+    Hashmap *module_symbols = &compiler->global->modules;
+    Symbol *module;
+
+    while (compiler->lexer->cur.type == TOK_USE) {
+        lexer_next(compiler->lexer);
+        expect(compiler, TOK_WORD);
+
+        module = get_module_in_module(compiler, &module_symbols);
+        for (size_t i = 0; i < module->as.module.symbols.capacity; i++) {
+            Hash_Entry entry = module->as.module.symbols.entries[i];
+            if (entry.key)
+                hashmap_add(&compiler->module->symbols, entry.key, entry.key_len, entry.val);
+        }
+    }
+}
+
 Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
     Lexer lexer;
     init_lexer(&lexer, src, file_path);
@@ -1376,19 +1350,16 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
 
     Hashmap *parent_symbols = unit.module->parent == NULL ? &global->modules : &unit.module->parent->symbols;
     Hash_Entry *entry = hashmap_get(parent_symbols, unit.module->name.str, unit.module->name.len);
-    if (entry && entry->key) {
-        global->had_error = 1;
-        eprintf(file_path, lexer.prev.loc, LEVEL_ERR, "A module with that name already exists\n");
-        return (Symbol *)entry->val;
-    }
+    if (entry && entry->key) return (Symbol *)entry->val;
 
     DA_APPEND(&global->options.link_cmd, obj_name);
     if (!global->options.emit_obj)
         DA_APPEND(&global->cleanup, obj_name);
 
     entry = hashmap_add(parent_symbols, unit.module->name.str, unit.module->name.len, module_sym);
-    unit.module->status = STATUS_UNRESOLVED;
+
     resolve_imports(&unit);
+    compile_uses(&unit);
 
     compile_decls(&unit);
 

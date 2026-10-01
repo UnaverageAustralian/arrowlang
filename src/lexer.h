@@ -57,6 +57,7 @@ typedef enum {
     TOK_GLOBAL,    TOK_UNION,
     TOK_DROP,      TOK_MODULE,
     TOK_IF,        TOK_EQ,
+    TOK_USE,
     // Types
     TOK_I8,        TOK_U8,
     TOK_I16,       TOK_U16,

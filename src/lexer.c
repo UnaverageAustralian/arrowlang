@@ -58,6 +58,7 @@ static const char *tok_spellings[] = {
     "global",  "union",
     "drop",    "module",
     "if",      "eq",
+    "use",
 
     "i8",      "u8",
     "i16",     "u16",
