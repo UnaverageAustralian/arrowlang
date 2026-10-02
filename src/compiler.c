@@ -1322,6 +1322,12 @@ void compile_uses(Compilation_Unit *compiler) {
         expect(compiler, TOK_WORD);
 
         module = get_module_in_module(compiler, &module_symbols);
+        if (!module) {
+            compiler->global->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "Module doesn't exist\n");
+            break;
+        }
+
         for (size_t i = 0; i < module->as.module.symbols.capacity; i++) {
             Hash_Entry entry = module->as.module.symbols.entries[i];
             if (entry.key)
