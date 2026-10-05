@@ -11,6 +11,8 @@
 
 #include "utils.h"
 
+#define TOMBSTONE (void *)-1
+
 char *level_str(Level level) {
     switch (level) {
     case LEVEL_NOTE:
@@ -156,14 +158,23 @@ Hash_Entry *hashmap_add(Hashmap *map, const char *key, size_t key_len, void *val
     if (entry && entry->key) return NULL;
 
     uint64_t index = hash_str(key, key_len) & (map->capacity-1);
-    while (map->entries[index].key != NULL) {
+    while (map->entries[index].key != NULL && map->entries[index].key != TOMBSTONE) {
         index++;
         index &= map->capacity-1;
     }
 
+    if (map->entries[index].key != TOMBSTONE)
+        map->count++;
     map->entries[index] = (Hash_Entry){ .key = key, .key_len = key_len, .val = val };
-    map->count++;
     return &map->entries[index];
+}
+
+void hashmap_delete(Hashmap *map, const char *key, size_t key_len) {
+    Hash_Entry *entry = hashmap_get(map, key, key_len);
+    if (entry) {
+        entry->key = TOMBSTONE;
+        entry->key_len = 0;
+    }
 }
 
 void init_arena(Arena *arena, size_t size) {

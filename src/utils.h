@@ -105,6 +105,7 @@ int cmd_exec(Cmd *cmd, int verbose);
 
 Hash_Entry *hashmap_add(Hashmap *map, const char *key, size_t key_len, void *val);
 Hash_Entry *hashmap_get(Hashmap *map, const char *key, size_t key_len);
+void hashmap_delete(Hashmap *map, const char *key, size_t key_len);
 
 void init_arena(Arena *arena, size_t size);
 void *arena_calloc(Arena *arena, size_t num_bytes);

@@ -4,7 +4,7 @@ import std::io
 
 $assert ( u8 str -> u8 )
     if over ! then
-        "Assertion failed: " std::io::prints
-        dup std::io::printsln
+        "Assertion failed: " io::prints
+        dup io::printsln
     end swap !
 $

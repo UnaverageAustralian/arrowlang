@@ -14,11 +14,11 @@ macro INIT_FOO ( -> Foo )
 end
 
 $main ( -> u8 )
-    FIVE 5 = "FIVE = 5" std::errors::assert
+    FIVE 5 = "FIVE = 5" errors::assert
 
     INIT_FOO
-    #x 0 = "#x = 0" std::errors::assert rot | swap
-    #y 0 = "#y = 0" std::errors::assert rot | swap
+    #x 0 = "#x = 0" errors::assert rot | swap
+    #y 0 = "#y = 0" errors::assert rot | swap
 
     0
 $

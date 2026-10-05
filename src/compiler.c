@@ -269,9 +269,15 @@ void print_ops(Ops *ops) {
 Hash_Entry *add_symbol(Compilation_Unit *compiler, Symbol *sym) {
     Hash_Entry *entry = hashmap_add(&compiler->module->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len, sym);
     if (!entry) {
-        compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Redefinition of a symbol\n");
-        return hashmap_get(&compiler->module->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len);
+        entry = hashmap_get(&compiler->module->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len);
+        if (((Symbol *)entry->val)->module == compiler->module) {
+            compiler->global->had_error = 1;
+            COMPILER_EPRINTF(LEVEL_ERR, "Redefinition of a symbol\n");
+            return hashmap_get(&compiler->module->symbols, compiler->lexer->prev.start, compiler->lexer->prev.len);
+        }
+        else {
+            entry->val = sym;
+        }
     }
     return entry;
 }
@@ -538,6 +544,8 @@ Hash_Entry *get_entry_in_module(Compilation_Unit *compiler) {
     Token *prev = &compiler->lexer->prev;
 
     Module *module = get_module(compiler);
+    if (!module) return NULL;
+
     Hash_Entry *entry = hashmap_get(&module->symbols, prev->start, prev->len);
     if (!entry || !entry->key) {
         compiler->global->had_error = 1;
@@ -1278,6 +1286,7 @@ void resolve_imports(Compilation_Unit *compiler) {
 
             Symbol *sym = compile_module(compiler->global, contents, path);
             hashmap_add(&compiler->module->symbols, sym->as.module.full_name.str, sym->as.module.full_name.len, sym);
+            hashmap_add(&compiler->module->symbols, sym->as.module.name.str, sym->as.module.name.len, sym);
             continue;
         }
 
@@ -1314,24 +1323,28 @@ void resolve_imports(Compilation_Unit *compiler) {
 }
 
 void compile_uses(Compilation_Unit *compiler) {
-    Hashmap *module_symbols = &compiler->global->modules;
     Symbol *module;
-
     while (compiler->lexer->cur.type == TOK_USE) {
         lexer_next(compiler->lexer);
         expect(compiler, TOK_WORD);
 
-        module = get_module_in_module(compiler, &module_symbols);
-        if (!module) {
+        Hash_Entry *entry = get_entry_in_module(compiler);
+        if (!entry || !entry->key) continue;
+
+        module = (Symbol *)entry->val;
+        if (module->type != STYPE_MODULE) {
             compiler->global->had_error = 1;
-            COMPILER_EPRINTF(LEVEL_ERR, "Module doesn't exist\n");
-            break;
+            COMPILER_EPRINTF(LEVEL_ERR, "Symbol isn't a module\n");
+            continue;
         }
 
         for (size_t i = 0; i < module->as.module.symbols.capacity; i++) {
-            Hash_Entry entry = module->as.module.symbols.entries[i];
-            if (entry.key)
-                hashmap_add(&compiler->module->symbols, entry.key, entry.key_len, entry.val);
+            Hash_Entry module_entry = module->as.module.symbols.entries[i];
+            if (module_entry.key && !hashmap_add(&compiler->module->symbols, module_entry.key, module_entry.key_len, module_entry.val)) {
+                Hash_Entry *entry = hashmap_get(&compiler->module->symbols, module_entry.key, module_entry.key_len);
+                if (((Symbol *)entry->val)->as.module.parent != compiler->module)
+                    hashmap_delete(&compiler->module->symbols, module_entry.key, module_entry.key_len);
+            }
         }
     }
 }
@@ -1355,14 +1368,14 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
         return NULL;
 
     Hashmap *parent_symbols = unit.module->parent == NULL ? &global->modules : &unit.module->parent->symbols;
-    Hash_Entry *entry = hashmap_get(parent_symbols, unit.module->name.str, unit.module->name.len);
-    if (entry && entry->key) return (Symbol *)entry->val;
+    Hash_Entry *entry = hashmap_add(parent_symbols, unit.module->name.str, unit.module->name.len, module_sym);
+    if (!entry) return (Symbol *)entry->val;
 
     DA_APPEND(&global->options.link_cmd, obj_name);
     if (!global->options.emit_obj)
         DA_APPEND(&global->cleanup, obj_name);
 
-    entry = hashmap_add(parent_symbols, unit.module->name.str, unit.module->name.len, module_sym);
+    hashmap_add(&unit.module->symbols, unit.module->name.str, unit.module->name.len, module_sym);
 
     resolve_imports(&unit);
     compile_uses(&unit);
