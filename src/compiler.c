@@ -101,7 +101,6 @@ static Opcode tok_to_opcode[] = {
     OP_NOP,         OP_INIT,
     OP_DROP,        OP_NOP,
     OP_NOP,         OP_EQ,
-    OP_NOP,
 
     OP_CONVERT,     OP_CONVERT,
     OP_CONVERT,     OP_CONVERT,
@@ -538,28 +537,6 @@ Unresolved_Symbol *compile_symbol(Compilation_Unit *compiler, Unresolved_Type ty
     };
     DA_APPEND(&compiler->unresolved, unresolved);
     return &compiler->unresolved.items[compiler->unresolved.count-1];
-}
-
-Hash_Entry *get_entry_in_module(Compilation_Unit *compiler) {
-    Token *prev = &compiler->lexer->prev;
-
-    Module *module = get_module(compiler);
-    if (!module) return NULL;
-
-    Hash_Entry *entry = hashmap_get(&module->symbols, prev->start, prev->len);
-    if (!entry || !entry->key) {
-        compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Unknown symbol %.*s in module %.*s\n", prev->len, prev->start, SV_ARG(module->full_name));
-        return NULL;
-    }
-
-    Symbol *sym = (Symbol *)entry->val;
-    if (sym->attributes.private) {
-        compiler->global->had_error = 1;
-        COMPILER_EPRINTF(LEVEL_ERR, "Private symbol %.*s in module %.*s\n", prev->len, prev->start, SV_ARG(module->full_name));
-        return NULL;
-    }
-    return entry;
 }
 
 void get_type(Compilation_Unit *compiler, Type *type) {
@@ -1259,6 +1236,34 @@ Symbol *get_module_in_module(Compilation_Unit *compiler, Hashmap **parent) {
 
 Symbol *compile_module(Compiler *global, char *src, const char *file_path);
 
+void import(Compilation_Unit *compiler, Symbol *module) {
+    String_View full_name = module->as.module.full_name;
+    hashmap_add(&compiler->module->symbols, full_name.str, full_name.len, module);
+    for (size_t i = 0; i < full_name.len; i++) {
+        if (full_name.str[i] != ':') continue;
+
+        i += 2;
+        if (!hashmap_add(&compiler->module->symbols, full_name.str + i, full_name.len - i, module)) {
+            Hash_Entry *entry = hashmap_get(&compiler->module->symbols, full_name.str + i, full_name.len - i);
+            Symbol *sym = (Symbol *)entry->val;
+            if (sym->module != module->module)
+                hashmap_delete(&compiler->module->symbols, full_name.str + i, full_name.len - i);
+        }
+    }
+
+    for (size_t i = 0; i < module->as.module.symbols.capacity; i++) {
+        Hash_Entry entry = module->as.module.symbols.entries[i];
+        Symbol *sym = (Symbol *)entry.val;
+        if (entry.key && !sym->attributes.private && sym->module == &module->as.module &&
+                !hashmap_add(&compiler->module->symbols, entry.key, entry.key_len, entry.val)) {
+            Hash_Entry *existing = hashmap_get(&compiler->module->symbols, entry.key, entry.key_len);
+            Symbol *sym = (Symbol *)existing->val;
+            if (sym->module != &module->as.module)
+                hashmap_delete(&compiler->module->symbols, entry.key, entry.key_len);
+        }
+    }
+}
+
 void resolve_imports(Compilation_Unit *compiler) {
     while (compiler->lexer->cur.type == TOK_IMPORT) {
         lexer_next(compiler->lexer);
@@ -1285,8 +1290,7 @@ void resolve_imports(Compilation_Unit *compiler) {
             }
 
             Symbol *sym = compile_module(compiler->global, contents, path);
-            hashmap_add(&compiler->module->symbols, sym->as.module.full_name.str, sym->as.module.full_name.len, sym);
-            hashmap_add(&compiler->module->symbols, sym->as.module.name.str, sym->as.module.name.len, sym);
+            import(compiler, sym);
             continue;
         }
 
@@ -1318,34 +1322,7 @@ void resolve_imports(Compilation_Unit *compiler) {
             module = get_module_in_module(compiler, &module_symbols);
         }
         if (!module) continue;
-        hashmap_add(&compiler->module->symbols, module->as.module.full_name.str, module->as.module.full_name.len, module);
-    }
-}
-
-void compile_uses(Compilation_Unit *compiler) {
-    Symbol *module;
-    while (compiler->lexer->cur.type == TOK_USE) {
-        lexer_next(compiler->lexer);
-        expect(compiler, TOK_WORD);
-
-        Hash_Entry *entry = get_entry_in_module(compiler);
-        if (!entry || !entry->key) continue;
-
-        module = (Symbol *)entry->val;
-        if (module->type != STYPE_MODULE) {
-            compiler->global->had_error = 1;
-            COMPILER_EPRINTF(LEVEL_ERR, "Symbol isn't a module\n");
-            continue;
-        }
-
-        for (size_t i = 0; i < module->as.module.symbols.capacity; i++) {
-            Hash_Entry module_entry = module->as.module.symbols.entries[i];
-            if (module_entry.key && !hashmap_add(&compiler->module->symbols, module_entry.key, module_entry.key_len, module_entry.val)) {
-                Hash_Entry *entry = hashmap_get(&compiler->module->symbols, module_entry.key, module_entry.key_len);
-                if (((Symbol *)entry->val)->as.module.parent != compiler->module)
-                    hashmap_delete(&compiler->module->symbols, module_entry.key, module_entry.key_len);
-            }
-        }
+        import(compiler, module);
     }
 }
 
@@ -1367,18 +1344,19 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
     else if (!validate_module_name(&unit))
         return NULL;
 
+    module_sym->module = module_sym->as.module.parent;
+
     Hashmap *parent_symbols = unit.module->parent == NULL ? &global->modules : &unit.module->parent->symbols;
-    Hash_Entry *entry = hashmap_add(parent_symbols, unit.module->name.str, unit.module->name.len, module_sym);
-    if (!entry) return (Symbol *)entry->val;
+    Hash_Entry *entry = hashmap_get(parent_symbols, unit.module->name.str, unit.module->name.len);
+    if (entry && entry->key) return (Symbol *)entry->val;
 
     DA_APPEND(&global->options.link_cmd, obj_name);
     if (!global->options.emit_obj)
         DA_APPEND(&global->cleanup, obj_name);
 
+    hashmap_add(parent_symbols, unit.module->name.str, unit.module->name.len, module_sym);
     hashmap_add(&unit.module->symbols, unit.module->name.str, unit.module->name.len, module_sym);
-
     resolve_imports(&unit);
-    compile_uses(&unit);
 
     compile_decls(&unit);
 
