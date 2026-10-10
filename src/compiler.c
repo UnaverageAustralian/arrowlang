@@ -1,6 +1,9 @@
+#define _GNU_SOURCE
+
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <linux/limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -180,8 +183,15 @@ Symbol *init_compilation_unit(Compilation_Unit *unit, Lexer *lexer, Compiler *gl
     module->type = STYPE_MODULE;
 
     unit->module = &module->as.module;
-    unit->module->name = strip_file_path(lexer->file_path);
-    unit->module->path = (String_View){ .len = unit->module->name.str - lexer->file_path, .str = lexer->file_path, };
+
+    char *file_path = arena_calloc(&global->arena, PATH_MAX);
+    if (!realpath(lexer->file_path, file_path)) {
+        eprintf(lexer->file_path, (Loc){ -1, 0 }, LEVEL_ERR, "Could not resolve file path\n");
+        exit(1);
+    }
+
+    unit->module->name = strip_file_path(file_path);
+    unit->module->path = (String_View){ .len = unit->module->name.str - file_path, .str = file_path, };
     unit->module->parent = NULL;
     unit->module->symbols = (Hashmap){0};
 
@@ -1193,8 +1203,11 @@ void compile_module_name(Compilation_Unit *compiler) {
             module->as.module.status = STATUS_RESOLVED;
 
             hashmap_add(parent_symbols, prev->start, prev->len, module);
+            compiler->module->parent = &module->as.module;
         }
-        compiler->module->parent = &((Symbol *)entry->val)->as.module;
+        else {
+            compiler->module->parent = &((Symbol *)entry->val)->as.module;
+        }
         lexer_next(compiler->lexer);
         expect(compiler, TOK_WORD);
     }
@@ -1290,7 +1303,8 @@ void resolve_imports(Compilation_Unit *compiler) {
             }
 
             Symbol *sym = compile_module(compiler->global, contents, path);
-            import(compiler, sym);
+            if (sym)
+                import(compiler, sym);
             continue;
         }
 
@@ -1348,7 +1362,15 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
 
     Hashmap *parent_symbols = unit.module->parent == NULL ? &global->modules : &unit.module->parent->symbols;
     Hash_Entry *entry = hashmap_get(parent_symbols, unit.module->name.str, unit.module->name.len);
-    if (entry && entry->key) return (Symbol *)entry->val;
+    if (entry && entry->key) {
+        Symbol *module = (Symbol *)entry->val;
+        if (strcmp(module->as.module.path.str, unit.module->path.str) != 0) {
+            global->had_error = 1;
+            eprintf(lexer.file_path, lexer.prev.loc, LEVEL_ERR, "Cannot create two modules with the same name\n");
+            return NULL;
+        }
+        return module;
+    }
 
     DA_APPEND(&global->options.link_cmd, obj_name);
     if (!global->options.emit_obj)

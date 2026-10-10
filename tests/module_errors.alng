@@ -1,1 +1,4 @@
+module std::io
+
+import std::io
 import io
