@@ -191,6 +191,7 @@ Symbol *init_compilation_unit(Compilation_Unit *unit, Lexer *lexer, Compiler *gl
     }
 
     unit->module->name = strip_file_path(file_path);
+    unit->module->full_name = unit->module->name;
     unit->module->path = (String_View){ .len = unit->module->name.str - file_path, .str = file_path, };
     unit->module->parent = NULL;
     unit->module->symbols = (Hashmap){0};
@@ -568,6 +569,7 @@ void get_type(Compilation_Unit *compiler, Type *type) {
         Unresolved_Symbol *unresolved = compile_symbol(compiler, UTYPE_TYPE);
         if (!unresolved) break;
         unresolved->as.type = type;
+        *type = (Type){0};
         break;
     }
     case TOK_STRUCT:
@@ -863,7 +865,7 @@ void compile_const(Compilation_Unit *compiler) {
     Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     Attributes valid = { .private = 1 };
 
-    if (!start_decl(compiler, sym, STYPE_TYPE, valid)) return;
+    if (!start_decl(compiler, sym, STYPE_CONST, valid)) return;
 
     lexer_next(compiler->lexer);
     switch (compiler->lexer->prev.type) {
@@ -894,7 +896,7 @@ void compile_global(Compilation_Unit *compiler) {
     Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     Attributes valid = { .private = 1 };
 
-    if (!start_decl(compiler, sym, STYPE_TYPE, valid)) return;
+    if (!start_decl(compiler, sym, STYPE_GLOBAL, valid)) return;
 
     sym->as.global.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
     sym->as.global.module_name = compiler->module->full_name;
@@ -912,7 +914,7 @@ void compile_macro(Compilation_Unit *compiler) {
     Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     Attributes valid = { .private = 1 };
 
-    if (!start_decl(compiler, sym, STYPE_TYPE, valid)) return;
+    if (!start_decl(compiler, sym, STYPE_MACRO, valid)) return;
 
     compile_signature(compiler, &sym->as.func.param_types, &sym->as.func.return_types);
 
@@ -1162,7 +1164,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
                 break;
             case STYPE_GLOBAL:
                 op->opcode = OP_PUSH_GLOBAL;
-                op->operand = (uint64_t)entry;
+                op->operand = (uint64_t)&sym->as.global;
                 op->types[0] = sym->as.global.type;
                 break;
             case STYPE_MACRO:
@@ -1179,7 +1181,10 @@ void resolve_symbols(Compilation_Unit *compiler) {
                         entry->key_len, entry->key);
                 break;
             }
-            *unresolved.as.type = ADVANCED_TYPE(TYPE_STRUCT, sym->as.type);
+            if (unresolved.as.type->kind == TYPE_PTR)
+                *unresolved.as.type = PTR_TYPE(ADVANCED_TYPE(sym->as.type->kind, sym->as.type));
+            else
+                *unresolved.as.type = ADVANCED_TYPE(sym->as.type->kind, sym->as.type);
             break;
         }
         }
