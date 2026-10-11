@@ -227,13 +227,11 @@ void print_op(Op *op) {
     case OP_CCALL:
     case OP_CALL:
     case OP_FUNC: {
-        Hash_Entry *entry = (Hash_Entry *)op->operand;
-        Function func = ((Symbol *)entry->val)->as.func;
-
+        Function func = ((Symbol *)op->operand)->as.func;
         if (func.module_name.str == NULL)
-            printf(" %.*s", entry->key_len, entry->key);
+            printf(" %.*s", SV_ARG(func.name));
         else
-            printf(" %.*s::%.*s", SV_ARG(func.module_name), entry->key_len, entry->key);
+            printf(" %.*s::%.*s", SV_ARG(func.module_name), SV_ARG(func.name));
         break;
     }
     case OP_STR:
@@ -250,13 +248,13 @@ void print_op(Op *op) {
     }
     case OP_PUSH_GLOBAL:
     case OP_GLOBAL: {
-        Global *global = (Global *)op->operand;
-        printf(" %.*s::%.*s", SV_ARG(global->module_name), SV_ARG(global->name));
+        Symbol *global = (Symbol *)op->operand;
+        printf(" %.*s::%.*s", SV_ARG(global->as.global.module_name), SV_ARG(global->as.global.name));
         break;
     }
     case OP_CALL_MACRO: {
-        Hash_Entry *entry = (Hash_Entry *)op->operand;
-        printf(" %.*s", entry->key_len, entry->key);
+        Symbol *macro = (Symbol *)op->operand;
+        printf(" %.*s", SV_ARG(macro->as.func.name));
         break;
     }
     default:
@@ -773,15 +771,15 @@ Hash_Entry *compile_function_signature(Compilation_Unit *compiler) {
     if (!entry) return NULL;
 
     sym->as.func.module_name = compiler->module->full_name;
-    sym->as.func.extern_name = (String_View){ .len = entry->key_len, .str = entry->key };
+    sym->as.func.name = (String_View){ .len = entry->key_len, .str = entry->key };
 
     if (sym->attributes.init) {
         sb_appendf(&compiler->global->gen_info.on_start, sym->as.func.module_name.str ? "    call \"%.*s::%.*s\"\n" : "call \"%.*s\"\n",
-                SV_ARG(sym->as.func.module_name), SV_ARG(sym->as.func.extern_name));
+                SV_ARG(sym->as.func.module_name), SV_ARG(sym->as.func.name));
     }
     if (sym->attributes.fini) {
         sb_appendf(&compiler->global->gen_info.on_exit, sym->as.func.module_name.str ? "    call \"%.*s::%.*s\"\n" : "call \"%.*s\"\n",
-                SV_ARG(sym->as.func.module_name), SV_ARG(sym->as.func.extern_name));
+                SV_ARG(sym->as.func.module_name), SV_ARG(sym->as.func.name));
     }
 
     compile_signature(compiler, &sym->as.func.param_types, &sym->as.func.return_types);
@@ -794,7 +792,7 @@ void compile_function(Compilation_Unit *compiler) {
     Hash_Entry *entry = compile_function_signature(compiler);
     if (!entry) return;
 
-    op->operand = (int64_t)entry;
+    op->operand = (uint64_t)entry->val;
     while (compiler->lexer->cur.type != TOK_FUNC && compiler->lexer->cur.type != TOK_EOF)
         compile_stmt(compiler);
 
@@ -821,10 +819,10 @@ void compile_external_function(Compilation_Unit *compiler, uint8_t is_c_func) {
     if (compiler->lexer->cur.type == TOK_EQ) {
         lexer_next(compiler->lexer);
         if (!expect(compiler, TOK_STR_LIT)) return;
-        func->extern_name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start, };
+        func->name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start, };
     }
     else {
-        func->extern_name = (String_View){ .len = entry->key_len, .str = entry->key };
+        func->name = (String_View){ .len = entry->key_len, .str = entry->key };
     }
 }
 
@@ -902,7 +900,7 @@ void compile_global(Compilation_Unit *compiler) {
     sym->as.global.name = (String_View){ .len = compiler->lexer->prev.len, .str = compiler->lexer->prev.start };
     sym->as.global.module_name = compiler->module->full_name;
 
-    make_op(compiler, OP_GLOBAL, (int64_t)&sym->as.global);
+    make_op(compiler, OP_GLOBAL, (uint64_t)sym);
 
     expect(compiler, TOK_COLON);
     if (compiler->lexer->prev.type == TOK_EOF) return;
@@ -915,11 +913,14 @@ void compile_macro(Compilation_Unit *compiler) {
     Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
     Attributes valid = { .private = 1 };
 
-    if (!start_decl(compiler, sym, STYPE_MACRO, valid)) return;
+    Hash_Entry *entry = start_decl(compiler, sym, STYPE_MACRO, valid);
+    if (!entry) return;
+
+    sym->as.func.name = (String_View){ .len = entry->key_len, .str = entry->key };
 
     compile_signature(compiler, &sym->as.func.param_types, &sym->as.func.return_types);
 
-    make_op(compiler, OP_MACRO, 0);
+    make_op(compiler, OP_MACRO, (uint64_t)sym);
     int macro_start = compiler->ops.count;
 
     sym->as.func.ops.items = compiler->ops.items + compiler->ops.count;
@@ -1161,7 +1162,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
             switch (sym->type) {
             case STYPE_FUNC:
                 op->opcode = sym->as.func.is_c_func ? OP_CCALL : OP_CALL;
-                op->operand = (uint64_t)entry;
+                op->operand = (uint64_t)sym;
                 break;
             case STYPE_TYPE:
                 op->opcode = OP_INIT;
@@ -1178,12 +1179,12 @@ void resolve_symbols(Compilation_Unit *compiler) {
                 break;
             case STYPE_GLOBAL:
                 op->opcode = OP_PUSH_GLOBAL;
-                op->operand = (uint64_t)&sym->as.global;
+                op->operand = (uint64_t)sym;
                 op->types[0] = sym->as.global.type;
                 break;
             case STYPE_MACRO:
                 op->opcode = OP_CALL_MACRO;
-                op->operand = (uint64_t)entry;
+                op->operand = (uint64_t)sym;
                 break;
             case STYPE_ALIAS:
                 if (IS_ADVANCED(sym->as.alias)) {
@@ -1199,7 +1200,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
             break;
         }
         case UTYPE_TYPE: {
-            if (sym->type != STYPE_TYPE) {
+            if (sym->type != STYPE_TYPE && sym->type != STYPE_ALIAS) {
                 compiler->global->had_error = 1;
                 eprintf(compiler->lexer->file_path, unresolved.loc, LEVEL_ERR, "%.*s is not a structure\n",
                         entry->key_len, entry->key);

@@ -142,11 +142,9 @@ typedef struct {
 typedef struct {
     Types param_types;
     Types return_types;
+    String_View name;
     union {
-        struct {
-            String_View extern_name;
-            String_View module_name;
-        };
+        String_View module_name;
         Ops ops;
     };
     int max_allocated;

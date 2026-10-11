@@ -7,6 +7,7 @@ typedef struct {
     Types stack;
     Types expected_types;
     Ops dst;
+    Ops macro_ops;
     Function *func;
     Ops *ops;
     unsigned block_start;
@@ -14,7 +15,6 @@ typedef struct {
     unsigned pos;
     int allocated;
     int max_allocated;
-    int macro_start;
     uint8_t had_error;
     uint8_t in_block;
 } Analyser;

@@ -166,8 +166,8 @@ void duplicate_struct(Generator *gen, Struct a) {
     gen->allocated += a.size;
 }
 
-void generate_ccall(Generator *gen, Hash_Entry *entry) {
-    Function func = ((Symbol *)entry->val)->as.func;
+void generate_ccall(Generator *gen, Symbol *sym) {
+    Function func = sym->as.func;
 
     int extra_arg = 0;
 
@@ -263,7 +263,7 @@ void generate_ccall(Generator *gen, Hash_Entry *entry) {
         }
     }
 
-    sb_appendf(&gen->sb, "    call \"%.*s\"\n", SV_ARG(func.extern_name));
+    sb_appendf(&gen->sb, "    call \"%.*s\"\n", SV_ARG(func.name));
     sb_appendf(&gen->sb, "    movq %%rbx, %%rsp\n");
     if (func.param_types.count > 0)
         sb_appendf(&gen->sb, "    addq $%d, %%rsp\n", func.param_types.count*8);
@@ -638,16 +638,15 @@ char *generate_x86_64(Ops *ops, Gen_Info *gen_info, char *output_file, int gen_s
             sb_appendf(&gen.sb, ".L%lld:\n", op->operand);
             break;
         case OP_FUNC: {
-            Hash_Entry *func_entry = (Hash_Entry *)op->operand;
-            gen.func = ((Symbol *)func_entry->val)->as.func;
+            gen.func = ((Symbol *)op->operand)->as.func;
 
             if (gen.func.module_name.str == NULL) {
-                sb_appendf(&gen.sb, ".globl \"%.*s\"\n", SV_ARG(gen.func.extern_name));
-                sb_appendf(&gen.sb, "\"%.*s\":\n", SV_ARG(gen.func.extern_name));
+                sb_appendf(&gen.sb, ".globl \"%.*s\"\n", SV_ARG(gen.func.name));
+                sb_appendf(&gen.sb, "\"%.*s\":\n", SV_ARG(gen.func.name));
             }
             else {
-                sb_appendf(&gen.sb, ".globl \"%.*s::%.*s\"\n", SV_ARG(gen.func.module_name), SV_ARG(gen.func.extern_name));
-                sb_appendf(&gen.sb, "\"%.*s::%.*s\":\n", SV_ARG(gen.func.module_name), SV_ARG(gen.func.extern_name));
+                sb_appendf(&gen.sb, ".globl \"%.*s::%.*s\"\n", SV_ARG(gen.func.module_name), SV_ARG(gen.func.name));
+                sb_appendf(&gen.sb, "\"%.*s::%.*s\":\n", SV_ARG(gen.func.module_name), SV_ARG(gen.func.name));
             }
             sb_appendf(&gen.sb, "    pushq %%rbp\n");
             sb_appendf(&gen.sb, "    pushq %%rbx\n");
@@ -674,13 +673,12 @@ char *generate_x86_64(Ops *ops, Gen_Info *gen_info, char *output_file, int gen_s
             break;
         }
         case OP_CALL: {
-            Hash_Entry *entry = (Hash_Entry *)op->operand;
-            Function func = ((Symbol *)entry->val)->as.func;
+            Function func = ((Symbol *)op->operand)->as.func;
 
             if (func.module_name.str == NULL)
-                sb_appendf(&gen.sb, "    call \"%.*s\"\n", SV_ARG(func.extern_name));
+                sb_appendf(&gen.sb, "    call \"%.*s\"\n", SV_ARG(func.name));
             else
-                sb_appendf(&gen.sb, "    call \"%.*s::%.*s\"\n", SV_ARG(func.module_name), SV_ARG(func.extern_name));
+                sb_appendf(&gen.sb, "    call \"%.*s::%.*s\"\n", SV_ARG(func.module_name), SV_ARG(func.name));
 
             for (int64_t i = func.return_types.count-1; i >= 0; i--) {
                 sb_appendf(&gen.sb, "    pushq %zu(%%rax)\n", i*8);
@@ -689,11 +687,9 @@ char *generate_x86_64(Ops *ops, Gen_Info *gen_info, char *output_file, int gen_s
             }
             break;
         }
-        case OP_CCALL: {
-            Hash_Entry *entry = (Hash_Entry *)op->operand;
-            generate_ccall(&gen, entry);
+        case OP_CCALL:
+            generate_ccall(&gen, (Symbol *)op->operand);
             break;
-        }
         case OP_STR:
             sb_appendf(&gen.sb, "    pushq $.str%zu\n", gen.strs.count);
             DA_APPEND(&gen.strs, (char *)op->operand);
@@ -882,13 +878,13 @@ char *generate_x86_64(Ops *ops, Gen_Info *gen_info, char *output_file, int gen_s
             break;
         }
         case OP_PUSH_GLOBAL: {
-            Global *global = (Global *)op->operand;
-            sb_appendf(&gen.sb, "    pushq $\"%.*s::%.*s\"\n", SV_ARG(global->module_name), SV_ARG(global->name));
+            Symbol *global = (Symbol *)op->operand;
+            sb_appendf(&gen.sb, "    pushq $\"%.*s::%.*s\"\n", SV_ARG(global->as.global.module_name), SV_ARG(global->as.global.name));
             break;
         }
         case OP_GLOBAL: {
-            Global *global = (Global *)op->operand;
-            DA_APPEND(&gen.globals, *global);
+            Symbol *global = (Symbol *)op->operand;
+            DA_APPEND(&gen.globals, global->as.global);
             break;
         }
         case OP_NOP: break;

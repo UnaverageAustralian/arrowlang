@@ -313,8 +313,7 @@ void type_check_call(Analyser *analyser, Function func) {
 
 void enter_func(Analyser *analyser) {
     Op *op = &analyser->ops->items[analyser->pos];
-    Hash_Entry *func_entry = (Hash_Entry *)op->operand;
-    analyser->func = &((Symbol *)func_entry->val)->as.func;
+    analyser->func = &((Symbol *)op->operand)->as.func;
 
     for (size_t i = 0; i < analyser->func->param_types.count; i++) {
         Type param = analyser->func->param_types.items[i];
@@ -349,9 +348,14 @@ void type_check_macro(Analyser *analyser) {
     while (analyser->ops->items[analyser->pos].opcode != OP_END)
         type_check_op(analyser);
 
-    DA_EXPAND(analyser->ops, analyser->macro_start + analyser->dst.count - macro_start);
-    memcpy(analyser->ops->items + analyser->macro_start, analyser->dst.items + macro_start, (analyser->dst.count - macro_start) * sizeof(Op));
-    analyser->macro_start += analyser->dst.count - macro_start;
+    int ops_count = analyser->dst.count - macro_start;
+    DA_EXPAND(&analyser->macro_ops, analyser->macro_ops.count + ops_count);
+    memcpy(analyser->macro_ops.items + analyser->macro_ops.count, analyser->dst.items + macro_start, ops_count * sizeof(Op));
+
+    analyser->func->ops.items = analyser->macro_ops.items + analyser->macro_ops.count;
+    analyser->func->ops.count = ops_count;
+
+    analyser->macro_ops.count += ops_count;
     analyser->dst.count = macro_start;
 
     exit_func(analyser);
@@ -637,7 +641,7 @@ void type_check_op(Analyser *analyser) {
     }
     case OP_CCALL:
     case OP_CALL: {
-        Function func = ((Symbol *)((Hash_Entry *)op->operand)->val)->as.func;
+        Function func = ((Symbol *)op->operand)->as.func;
         if (!check_operand_count(analyser, func.param_types.count)) break;
 
         type_check_call(analyser, func);
@@ -987,8 +991,7 @@ void type_check_op(Analyser *analyser) {
         break;
     }
     case OP_CALL_MACRO: {
-        Hash_Entry *entry = (Hash_Entry *)op->operand;
-        Function macro = ((Symbol *)entry->val)->as.func;
+        Function macro = ((Symbol *)op->operand)->as.func;
 
         type_check_call(analyser, macro);
 
