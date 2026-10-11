@@ -53,6 +53,7 @@ typedef enum {
     STYPE_FUNC,   STYPE_MODULE,
     STYPE_TYPE,   STYPE_CONST,
     STYPE_GLOBAL, STYPE_MACRO,
+    STYPE_ALIAS,
 } Symbol_Type;
 
 typedef enum {
@@ -189,6 +190,7 @@ typedef struct {
         Advanced_Type *type;
         Constant constant;
         Global global;
+        Type alias;
     } as;
 } Symbol;
 

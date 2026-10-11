@@ -1,0 +1,20 @@
+import std::errors
+
+struct Foo
+    x : i32
+    y : i32
+end
+
+alias int i32
+alias float f32
+
+alias Vec2 Foo
+
+$main ( -> u8 )
+    3.0 int   3 = "3.0 int = 3"   errors::assert
+    3 float 3.0 = "3 float = 3.0" errors::assert |
+
+    2 3 Vec2
+         #x 2 = "#x = 2" errors::assert rot |
+    swap #y 3 = "#y = 3" errors::assert rot |
+$

@@ -104,6 +104,7 @@ static Opcode tok_to_opcode[] = {
     OP_NOP,         OP_INIT,
     OP_DROP,        OP_NOP,
     OP_NOP,         OP_EQ,
+    OP_NOP,
 
     OP_CONVERT,     OP_CONVERT,
     OP_CONVERT,     OP_CONVERT,
@@ -935,6 +936,16 @@ void compile_macro(Compilation_Unit *compiler) {
     }
 }
 
+void compile_alias(Compilation_Unit *compiler) {
+    Symbol *sym = arena_calloc(&compiler->global->arena, sizeof(Symbol));
+    Attributes valid = { .private = 1 };
+
+    if (!start_decl(compiler, sym, STYPE_ALIAS, valid)) return;
+
+    lexer_next(compiler->lexer);
+    get_type(compiler, &sym->as.alias);
+}
+
 void compile_attributes(Compilation_Unit *compiler, Attributes *attrs) {
     Token *prev = &compiler->lexer->prev;
 
@@ -1054,6 +1065,9 @@ void compile_decls(Compilation_Unit *compiler) {
         case TOK_AT:
             compile_directive(compiler);
             continue;
+        case TOK_ALIAS:
+            compile_alias(compiler);
+            continue;
         default: break;
         }
         break;
@@ -1170,6 +1184,16 @@ void resolve_symbols(Compilation_Unit *compiler) {
             case STYPE_MACRO:
                 op->opcode = OP_CALL_MACRO;
                 op->operand = (uint64_t)entry;
+                break;
+            case STYPE_ALIAS:
+                if (IS_ADVANCED(sym->as.alias)) {
+                    op->opcode = OP_INIT;
+                    op->types[0] = sym->as.alias;
+                }
+                else {
+                    op->opcode = OP_CONVERT;
+                    op->types[1] = sym->as.alias;
+                }
                 break;
             }
             break;
@@ -1395,7 +1419,7 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
     if (!global->had_error && !global->options.debug)
         global->had_error = type_check(&unit.ops);
 
-    if (!global->had_error && !global->options.print_ir) {
+    if (!global->had_error && !global->options.debug && !global->options.print_ir) {
         Hash_Entry *main = hashmap_get(&unit.module->symbols, "main", 4);
         char *output_asm = generate_x86_64(&unit.ops, &global->gen_info, obj_name, main != NULL && main->key != NULL);
         if (!output_asm) global->had_error = 1;
