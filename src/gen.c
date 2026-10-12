@@ -198,9 +198,14 @@ void generate_ccall(Generator *gen, Symbol *sym) {
             iparams++;
         }
         else {
-            sparams++;
+            sparams += ALIGN(param->advanced->structure.size, 8) / 8;
         }
     }
+
+    if (iparams > 6)
+        sparams += iparams - 6;
+    if (fparams > 8)
+        sparams += fparams - 8;
 
     iparams = 0;
     fparams = 0;

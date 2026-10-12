@@ -730,7 +730,6 @@ void type_check_op(Analyser *analyser) {
                 had_error = 1;
                 continue;
             }
-
             if (!types_equal(a, field)) {
                 a.kind = a.kind == TYPE_INT ? TYPE_I64 : a.kind == TYPE_REAL ? TYPE_F64 : a.kind;
                 make_conversion_op(analyser, field, a, (fields.count-i-1)*8);
@@ -840,11 +839,16 @@ void type_check_op(Analyser *analyser) {
             EPRINTF_AT_OP(op, LEVEL_ERR, "%.*s has no field %.*s\n", SV_ARG(structure.name), sv->len, sv->str);
             break;
         }
+
         if (!types_compatible(item, field->type)) {
             analyser->had_error = 1;
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source type does not match destination type, expected %s, got %s\n",
                           type_spelling(field->type), type_spelling(item));
             break;
+        }
+        if (!types_equal(item, field->type)) {
+            item.kind = item.kind == TYPE_INT ? TYPE_I64 : item.kind == TYPE_REAL ? TYPE_F64 : item.kind;
+            make_conversion_op(analyser, field->type, item, 0);
         }
 
         op->operand = (uint64_t)field;
@@ -868,6 +872,10 @@ void type_check_op(Analyser *analyser) {
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source type does not match dereferenced destination type, expected %s, got %s\n",
                           type_spelling(deref), type_spelling(item));
             break;
+        }
+        if (!types_equal(item, deref)) {
+            item.kind = item.kind == TYPE_INT ? TYPE_I64 : item.kind == TYPE_REAL ? TYPE_F64 : item.kind;
+            make_conversion_op(analyser, deref, item, 0);
         }
 
         op->types[0] = deref;
@@ -961,6 +969,10 @@ void type_check_op(Analyser *analyser) {
             EPRINTF_AT_OP(op, LEVEL_ERR, "Source type does not match dereferenced destination type, expected %s, got %s\n",
                           type_spelling(deref), type_spelling(item));
             break;
+        }
+        if (!types_equal(item, deref)) {
+            item.kind = item.kind == TYPE_INT ? TYPE_I64 : item.kind == TYPE_REAL ? TYPE_F64 : item.kind;
+            make_conversion_op(analyser, deref, item, 0);
         }
 
         op->types[0] = deref;
