@@ -549,8 +549,10 @@ Unresolved_Symbol *compile_symbol(Compilation_Unit *compiler, Unresolved_Type ty
     return &compiler->unresolved.items[compiler->unresolved.count-1];
 }
 
-void get_type(Compilation_Unit *compiler, Type *type) {
+Unresolved_Symbol *get_type(Compilation_Unit *compiler, Type *type, Unresolved_Type unresolved_type) {
     Token *prev = &compiler->lexer->prev;
+
+    Unresolved_Symbol *unresolved = NULL;
     switch (prev->type) {
     case TOK_I8:   *type = BASIC_TYPE(TYPE_I8);             break;
     case TOK_CHAR: *type = BASIC_TYPE(TYPE_CHAR);           break;
@@ -564,13 +566,20 @@ void get_type(Compilation_Unit *compiler, Type *type) {
     case TOK_F32:  *type = BASIC_TYPE(TYPE_F32);            break;
     case TOK_F64:  *type = BASIC_TYPE(TYPE_F64);            break;
     case TOK_STR:  *type = PTR_TYPE(BASIC_TYPE(TYPE_CHAR)); break;
-    case TOK_WORD: {
-        Unresolved_Symbol *unresolved = compile_symbol(compiler, UTYPE_TYPE);
+    case TOK_WORD:
+        unresolved = compile_symbol(compiler, unresolved_type);
         if (!unresolved) break;
-        unresolved->as.type = type;
+
+        if (unresolved_type == UTYPE_OP_TYPE) {
+            unresolved->as.op.num = compiler->ops.count-1;
+            unresolved->as.op.type_num = 0;
+        }
+        else {
+            unresolved->as.type = type;
+        }
+
         *type = (Type){0};
         break;
-    }
     case TOK_STRUCT:
         *type = ADVANCED_TYPE(TYPE_STRUCT, compile_anonymous_struct(compiler));
         type->advanced->kind = TYPE_STRUCT;
@@ -583,7 +592,7 @@ void get_type(Compilation_Unit *compiler, Type *type) {
         expect(compiler, TOK_LBRACKET);
 
         lexer_next(compiler->lexer);
-        get_type(compiler, type);
+        unresolved = get_type(compiler, type, unresolved_type);
         *type = PTR_TYPE(*type);
 
         expect(compiler, TOK_RBRACKET);
@@ -595,6 +604,7 @@ void get_type(Compilation_Unit *compiler, Type *type) {
         *type = BASIC_TYPE(TYPE_VOID);
         break;
     }
+    return unresolved;
 }
 
 void compile_stmt(Compilation_Unit *compiler) {
@@ -659,7 +669,7 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_WORD: {
         Unresolved_Symbol *unresolved = compile_symbol(compiler, UTYPE_OP);
         if (!unresolved) break;
-        unresolved->as.op = compiler->ops.count;
+        unresolved->as.op.num = compiler->ops.count;
         make_op(compiler, OP_UNKNOWN, 0);
         break;
     }
@@ -685,9 +695,12 @@ void compile_stmt(Compilation_Unit *compiler) {
     case TOK_F32:
     case TOK_F64:
     case TOK_PTR:
-    case TOK_STR:
-        get_type(compiler, &op->types[1]);
+    case TOK_STR: {
+        Unresolved_Symbol *unresolved = get_type(compiler, &op->types[1], UTYPE_OP_TYPE);
+        if (unresolved)
+            unresolved->as.op.type_num = 1;
         break;
+    }
     case TOK_HASH:
     case TOK_ARROW_HASH:
     case TOK_DOT: {
@@ -699,11 +712,11 @@ void compile_stmt(Compilation_Unit *compiler) {
     }
     case TOK_ALLOC:
         lexer_next(compiler->lexer);
-        get_type(compiler, &op->types[0]);
+        get_type(compiler, &op->types[0], UTYPE_OP_TYPE);
         break;
     case TOK_SIZEOF:
         lexer_next(compiler->lexer);
-        get_type(compiler, &op->types[0]);
+        get_type(compiler, &op->types[0], UTYPE_OP_TYPE);
         break;
     case TOK_ERROR:
         compiler->global->had_error = 1;
@@ -741,7 +754,7 @@ void compile_signature(Compilation_Unit *compiler, Types *param_types, Types *re
     while (compiler->lexer->cur.type != TOK_ARROW && compiler->lexer->cur.type != TOK_RPAREN && compiler->lexer->cur.type != TOK_EOF) {
         lexer_next(compiler->lexer);
         DA_APPEND(param_types, (Type){0});
-        get_type(compiler, &param_types->items[param_types->count-1]);
+        get_type(compiler, &param_types->items[param_types->count-1], UTYPE_TYPE);
     }
 
     if (compiler->lexer->cur.type == TOK_EOF) {
@@ -756,7 +769,7 @@ void compile_signature(Compilation_Unit *compiler, Types *param_types, Types *re
     while (compiler->lexer->cur.type != TOK_RPAREN && compiler->lexer->cur.type != TOK_EOF) {
         lexer_next(compiler->lexer);
         DA_APPEND(return_types, (Type){0});
-        get_type(compiler, &return_types->items[return_types->count-1]);
+        get_type(compiler, &return_types->items[return_types->count-1], UTYPE_TYPE);
     }
 
     if (compiler->lexer->cur.type == TOK_EOF) return;
@@ -839,7 +852,7 @@ void compile_struct_fields(Compilation_Unit *compiler, Struct *structure) {
         lexer_next(compiler->lexer);
         ARENA_DA_APPEND(&compiler->global->arena, &structure->fields, field);
 
-        get_type(compiler, &structure->fields.items[structure->fields.count-1].type);
+        get_type(compiler, &structure->fields.items[structure->fields.count-1].type, UTYPE_TYPE);
     }
     expect(compiler, TOK_END);
 }
@@ -906,7 +919,7 @@ void compile_global(Compilation_Unit *compiler) {
     if (compiler->lexer->prev.type == TOK_EOF) return;
 
     lexer_next(compiler->lexer);
-    get_type(compiler, &sym->as.global.type);
+    get_type(compiler, &sym->as.global.type, UTYPE_TYPE);
 }
 
 void compile_macro(Compilation_Unit *compiler) {
@@ -923,7 +936,9 @@ void compile_macro(Compilation_Unit *compiler) {
     make_op(compiler, OP_MACRO, (uint64_t)sym);
     int macro_start = compiler->ops.count;
 
-    sym->as.func.ops.items = compiler->ops.items + compiler->ops.count;
+    sym->as.func.ops.items = &compiler->ops.items;
+    sym->as.func.ops.start = compiler->ops.count;
+
     while (compiler->lexer->cur.type != TOK_END && compiler->lexer->cur.type != TOK_EOF)
         compile_stmt(compiler);
     sym->as.func.ops.count = compiler->ops.count - macro_start;
@@ -944,7 +959,7 @@ void compile_alias(Compilation_Unit *compiler) {
     if (!start_decl(compiler, sym, STYPE_ALIAS, valid)) return;
 
     lexer_next(compiler->lexer);
-    get_type(compiler, &sym->as.alias);
+    get_type(compiler, &sym->as.alias, UTYPE_TYPE);
 }
 
 void compile_attributes(Compilation_Unit *compiler, Attributes *attrs) {
@@ -1158,7 +1173,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
 
         switch (unresolved.type) {
         case UTYPE_OP: {
-            Op *op = &compiler->ops.items[unresolved.as.op];
+            Op *op = &compiler->ops.items[unresolved.as.op.num];
             switch (sym->type) {
             case STYPE_FUNC:
                 op->opcode = sym->as.func.is_c_func ? OP_CCALL : OP_CALL;
@@ -1199,6 +1214,7 @@ void resolve_symbols(Compilation_Unit *compiler) {
             }
             break;
         }
+        case UTYPE_OP_TYPE:
         case UTYPE_TYPE: {
             if (sym->type != STYPE_TYPE && sym->type != STYPE_ALIAS) {
                 compiler->global->had_error = 1;
@@ -1206,10 +1222,13 @@ void resolve_symbols(Compilation_Unit *compiler) {
                         entry->key_len, entry->key);
                 break;
             }
-            if (unresolved.as.type->kind == TYPE_PTR)
-                *unresolved.as.type = PTR_TYPE(ADVANCED_TYPE(sym->as.type->kind, sym->as.type));
+
+            Type *type = unresolved.type == UTYPE_OP_TYPE ? &compiler->ops.items[unresolved.as.op.num].types[unresolved.as.op.type_num]
+                                                          : unresolved.as.type;
+            if (type->kind == TYPE_PTR)
+                *type = PTR_TYPE(ADVANCED_TYPE(sym->as.type->kind, sym->as.type));
             else
-                *unresolved.as.type = ADVANCED_TYPE(sym->as.type->kind, sym->as.type);
+                *type = ADVANCED_TYPE(sym->as.type->kind, sym->as.type);
             break;
         }
         }

@@ -57,7 +57,7 @@ typedef enum {
 } Symbol_Type;
 
 typedef enum {
-    UTYPE_OP, UTYPE_TYPE,
+    UTYPE_OP, UTYPE_OP_TYPE, UTYPE_TYPE,
 } Unresolved_Type;
 
 typedef enum {
@@ -128,7 +128,10 @@ typedef struct {
     Loc loc;
     Unresolved_Type type;
     union {
-        size_t op;
+        struct {
+            size_t num;
+            int type_num;
+        } op;
         Type *type;
     } as;
 } Unresolved_Symbol;
