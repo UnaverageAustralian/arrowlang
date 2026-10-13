@@ -936,9 +936,7 @@ void compile_macro(Compilation_Unit *compiler) {
     make_op(compiler, OP_MACRO, (uint64_t)sym);
     int macro_start = compiler->ops.count;
 
-    sym->as.func.ops.items = &compiler->ops.items;
-    sym->as.func.ops.start = compiler->ops.count;
-
+    sym->as.func.ops.items = compiler->ops.items + compiler->ops.count;
     while (compiler->lexer->cur.type != TOK_END && compiler->lexer->cur.type != TOK_EOF)
         compile_stmt(compiler);
     sym->as.func.ops.count = compiler->ops.count - macro_start;
