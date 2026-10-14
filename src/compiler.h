@@ -143,12 +143,18 @@ typedef struct {
 } Unresolved_Symbols;
 
 typedef struct {
+    size_t start;
+    size_t count;
+    Op **items;
+} Ops_Slice;
+
+typedef struct {
     Types param_types;
     Types return_types;
     String_View name;
     union {
         String_View module_name;
-        Ops ops;
+        Ops_Slice ops;
     };
     int max_allocated;
     uint8_t is_c_func;
@@ -202,6 +208,7 @@ typedef struct {
 
 typedef struct {
     Arena arena;
+    Ops macro_ops;
     Compiler_Options options;
     Hashmap modules;
     String_Array cleanup;

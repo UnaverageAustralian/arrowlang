@@ -11,9 +11,10 @@
 
 #define EPRINTF_AT_OP(op, level, ...) eprintf((op)->file_path, (op)->loc, level, __VA_ARGS__);
 
-inline void init_analyser(Analyser *analyser, Ops *ops) {
+inline void init_analyser(Analyser *analyser, Ops *ops, Ops *macro_ops) {
     *analyser = (Analyser){0};
     analyser->ops = ops;
+    analyser->macro_ops = macro_ops;
 }
 
 static inline Type peek(Analyser *analyser, int count) {
@@ -349,13 +350,14 @@ void type_check_macro(Analyser *analyser) {
         type_check_op(analyser);
 
     int ops_count = analyser->dst.count - macro_start;
-    DA_EXPAND(&analyser->macro_ops, analyser->macro_ops.count + ops_count);
-    memcpy(analyser->macro_ops.items + analyser->macro_ops.count, analyser->dst.items + macro_start, ops_count * sizeof(Op));
+    DA_EXPAND(analyser->macro_ops, analyser->macro_ops->count + ops_count);
+    memcpy(analyser->macro_ops->items + analyser->macro_ops->count, analyser->dst.items + macro_start, ops_count * sizeof(Op));
 
-    analyser->func->ops.items = analyser->macro_ops.items + analyser->macro_ops.count;
+    analyser->func->ops.start = analyser->macro_ops->count;
+    analyser->func->ops.items = &analyser->macro_ops->items;
     analyser->func->ops.count = ops_count;
 
-    analyser->macro_ops.count += ops_count;
+    analyser->macro_ops->count += ops_count;
     analyser->dst.count = macro_start;
 
     exit_func(analyser);
@@ -1008,7 +1010,7 @@ void type_check_op(Analyser *analyser) {
         type_check_call(analyser, macro);
 
         DA_EXPAND(&analyser->dst, analyser->dst.count + macro.ops.count);
-        memcpy(analyser->dst.items + analyser->dst.count, macro.ops.items, macro.ops.count * sizeof(Op));
+        memcpy(analyser->dst.items + analyser->dst.count, *macro.ops.items + macro.ops.start, macro.ops.count * sizeof(Op));
         analyser->dst.count += macro.ops.count;
 
         analyser->pos++;
@@ -1037,9 +1039,9 @@ void type_check_op(Analyser *analyser) {
     analyser->pos++;
 }
 
-int type_check(Ops *ops) {
+int type_check(Ops *ops, Ops *macro_ops) {
     Analyser analyser;
-    init_analyser(&analyser, ops);
+    init_analyser(&analyser, ops, macro_ops);
 
     while (analyser.pos < ops->count)
         type_check_op(&analyser);

@@ -7,9 +7,9 @@ typedef struct {
     Types stack;
     Types expected_types;
     Ops dst;
-    Ops macro_ops;
     Function *func;
     Ops *ops;
+    Ops *macro_ops;
     unsigned block_start;
     unsigned expected_types_start;
     unsigned pos;
@@ -19,6 +19,6 @@ typedef struct {
     uint8_t in_block;
 } Analyser;
 
-int type_check(Ops *ops);
+int type_check(Ops *ops, Ops *macro_ops);
 
 #endif // ARROW_TYPE_CHECKER_H

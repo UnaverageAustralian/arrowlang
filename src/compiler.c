@@ -936,7 +936,9 @@ void compile_macro(Compilation_Unit *compiler) {
     make_op(compiler, OP_MACRO, (uint64_t)sym);
     int macro_start = compiler->ops.count;
 
-    sym->as.func.ops.items = compiler->ops.items + compiler->ops.count;
+    sym->as.func.ops.start = compiler->ops.count;
+    sym->as.func.ops.items = &compiler->ops.items;
+
     while (compiler->lexer->cur.type != TOK_END && compiler->lexer->cur.type != TOK_EOF)
         compile_stmt(compiler);
     sym->as.func.ops.count = compiler->ops.count - macro_start;
@@ -1435,7 +1437,7 @@ Symbol *compile_module(Compiler *global, char *src, const char *file_path) {
     unit.module->status = STATUS_RESOLVED;
 
     if (!global->had_error && !global->options.debug)
-        global->had_error = type_check(&unit.ops);
+        global->had_error = type_check(&unit.ops, &global->macro_ops);
 
     if (!global->had_error && !global->options.debug && !global->options.print_ir) {
         Hash_Entry *main = hashmap_get(&unit.module->symbols, "main", 4);
@@ -1494,6 +1496,8 @@ void compile(Compiler_Options options) {
 
     if (!compiler.options.emit_asm && !compiler.options.debug && !compiler.options.print_ir)
         clean_files(&compiler);
+
     free_arena(&compiler.arena);
+    free(compiler.macro_ops.items);
 }
 
